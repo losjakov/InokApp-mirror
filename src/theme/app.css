@@ -205,10 +205,13 @@ ion-tab-button { position: relative; }
 .crash__code, .crash__line { margin: 0; }
 .crash__line { font-family: monospace; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); overflow-wrap: anywhere; user-select: all; }
 /* D4: the search field lives in the toolbar */
-.toolbar--search ion-searchbar { --background: rgba(255, 255, 255, 0.92); --color: #1a1a1a; --placeholder-color: #555; --icon-color: #555; --clear-button-color: #555; --border-radius: 10px; --box-shadow: none; padding: 0 4px 0 8px; height: 44px; }
-.toolbar--search ion-searchbar .searchbar-input-container { height: 40px; }
+.toolbar--search ion-searchbar { --background: rgba(255, 255, 255, 0.92); --color: #1a1a1a; --placeholder-color: #555; --icon-color: #555; --clear-button-color: #555; --border-radius: 10px; --box-shadow: none; padding: 0 4px 0 8px; min-height: 44px; height: auto; }
+/* NOTE 2 cloud_31: at a large system font the box grows with its text (was a fixed 40 px - the text overflowed it at 200 %); the
+   placeholder that does not fit ends with «…» */
+.toolbar--search ion-searchbar .searchbar-input-container { min-height: 40px; height: auto; }
+.toolbar--search ion-searchbar .searchbar-input { text-overflow: ellipsis; min-height: 40px; height: auto; line-height: 1.25; }
 /* A-28: the placeholder «Пошук монастирів» whole beside the filter button — Ionic md reserves 55 px each side; the icon needs 44, the clear «×» 36 */
-.toolbar--search ion-searchbar.searchbar-left-aligned .searchbar-input { padding-inline-start: 44px; padding-inline-end: 36px; }
+.toolbar--search ion-searchbar.searchbar-left-aligned .searchbar-input { padding-inline-start: calc(28px + 1rem); padding-inline-end: 36px; }
 .toolbar--search ion-searchbar .searchbar-search-icon { inset-inline-start: 12px; }
 .toolbar__search { display: flex; align-items: center; min-width: 0; }
 .toolbar__search ion-searchbar { flex: 1 1 auto; min-width: 0; }
@@ -385,6 +388,7 @@ ion-tab-button { position: relative; }
 .viewer__scroll { flex: 1; overflow: auto; display: flex; align-items: center; touch-action: none; } /* A-96 W-4: at 1x the viewer's own swipes */
 .viewer__scroll--zoomed { touch-action: pan-x pan-y; } /* zoomed: the picture pans natively */
 .viewer__scroll img { display: block; margin: auto; max-width: none; height: auto; }
+.viewer__frame { width: 100%; margin: auto; background: #111; } /* R-49: the one copy on its way - the frame already has the photo's shape */
 .viewer__caption { margin: 0; padding: 8px 16px calc(12px + var(--inok-safe-bottom)); color: #ddd; font-size: var(--inok-type-caption); }
 .viewer__close { position: absolute; top: calc(4px + var(--inok-safe-top)); right: calc(4px + var(--inok-safe-right)); --color: #fff; --background: rgba(0,0,0,.45); --border-radius: 50%;
   width: 48px; height: 48px; }

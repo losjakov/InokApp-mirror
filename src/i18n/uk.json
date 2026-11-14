@@ -208,6 +208,8 @@
   "common.opens_browser": "відкриється в браузері",
   "card.gallery_hint": "Фотогалерея (відкриється на сайті)",
   "card.gallery": "Фотогалерея",
+  "card.gallery_open": "Фотогалерея: переглянути фото",
+  "card.gallery_offline": "Фотогалерея доступна лише з інтернетом",
   "articles.text_smaller": "Зменшити шрифт",
   "articles.text_larger": "Збільшити шрифт",
   "more.contacts": "Контакти",

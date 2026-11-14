@@ -119,12 +119,18 @@ export interface AppConfig {
   live_poll_seconds: number;
   /** R-41 (A-80; window C adds it): `store_links` = the Play listing is public (share + rate shown); absent = false */
   features: { comments_write: boolean; embedded_player: boolean; store_links?: boolean; /** R-44: the server takes `q` / `sort` (A-97 buttons) */ articles_query?: boolean;
-    /** R-48 (A-101): the server takes `sort=views_week|rating` (the sheet's two new orders) */ articles_sort_v2?: boolean };
+    /** R-48 (A-101): the server takes `sort=views_week|rating` (the sheet's two new orders) */ articles_sort_v2?: boolean;
+    /** R-49 (A-109): the server answers `monasteries/<code>/photos` - the card's gallery opens in the app's viewer; absent = 1.0.7's `gallery_url` */ monastery_photos?: boolean };
   donate_url: string;
   privacy_url: string;
   /** R-41: the Play listing's address; absent = the one built from the package id (src/native/play.ts) */
   store_url?: string | null;
 }
+
+/** R-49: one picture file of a card's gallery - https, the file's own size */
+export interface PhotoFile { url: string; w: number; h: number }
+/** R-49 `GET monasteries/<code>/photos`: the card's gallery in the site viewer's order (`count` = `photos.length` = the export's `photo_count`) */
+export interface MonasteryPhotos { code: number; count: number; photos: { thumb: PhotoFile | null; full: PhotoFile; alt: L10n | null }[] }
 
 export interface LiveStatus {
   at: string;

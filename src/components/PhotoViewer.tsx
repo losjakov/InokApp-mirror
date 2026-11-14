@@ -3,11 +3,20 @@ import { chevronBackOutline, chevronForwardOutline, closeOutline } from 'ionicon
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { photoSrc } from '@/native/covers';
 import type { Wait } from '@/data/photos/policy';
+import type { GalleryItem } from '@/data/photos/gallery';
 import { useApp } from '@/state/AppContext';
 
 /** What the viewer shows: the picture as shown in the text (`src`; `shown` = its local copy when the slot already has it), and (a gallery
- *  picture, R-18) the site's full file behind its link. */
-export interface ViewerPhoto { code: string; src: string; shown: string | null; full: string | null; alt: string }
+ *  picture, R-18) the site's full file behind its link. `full` = `src`: the server keeps no reduced copy (R-49 `thumb` null) - the ONE copy
+ *  is fetched as the full file (a manual request, A-20), never twice and never by the WebView behind the pipeline. `w` / `h`: the frame's
+ *  shape before the picture arrives (no jump). */
+export interface ViewerPhoto { code: string; src: string; shown: string | null; full: string | null; alt: string; w?: number | null; h?: number | null }
+/** ONE picture as a set (a cover, a body picture): what a tap on a shown slot opens - also the card's cover offline (A-109). */
+export const onePhoto = (code: number | string, src: string, shown: string | null, alt: string, full: string | null = null): ViewerSet =>
+  ({ at: 0, photos: [{ code: String(code), src, shown, full, alt }] });
+/** A-96 W-4 / A-109: a gallery's items as the viewer's set - ONE mapping for a publication's gallery and a card's (`code` = the photo store key). */
+export const viewerPhotos = (items: GalleryItem[], code: number | string): ViewerPhoto[] =>
+  items.map((x) => ({ code: String(code), src: x.src, shown: null, full: x.full, alt: x.alt, w: x.w, h: x.h }));
 /** A-96 W-4: the viewer opens on `at` of a set - one picture, or a whole site gallery (R-45) to page through. */
 export interface ViewerSet { photos: ViewerPhoto[]; at: number }
 
@@ -32,8 +41,10 @@ export function PhotoViewer({ set, onClose }: { set: ViewerSet | null; onClose: 
   const pk = photo ? `${i}|${photo.src}` : '';
   const [got, setGot] = useState<{ pk: string; thumb?: string; full?: string; why?: Wait } | null>(null);
   const g = got?.pk === pk ? got : null;
+  const one = !!photo?.full && photo.full === photo.src; // R-49: no reduced copy - the full file is the only one
   const thumb = photo?.shown ?? g?.thumb ?? null;
   const full = g?.full ?? null;
+  const ratio = photo?.w && photo.h ? `${photo.w} / ${photo.h}` : undefined;
   const why = g?.why ?? null;
   const [zs, setZs] = useState({ pk: '', z: 1 });
   const zoom = zs.pk === pk ? zs.z : 1;
@@ -46,7 +57,7 @@ export function PhotoViewer({ set, onClose }: { set: ViewerSet | null; onClose: 
     if (!photo) return;
     let on = true;
     const put = (v: { thumb?: string; full?: string; why?: Wait }) => on && setGot((o) => ({ ...(o?.pk === pk ? o : {}), ...v, pk }));
-    if (!photo.shown) void photoSrc(photo.code, photo.src, settings.photos, { small: true }).then((r) => { if (r.src !== null) put({ thumb: r.src }); });
+    if (!photo.shown && photo.full !== photo.src) void photoSrc(photo.code, photo.src, settings.photos, { small: true }).then((r) => { if (r.src !== null) put({ thumb: r.src }); });
     if (photo.full) void photoSrc(photo.code, photo.full, settings.photos, { manual: true }).then((r) => put(r.src !== null ? { full: r.src } : { why: r.why }));
     return () => { on = false; };
   }, [photo, pk, settings.photos]);
@@ -86,8 +97,10 @@ export function PhotoViewer({ set, onClose }: { set: ViewerSet | null; onClose: 
             }}
             onPointerCancel={(e) => { pts.current.delete(e.pointerId); pinch0.current = null; start.current = null; }}
           >
-            <img src={full ?? thumb ?? photo.src} alt={photo.alt} style={{ width: `${zoom * 100}%` }} draggable={false}
-              data-testid="viewer-img" data-full={full ? '1' : '0'} data-index={i} />
+            {(full ?? thumb ?? (one ? null : photo.src))
+              ? <img src={full ?? thumb ?? photo.src} alt={photo.alt} style={{ width: `${zoom * 100}%`, aspectRatio: ratio && `auto ${ratio}` }} draggable={false}
+                  data-testid="viewer-img" data-full={full ? '1' : '0'} data-index={i} />
+              : <div className="viewer__frame" style={{ aspectRatio: ratio ?? '4 / 3' }} role="img" aria-label={photo.alt} data-testid="viewer-wait" data-index={i} />}
           </div>
           {why && <p className="viewer__note" role="status" data-testid="viewer-note">{t(`photos.reason_${why}`)}</p>}
           {photo.alt && <p className="viewer__caption">{photo.alt}</p>}

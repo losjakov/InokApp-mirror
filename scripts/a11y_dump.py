@@ -6,6 +6,9 @@ EVERY actionable node (clickable / long-clickable / checkable) of the app has a 
   python3 -I scripts/a11y_dump.py <dump.xml> <screen>   -> one line «a11y <screen>: actionable=N unnamed=M [bounds of the unnamed]»; exit 1 if M > 0
   python3 -I scripts/a11y_dump.py --self-test
 Only the app's own nodes count (package info.inok.app); the system bars are the system's.
+cloud_33 (REVIEW cloud_32 «seen, not judged»): a dump with NO window of the app (another app's dialog in front - on API 35 TalkBack's own
+«Allow Android Accessibility Suite to send you notifications?», package com.google.android.permissioncontroller) prints «covered by <pkg>»,
+never «actionable=0»: a dump of someone else's window is not a measurement of the app.
 """
 import sys
 import xml.etree.ElementTree as ET
@@ -17,6 +20,12 @@ def named(n):
     if (n.get('text') or '').strip() or (n.get('content-desc') or '').strip():
         return True
     return any(named(c) for c in n)
+
+
+def front(xml_text):
+    """The packages of the windows in the dump (the hierarchy's top nodes), or None when one of them is the app."""
+    tops = {n.get('package') or '?' for n in ET.fromstring(xml_text)}
+    return None if PKG in tops else sorted(tops)
 
 
 def check(xml_text):
@@ -44,6 +53,10 @@ def self_test():
          '</node><node package="com.android.systemui" class="android.widget.ImageView" clickable="true" text="" content-desc=""/></hierarchy>')
     act, un = check(x)
     assert act == 3 and un == ['Button[300,0][348,48]'], (act, un)
+    assert front(x) is None
+    dlg = ('<hierarchy><node package="com.google.android.permissioncontroller" class="android.widget.FrameLayout">'
+           '<node package="com.google.android.permissioncontroller" class="android.widget.Button" clickable="true" text="Allow"/></node></hierarchy>')
+    assert front(dlg) == ['com.google.android.permissioncontroller'] and check(dlg) == (0, []), front(dlg)
     print('a11y_dump self-test: PASS')
 
 
@@ -52,7 +65,11 @@ if __name__ == '__main__':
         self_test()
     elif len(sys.argv) == 3:
         try:
-            act, un = check(open(sys.argv[1], encoding='utf-8', errors='replace').read())
+            text = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+            other = front(text)
+            if other:
+                print(f"a11y {sys.argv[2]}: covered by {','.join(other)}"); sys.exit(3)
+            act, un = check(text)
         except ET.ParseError as e:
             print(f'a11y {sys.argv[2]}: no dump ({e})'); sys.exit(2)
         print(f"a11y {sys.argv[2]}: actionable={act} unnamed={len(un)}{(' ' + ' '.join(un[:8])) if un else ''}")

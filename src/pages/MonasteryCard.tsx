@@ -8,6 +8,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { DirectionsSheet } from '@/components/DirectionsSheet';
 import { CoverImage, LoadAllPhotos, PhotoScope } from '@/components/CoverImage';
+import { onePhoto, PhotoViewer, viewerPhotos, type ViewerSet } from '@/components/PhotoViewer';
+import { cardGallery, galleryInApp } from '@/data/photos/gallery';
 import { HtmlLite } from '@/components/HtmlLite';
 import { Collapsible } from '@/components/Collapsible';
 import { ExternalLinkRow, InfoRow } from '@/components/InfoRow';
@@ -82,8 +84,10 @@ function PlaceLine({ row, wide }: { row: MonasteryRow; wide: boolean }) {
 
 /** One label-over-value row of the card's facts (the site's «Офіційна назва: …», «Телефони: …», «GPS …»). */
 function Detail({ code }: { code: number }) {
-  const { db, t, lang, dict } = useApp();
+  const { db, t, lang, dict, config } = useApp();
   const wide = useWide();
+  const [viewer, setViewer] = useState<ViewerSet | null>(null);
+  const asking = useRef(false);
   const [data, setData] = useState<{ row: MonasteryRow | null; channel: ChannelRow | null; parent: MonasteryRow | null; units: MonasteryListRow[] } | undefined>(undefined);
   const [histLang, setHistLang] = useState<Lang | null>(null);
   const [dirs, setDirs] = useState(false);
@@ -133,6 +137,18 @@ function Detail({ code }: { code: number }) {
   const links: { title: Partial<Record<Lang, string | null>>; url: string }[] = JSON.parse(row.links_json || '[]');
   const pick = (o: Partial<Record<Lang, string | null>>) => field(Object.fromEntries(Object.entries(o).map(([k, v]) => [`t_${k}`, v])), 't', lang);
 
+  // A-98 / A-109: the gallery in THE viewer (A-96) when the server answers R-49; the list is asked on THIS tap, never ahead
+  const inApp = galleryInApp(config) && row.photo_count > 0;
+  const coverUrl = row.cover_large_url ?? row.cover_url;
+  const openGallery = async (cover: string | null) => {
+    if (asking.current) return; // one request per tap
+    asking.current = true;
+    const r = await cardGallery(row.code, name, lang).finally(() => { asking.current = false; });
+    if (r.kind === 'photos') setViewer({ at: 0, photos: viewerPhotos(r.items, row.code) });
+    else if (r.kind === 'offline' && cover === null) toast(t('card.gallery_offline'), { duration: FLASH_MS, testId: 'gallery-offline' }); // A-110, ~2 s as the star's
+    else if (coverUrl) setViewer(onePhoto(row.code, coverUrl, cover, name)); // offline cover / the server has none: the cover alone, as 1.0.7
+  };
+
   const actions: { k: string; icon: string; label: string; on: () => void; testId?: string }[] = [
     ...(firstDial ? [{ k: 'call', icon: callOutline, label: t('card.call_short'), on: () => callPhone(firstDial), testId: 'call' }] : []),
     ...(row.website ? [{ k: 'site', icon: globeOutline, label: t('card.site_short'), on: () => openLink(row.website!, lang) }] : []),
@@ -146,13 +162,17 @@ function Detail({ code }: { code: number }) {
     <PhotoScope>
     <article data-testid="card" ref={root} className="arrows-host">
       <div className="card__cover-wrap">
-        <CoverImage code={row.code} url={row.cover_large_url ?? row.cover_url} alt={name} className="card__cover" full openable onShown={setCoverShown} />
-        {/* A-23 #6: a button that says where it leads (the site's gallery) — only over a cover that is really shown */}
-        {coverShown && row.gallery_url && row.photo_count > 0 && (
-          <button type="button" className="over-photo card__photos" onClick={() => openLink(row.gallery_url!, lang)} aria-label={t('card.gallery_hint')} data-testid="gallery">
-            <IonIcon icon={imagesOutline} aria-hidden="true" /><span>{t('card.gallery')}</span><IonIcon icon={openOutline} aria-hidden="true" />
+        <CoverImage code={row.code} url={coverUrl} alt={name} className="card__cover" full onShown={setCoverShown}
+          openable={inApp ? { open: (shown) => void openGallery(shown), label: t('card.gallery_open') } : true} />
+        {/* A-23 #6: only over a cover that is really shown. A-109: in the app's viewer (no «opens outside» sign; no thumbnail grid on the
+            card - the photos appear only in the viewer); a server without R-49 = 1.0.7's site gallery, the sign kept */}
+        {coverShown && row.photo_count > 0 && (inApp || row.gallery_url) && (
+          <button type="button" className="over-photo card__photos" onClick={() => (inApp ? void openGallery(null) : openLink(row.gallery_url!, lang))}
+            aria-label={t(inApp ? 'card.gallery_open' : 'card.gallery_hint')} data-testid="gallery" data-in-app={inApp ? '1' : '0'}>
+            <IonIcon icon={imagesOutline} aria-hidden="true" /><span>{t('card.gallery')}</span>{!inApp && <IonIcon icon={openOutline} aria-hidden="true" />}
           </button>
         )}
+        <PhotoViewer set={viewer} onClose={() => setViewer(null)} />
       </div>
       {/* D49: on ≥600 dp (no toolbar of its own) the star sits at the end of the title row — the cover carries only the open sign and «Фотогалерея» */}
       <div className="card__title-row"><h1 className="card__title">{name}</h1>{wide && <FavButton code={row.code} />}</div>

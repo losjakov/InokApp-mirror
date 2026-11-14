@@ -40,6 +40,7 @@ jobs:
       INOK_SUMMARY: /tmp/inok-ci/summary.md
     steps:
       - uses: actions/checkout@v7
+        with: { fetch-depth: 50 } # REVIEW cloud_32 NOTE 1: the snapshot is named after the newest commit that changed a listed path
       - name: Facts - which repository and event run this (A-104 split)
         env: { EXPR_PRIVATE: '${{ github.event.repository.private }}', MIRROR_LIVE: '${{ vars.MIRROR_LIVE }}' }
         run: python3 -I scripts/ci_infra.py facts

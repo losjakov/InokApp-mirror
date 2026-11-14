@@ -208,6 +208,8 @@
   "common.opens_browser": "opens in the browser",
   "card.gallery_hint": "Photo gallery (opens on the website)",
   "card.gallery": "Photo gallery",
+  "card.gallery_open": "Photo gallery: view the photos",
+  "card.gallery_offline": "The photo gallery needs an internet connection",
   "articles.text_smaller": "Smaller text",
   "articles.text_larger": "Larger text",
   "more.contacts": "Contact us",

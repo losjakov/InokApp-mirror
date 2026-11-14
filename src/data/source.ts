@@ -1,6 +1,6 @@
 import { ApiError, apiBytes, apiJson, readJson } from './api/client';
 import { decodeExport, manifestFile } from './api/exportLoader';
-import type { AppConfig, Article, ArticlesPage, Comments, Directory, LiveStatus, Manifest, RatingAnswer, ReportAnswer, ViewsAnswer, VoteAnswer, VoteValue } from './api/types';
+import type { AppConfig, Article, ArticlesPage, Comments, Directory, LiveStatus, Manifest, MonasteryPhotos, RatingAnswer, ReportAnswer, ViewsAnswer, VoteAnswer, VoteValue } from './api/types';
 import type { Lang } from '@/i18n';
 import { isNative } from '@/native/platform';
 import { sortArticles, type ArticleSort } from '@/data/repo/articleOrder';
@@ -30,6 +30,8 @@ export type DataSource = {
   views(path: string): Promise<ViewsAnswer>;
   /** R-38: ONE view of that page (202, the same whether counted or not) */
   view(path: string, body: { token: string; install_id: string; integrity_token?: string }): Promise<ReportAnswer>;
+  /** R-49 (A-109): a card's gallery, asked on a tap only (online); 404 = unknown / inactive card */
+  monasteryPhotos(code: number): Promise<MonasteryPhotos>;
 };
 
 export type ArticleKind = 'publication' | 'video' | 'news';
@@ -80,6 +82,7 @@ const live: DataSource = {
   report: (id, cid, body) => apiJson<ReportAnswer>(`articles/${id}/comments/${cid}/report`, { method: 'POST', body }),
   views: (path) => apiJson<ViewsAnswer>(path),
   view: (path, body) => apiJson<ReportAnswer>(path, { method: 'POST', body }),
+  monasteryPhotos: (code) => apiJson<MonasteryPhotos>(`monasteries/${code}/photos`),
   async rate(id, body) {
     try {
       return await apiJson<RatingAnswer>(`articles/${id}/rating`, { method: 'POST', body });
@@ -113,7 +116,7 @@ const fixtures: DataSource = {
     map_style_url: 'https://tiles.openfreemap.org/styles/liberty',
     export_poll_hours: 24,
     live_poll_seconds: 120,
-    features: { comments_write: false, embedded_player: false, articles_query: true, articles_sort_v2: true }, // R-44: live 13.11.2026; R-48: 14.11
+    features: { comments_write: false, embedded_player: false, articles_query: true, articles_sort_v2: true, monastery_photos: true }, // R-44: live 13.11.2026; R-48 + R-49: 14.11
     donate_url: 'https://inok.info/donate/',
     privacy_url: 'https://inok.info/app/privacy/',
     ...(globalThis as { __inokConfig?: object }).__inokConfig, // a screen's stand-in for the site's answer (R-41's switch)
@@ -164,6 +167,13 @@ const fixtures: DataSource = {
     return { views: all[path] ?? null, token: 'fixture.dwell', gi, gn };
   },
   view: async (path) => { await fx<unknown>(`views.json?view=${encodeURIComponent(path)}`); return { ok: true }; },
+  // fixtures/monastery_photos.json: the live R-49 answers of 242 (40), 16 / 275 (one), 47 (none), 14.11.2026, keyed by code; any other
+  // code = 404 as the server answers an unknown card (`?code=` lets a screen count / refuse the request)
+  async monasteryPhotos(code) {
+    const a = (await fx<Record<string, MonasteryPhotos>>(`monastery_photos.json?code=${code}`))[String(code)];
+    if (!a) throw new ApiError(404, 'not_found');
+    return a;
+  },
 };
 
 export const dataSource = (): DataSource => (mode() === 'live' ? live : fixtures);

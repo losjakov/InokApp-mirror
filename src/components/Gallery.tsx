@@ -1,10 +1,8 @@
 import { useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { useApp } from '@/state/AppContext';
+import type { GalleryItem } from '@/data/photos/gallery';
 import { CoverImage } from './CoverImage';
-import { PhotoViewer, type ViewerSet } from './PhotoViewer';
-
-/** One picture of a site gallery (R-45): the reduced copy the page shows, its own size, and the full file behind its link. */
-export interface GalleryItem { src: string; full: string | null; w: number | null; h: number | null; alt: string }
+import { PhotoViewer, viewerPhotos, type ViewerSet } from './PhotoViewer';
 
 /** The cell = the widest thumbnail's own width (never upscaled, A-96 W-4 (a)); a gallery without sizes uses the site's 150. */
 export const galleryCell = (items: GalleryItem[]): number => Math.max(...items.map((x) => x.w ?? 0), 0) || 150;
@@ -18,7 +16,7 @@ export const galleryCell = (items: GalleryItem[]): number => Math.max(...items.m
 export function Gallery({ items, photoKey }: { items: GalleryItem[]; photoKey: string }) {
   const { t } = useApp();
   const [set, setSet] = useState<ViewerSet | null>(null);
-  const photos = useMemo(() => items.map((x) => ({ code: photoKey, src: x.src, shown: null, full: x.full, alt: x.alt })), [items, photoKey]);
+  const photos = useMemo(() => viewerPhotos(items, photoKey), [items, photoKey]);
   const open = useCallback((at: number, shown: string) => setSet({ at, photos: photos.map((p, k) => (k === at ? { ...p, shown } : p)) }), [photos]);
   const style = { '--gallery-cell': `${galleryCell(items)}px` } as CSSProperties;
   return (

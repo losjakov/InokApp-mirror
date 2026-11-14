@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { photoSrc, type PhotoResult } from '@/native/covers';
 import { onNetChange } from '@/native/network';
 import { useApp } from '@/state/AppContext';
-import { PhotoViewer, type ViewerPhoto, type ViewerSet } from './PhotoViewer';
+import { onePhoto, PhotoViewer, type ViewerSet } from './PhotoViewer';
 import { scrollRoot } from './SplitContent';
 
 /**
@@ -103,7 +103,7 @@ export function CoverImage({ code, url, alt, className, version, small, full, fa
     <div ref={ref} className={className} style={ratio ? { aspectRatio: String(ratio) } : undefined}>
       {res?.src ? (openable
         ? <button type="button" className="photo-open" onClick={() => (typeof openable === 'object' && 'open' in openable ? openable.open(res.src!)
-            : setViewer({ at: 0, photos: [{ code: String(code), src: url!, shown: res.src!, full: openable === true ? null : openable.full, alt } satisfies ViewerPhoto] }))}
+            : setViewer(onePhoto(code, url!, res.src!, alt, openable === true ? null : openable.full)))}
             aria-label={typeof openable === 'object' && 'open' in openable ? openable.label : alt ? `${t('photos.open')}: ${alt}` : t('photos.open')} data-testid="photo-open">
             <img src={res.src} alt={alt} loading="lazy" onError={() => setRes(null)} />
             <span className="over-photo photo-open__hint" aria-hidden="true"><IonIcon icon={expandOutline} aria-hidden="true" /></span></button>

@@ -129,29 +129,36 @@ a11y_dumps() {
   A11Y=n/a; [ "${API%%-*}" -ge 35 ] || return 0
   local tb svc=com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService
   if adb shell pm list packages 2>/dev/null | grep -q 'com.google.android.marvin.talkback'; then
+    # cloud_33: on API 33+ TalkBack asks for POST_NOTIFICATIONS the moment it starts - that system dialog covered every page after Home
+    # (cloud_32 runs: «0/0» = the dialog's dump). Granted first, so the dumps see the app.
+    adb shell pm grant com.google.android.marvin.talkback android.permission.POST_NOTIFICATIONS 2>/dev/null || true
     adb shell settings put secure enabled_accessibility_services "$svc" || true; adb shell settings put secure accessibility_enabled 1 || true; tb=on; sleep 3
   else tb="absent-on-image"; fi
   adb shell am start -n $PKG/.MainActivity > /dev/null || true; sleep 6
   A11Y="talkback=$tb"
   # cloud_30 (A-95): + the 1.0.6 screens - the gallery viewer, the search header, the sort sheet, «Ще» (incognito), the monasteries' strip
-  for spec in home:/home streams:/streams card:/monasteries/37 article:/articles viewer:/articles?id=1714 search:/articles sort:/articles more:/more monasteries:/monasteries; do
+  # cloud_33 (1.0.8, A-109): + the card's gallery - the viewer opened from the card 242's «Фотогалерея» (its cover loaded by hand on a metered emulator)
+  for spec in home:/home streams:/streams card:/monasteries/37 article:/articles viewer:/articles?id=1714 search:/articles sort:/articles more:/more monasteries:/monasteries cardgallery:/monasteries/242; do
     local name=${spec%%:*} path=${spec#*:} after=''
     node "$ROOT/scripts/emu_nav.mjs" go "$path" >> "$OUT/nav.txt" 2>&1 || true; sleep 5
     [ "$name" = article ] && { node "$ROOT/scripts/emu_nav.mjs" click '[data-testid^="arow-"]' >> "$OUT/nav.txt" 2>&1 || true; sleep 5; }
     [ "$name" = viewer ] && { node "$ROOT/scripts/emu_nav.mjs" click '[data-testid="gallery-grid"] [data-testid="photo-open"]' >> "$OUT/nav.txt" 2>&1 || true; sleep 5; after=back; }
     [ "$name" = search ] && { node "$ROOT/scripts/emu_nav.mjs" click '[data-testid="search-open"]' >> "$OUT/nav.txt" 2>&1 || true; sleep 3; after=clear; }
+    [ "$name" = cardgallery ] && { node "$ROOT/scripts/emu_nav.mjs" click '[data-testid="card"] [data-testid="photo-load"]' >> "$OUT/nav.txt" 2>&1 || true; sleep 6
+      node "$ROOT/scripts/emu_nav.mjs" click '[data-testid="card"] [data-testid="gallery"]' >> "$OUT/nav.txt" 2>&1 || true; sleep 6; after=back; }
     [ "$name" = sort ] && { node "$ROOT/scripts/emu_nav.mjs" click '[data-testid="sort-open"]' >> "$OUT/nav.txt" 2>&1 || true; sleep 3; after=back; }
     adb shell uiautomator dump /sdcard/a11y.xml > /dev/null 2>&1 || true
     adb exec-out cat /sdcard/a11y.xml > "$OUT/a11y_$name.xml" 2>/dev/null || true
     shot "$OUT/a11y_$name.png"
     local line; line=$(python3 -I "$ROOT/scripts/a11y_dump.py" "$OUT/a11y_$name.xml" "$name" || true)
     echo "$line" | tee -a "$OUT/a11y.txt"
-    A11Y="$A11Y $name:$( (echo "$line" | grep -oE 'actionable=[0-9]+ unnamed=[0-9]+' || echo 'no-dump') | sed 's/actionable=//; s/ unnamed=/\//')"
+    A11Y="$A11Y $name:$( (echo "$line" | grep -oE 'actionable=[0-9]+ unnamed=[0-9]+|covered by [^ ]+' || echo 'no-dump') | sed 's/actionable=//; s/ unnamed=/\//; s/covered by /covered:/')"
     [ "$after" = back ] && { adb shell input keyevent 4; sleep 2; }
     [ "$after" = clear ] && { node "$ROOT/scripts/emu_nav.mjs" click '[data-testid="articles-search"] .searchbar-clear-button' >> "$OUT/nav.txt" 2>&1 || true; sleep 2; }
   done
   if [ "$tb" = on ]; then adb shell settings delete secure enabled_accessibility_services || true; adb shell settings put secure accessibility_enabled 0 || true; fi
   echo "a11y (TalkBack tree): $A11Y" | tee -a "$OUT/a11y.txt"
+  grep -q 'covered by' "$OUT/a11y.txt" && echo "::warning::API $API: A-88 a page was covered by another app's window - its dump is not the app's ($OUT/a11y.txt)" || true
   grep -q 'unnamed=[1-9]' "$OUT/a11y.txt" && echo "::warning::API $API: A-88 actionable nodes without a name - $OUT/a11y.txt" || true
 }
 notify_proof() {
@@ -345,6 +352,15 @@ if [ "$WV" -ge "$FLOOR" ]; then
   V2=$(ev "[...document.querySelectorAll('.ion-page:not(.ion-page-hidden) [data-testid=article-video]')].map((b)=>b.dataset.host).join(',')+'|read='+document.querySelectorAll('.ion-page:not(.ion-page-hidden) [data-testid=read-site]').length+'|body='+document.querySelectorAll('.ion-page:not(.ion-page-hidden) .aview__body').length")
   shot "$OUT/v107_video_youtube.png"
   echo "v107 1682=$V1 1892=$V2 sort_options=$S2" | tee "$OUT/v107.txt"
+  # cloud_33 (1.0.8, A-109 / R-49), NOT gating (the browser ring gates): the live card 242 -> its cover loaded by hand when the network is
+  # metered -> «Фотогалерея» = the app's viewer «1 / 40» with the FULL file of photo 1 (the live list asked on the tap) -> Back closes it
+  nav go '/monasteries/242'; sleep 8; nav click '[data-testid="card"] [data-testid="photo-load"]'; sleep 6
+  nav wait '[data-testid="card"] [data-testid="gallery"]'; P0=$(ev "(document.querySelector('[data-testid=card] [data-testid=gallery]')||{}).dataset?.inApp||'none'")
+  nav click '[data-testid="card"] [data-testid="gallery"]'; sleep 8
+  P1=$(ev "(document.querySelector('[data-testid=viewer-count]')||{}).textContent||'none'"); P2=$(ev "(document.querySelector('[data-testid=viewer-img]')||{}).dataset?.full||'none'")
+  shot "$OUT/v108_card_gallery.png"; adb shell input keyevent 4; sleep 3
+  P3=$(ev "document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed'")
+  echo "v108 in_app=$P0 viewer=$P1 full=$P2 back=$P3" | tee "$OUT/v108.txt"
   # owner 01.11 (after cloud_05): system Back on «Ще» did nothing. Now: tab root → «Головна»; Back on «Головна» folds the app
   adb shell input tap 288 615; sleep 3; adb shell input keyevent 4; sleep 3
   shot "$OUT/back_from_more.png"

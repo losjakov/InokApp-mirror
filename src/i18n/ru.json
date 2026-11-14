@@ -208,6 +208,8 @@
   "common.opens_browser": "откроется в браузере",
   "card.gallery_hint": "Фотогалерея (откроется на сайте)",
   "card.gallery": "Фотогалерея",
+  "card.gallery_open": "Фотогалерея: посмотреть фото",
+  "card.gallery_offline": "Фотогалерея доступна только с интернетом",
   "articles.text_smaller": "Уменьшить шрифт",
   "articles.text_larger": "Увеличить шрифт",
   "more.contacts": "Контакты",

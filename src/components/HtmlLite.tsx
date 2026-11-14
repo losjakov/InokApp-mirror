@@ -2,7 +2,8 @@ import { Fragment, createElement, useMemo, type ReactNode } from 'react';
 import { useFollowLink } from '@/app/links';
 import { absoluteHref, isSitePicture } from '@/data/links/router';
 import { CoverImage } from './CoverImage';
-import { Gallery, type GalleryItem } from './Gallery';
+import type { GalleryItem } from '@/data/photos/gallery';
+import { Gallery } from './Gallery';
 
 const ALLOWED = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'SUP', 'UL', 'OL', 'LI', 'A', 'IMG', 'H2', 'H3', 'H4', 'H5']); // U: the calendar's week line (R-24); H2-H5: R-33
 /** R-37: `class="al-r"` / `"al-c"` on p, li, h2-h5 = the page's right / centred text (theme/app.css: one rule for bodies and histories). */

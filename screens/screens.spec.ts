@@ -541,6 +541,15 @@ const bannerContrast = async (p: Page, id: string) => {
   }
 };
 const UK = ['phone-light', 'phone-dark', 'tablet'];
+/** A-109 (R-49): every request of a card's gallery - the list (`monastery_photos.json?code=`) and the gallery files (`/images/monasteries/<code>/<file>`;
+ *  the covers live under `og_img/` / `medium/` and are not counted) - recorded from the page's first request */
+const galleryReqs = new WeakMap<Page, { list: string[]; photos: string[] }>();
+const countGallery = async (p: Page) => {
+  const r = { list: [] as string[], photos: [] as string[] }; galleryReqs.set(p, r);
+  p.on('request', (q) => { const u = q.url(); if (u.includes('monastery_photos.json')) r.list.push(u); else { const m = /\/images\/monasteries\/(\d+\/[^/]+)$/.exec(u); if (m) r.photos.push(m[1]); } });
+};
+const gallery = (p: Page) => galleryReqs.get(p)!;
+const viewerGone = (p: Page) => expect(p.locator('ion-modal.viewer')).toHaveCount(0, { timeout: 5000 }).catch(async () => expect(p.locator('ion-modal.viewer:not(.overlay-hidden)')).toHaveCount(0));
 
 /** A-55 (A-54 withdrawn): NO row in `scope` carries a lead line - each label holds only the title, the subtitle, «kind · date» and the badges line
  *  (cloud_19's row); every line stays inside the row (cloud_20 200 %: a long word wraps, never runs off the edge). Returns the NEWS rows checked. */
@@ -905,7 +914,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('count').locator('visible=true')).toContainText('138');
       await p.locator('[data-testid="list"] [data-testid^="mrow-"]').first().scrollIntoViewIfNeeded();
     } },
-  { name: 'monastery', path: '/monasteries/37', ready: async (p) => { await expect(p.getByTestId('card')).toBeVisible(); await expect(p.getByTestId('call')).toBeVisible(); await expect(p.getByTestId('gallery')).toContainText(/Фотогалерея|Photo gallery/); await expect(p.getByTestId('gallery')).toHaveAttribute('aria-label', /сайті|сайте|website/); await expect(p.getByTestId('gps')).toContainText('50.320787'); await expect(p.getByTestId('links')).toBeVisible(); await cardOrder(p);
+  { name: 'monastery', path: '/monasteries/37', ready: async (p) => { await expect(p.getByTestId('card')).toBeVisible(); await expect(p.getByTestId('call')).toBeVisible(); await expect(p.getByTestId('gallery')).toContainText(/Фотогалерея|Photo gallery/); await expect(p.getByTestId('gallery')).toHaveAttribute('aria-label', /Фотогалерея: переглянути|Фотогалерея: посмотреть|Photo gallery: view/); await expect(p.getByTestId('gps')).toContainText('50.320787'); await expect(p.getByTestId('links')).toBeVisible(); await cardOrder(p);
       // D24: no label breaks inside a word — each word of a label sits on ONE line (its glyph boxes share a top), nothing overflows
       const split = await p.locator('.actions__btn span').evaluateAll((es) => es.flatMap((e) => {
         const t = e.firstChild as Text; const out: string[] = []; let i = 0;
@@ -1025,6 +1034,89 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('division-of')).toContainText(/Є канонічним підрозділом \(скит\) обителі|Является каноническим подразделением \(скит\) обители/);
       await expect(p.getByTestId('division-of')).toContainText(/Святогірська Успенська Лавра|Святогорская Успенская Лавра/);
       await p.getByTestId('division-of').scrollIntoViewIfNeeded();
+    } },
+  // A-98 / A-109 (R-49): the card shows the button WITHOUT the «opens outside» sign and NO thumbnail grid; nothing of the gallery is asked
+  // or fetched until a tap (the list, the files: 0 requests while the card is open)
+  { name: 'card', only: UK, path: '/monasteries/242', before: countGallery, ready: async (p) => {
+      const card = onShown(p, 'card');
+      const btn = card.getByTestId('gallery');
+      await expect(btn).toBeVisible({ timeout: 15_000 });
+      await expect(btn).toHaveAttribute('data-in-app', '1');
+      await expect(btn.locator('ion-icon')).toHaveCount(1); // the pictures sign only; openOutline gone (it leads nowhere outside now)
+      await expect.poll(() => spokenName(btn)).toBe((await words(p, ['card.gallery_open']))[0]);
+      await expect(card.getByTestId('gallery-grid')).toHaveCount(0);
+      await expect(card.locator('[data-testid="photo-open"]')).toHaveAttribute('aria-label', (await words(p, ['card.gallery_open']))[0]);
+      await p.waitForTimeout(1500); // the card's own requests (views, related, covers) are over
+      expect(gallery(p), 'A-109: no gallery request before a tap').toEqual({ list: [], photos: [] });
+    } },
+  // A-109: «Фотогалерея» and a tap on the cover open THE viewer (A-96) with ALL the card's photos from photos[0]: «1 / 40», the full file of the
+  // SHOWN photo only (thumb null = it is the one copy), the card's name as the caption (alt null); the list asked ONCE per launch
+  { name: 'card-gallery', only: [...UK, 'phone-ru'], path: '/monasteries/242', before: countGallery, ready: async (p) => {
+      const card = onShown(p, 'card');
+      await expect(card.getByTestId('gallery')).toHaveAttribute('data-in-app', '1', { timeout: 15_000 }); // the config has arrived (else 1.0.7's site link)
+      await card.getByTestId('gallery').click();
+      const img = p.getByTestId('viewer-img');
+      await expect(p.getByTestId('viewer-count')).toContainText('1 / 40');
+      await expect(img).toHaveAttribute('src', /\/monasteries\/242\/00\.jpg$/);
+      await expect(img).toHaveAttribute('data-full', '1');
+      await expect(p.locator('.viewer__caption')).toHaveText((await card.locator('.card__title').textContent())!);
+      expect(gallery(p).list).toHaveLength(1);
+      expect(gallery(p).photos, 'only the shown photo (no neighbour ahead)').toEqual(['242/00.jpg']);
+      await p.getByTestId('viewer-next').click();
+      await expect(p.getByTestId('viewer-count')).toContainText('2 / 40');
+      await expect(img).toHaveAttribute('src', /\/242\/01\.jpg$/);
+      expect(gallery(p).photos.filter((x) => x !== '242/00.jpg'), 'paging fetches the new current photo only').toEqual(['242/01.jpg']);
+      await p.getByTestId('viewer-close').click();
+      await viewerGone(p);
+      // the cover itself: the same gallery at its first photo, the held list (no second request)
+      await card.locator('[data-testid="photo-open"]').click();
+      await expect(p.getByTestId('viewer-count')).toContainText('1 / 40');
+      await expect(img).toHaveAttribute('src', /\/242\/00\.jpg$/);
+      expect(gallery(p).list, 'the list held for this launch').toHaveLength(1);
+      await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
+    } },
+  // A-109: a card with ONE photo (275, the live answer): the viewer shows it with no counter and no arrows (nothing to page)
+  { name: 'card-gallery-one', only: ['phone-light'], path: '/monasteries/275', before: countGallery, ready: async (p) => {
+      const card = onShown(p, 'card');
+      await expect(card.getByTestId('gallery')).toHaveAttribute('data-in-app', '1', { timeout: 15_000 });
+      await card.getByTestId('gallery').click();
+      await expect(p.getByTestId('viewer-img')).toHaveAttribute('src', /\/monasteries\/275\/00\.JPG$/);
+      await expect(p.getByTestId('viewer-count')).toHaveCount(0);
+      await expect(p.getByTestId('viewer-next')).toHaveCount(0);
+      expect(gallery(p)).toEqual({ list: [gallery(p).list[0]], photos: ['275/00.JPG'] });
+      await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
+    } },
+  // A-109 / A-110: offline the cover opens the cover alone (as 1.0.7) and «Фотогалерея» = the short message (~2 s, the star's way), no request
+  { name: 'card-gallery-offline', only: UK, path: '/monasteries/242', before: countGallery, ready: async (p) => {
+      const card = onShown(p, 'card');
+      await expect(card.getByTestId('gallery')).toHaveAttribute('data-in-app', '1', { timeout: 15_000 }); // the config has arrived (else 1.0.7's site link)
+      await p.evaluate(() => localStorage.setItem('inok.net', JSON.stringify({ connected: false, metered: false, dataSaver: false })));
+      await card.locator('[data-testid="photo-open"]').click();
+      await expect(p.getByTestId('viewer-img')).toHaveAttribute('src', /og_img\/242\.jpg$/);
+      await expect(p.getByTestId('viewer-count')).toHaveCount(0); // one picture
+      await p.getByTestId('viewer-close').click();
+      await viewerGone(p);
+      const toasts = p.locator('ion-toast[data-testid="gallery-offline"]:not(.overlay-hidden)');
+      await card.getByTestId('gallery').click();
+      await expect(toasts).toHaveCount(1);
+      await expect(toasts.first()).toContainText((await words(p, ['card.gallery_offline']))[0]);
+      await toastAboveTabs(p, 'ion-toast[data-testid="gallery-offline"]:not(.overlay-hidden)'); // D73
+      await expect(toasts).toHaveCount(0, { timeout: 4000 }); // gone after ~2 s
+      await expect(card.getByTestId('gallery')).toBeVisible(); // the button stays
+      await card.getByTestId('gallery').click(); // the shot: the message above the tab bar
+      await expect(toasts.first()).toContainText((await words(p, ['card.gallery_offline']))[0]);
+      expect(gallery(p), 'offline: no request of the gallery').toEqual({ list: [], photos: [] });
+      await expect(p.locator('ion-modal.viewer:not(.overlay-hidden)')).toHaveCount(0);
+    } },
+  // P1: a server WITHOUT `features.monastery_photos` = 1.0.7: the button opens the site's gallery (`gallery_url`), its «outside» sign kept
+  { name: 'card-gallery-site', only: ['phone-light'], path: '/monasteries/242', before: async (p) => { await countGallery(p); await recordOpens(p);
+      await p.addInitScript(() => { (window as any).__inokConfig = { features: { comments_write: false, embedded_player: false, articles_query: true, articles_sort_v2: true } }; }); }, ready: async (p) => {
+      const btn = onShown(p, 'card').getByTestId('gallery');
+      await expect(btn).toHaveAttribute('data-in-app', '0', { timeout: 15_000 });
+      await expect(btn.locator('ion-icon')).toHaveCount(2);
+      await expect(btn).toHaveAttribute('aria-label', (await words(p, ['card.gallery_hint']))[0]);
+      expect(await opened(p, 'gallery')).toMatch(/^https:\/\/inok\.info\/monasteries\/242\/\?gallery=Y/);
+      expect(gallery(p).list).toEqual([]);
     } },
   { name: 'monastery-favourite', path: '/monasteries/37', ready: async (p) => {
       await expect(p.getByTestId('card')).toBeVisible();

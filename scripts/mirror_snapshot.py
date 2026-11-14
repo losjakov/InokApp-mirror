@@ -185,9 +185,25 @@ def check_matrix(value):
     return json.dumps(m, separators=(',', ':'))
 
 
+def source_commit(rev='HEAD', cwd=ROOT):
+    """REVIEW cloud_32 NOTE 1: the commit a snapshot of `rev` is named after = the NEWEST commit up to `rev` that changed a listed path
+    (its listed files = the snapshot's). A push of a code commit = that commit; a dispatch on a docs commit (CD's, his words in the
+    subject) = the code commit below it, so a private docs subject never reaches the mirror and §3.1's «the snapshot names the release
+    commit» holds. Needs the history (mirror.yml checks out 50 commits); none found = `rev` itself."""
+    allow = read_list(git('show', f'{rev}:{LIST}', cwd=cwd).stdout.decode('utf-8'))
+    out = git('log', '-1', '--format=%H%x1f%s', rev, '--', *allow, cwd=cwd).stdout.decode().strip()
+    if not out:
+        out = git('log', '-1', '--format=%H%x1f%s', rev, cwd=cwd).stdout.decode().strip()
+    sha, subject = out.split('\x1f', 1)
+    return sha, subject
+
+
 def publish(snap, remote, matrix=None, orphan=False, src=None, subject=None, run_id=None):
     """Returns (main tip, committed?, emulator tip or None)."""
-    sha = src or git('rev-parse', 'HEAD').stdout.decode().strip()
+    if src is None:
+        src, named = source_commit()
+        subject = named if subject is None else subject
+    sha = src
     subject = subject if subject is not None else git('log', '-1', '--format=%s', sha).stdout.decode().strip()
     run_id = run_id or os.environ.get('GITHUB_RUN_ID', 'local')
     m = check_matrix(matrix)
@@ -197,7 +213,7 @@ def publish(snap, remote, matrix=None, orphan=False, src=None, subject=None, run
     try:
         git('init', '-q', '-b', 'main', w, cwd=snap)
         os.makedirs(os.path.join(w, '.git', 'info'), exist_ok=True)
-        with open(os.path.join(w, '.git', 'info', 'attributes'), 'w') as h:
+        with open(os.path.join(w, '.git', 'info', 'attributes'), 'w', newline='\n') as h:
             h.write('* -text -filter\n')  # the snapshot's bytes = git's blobs; no eol / filter rewrite on the way back in
         heads = git('ls-remote', '--heads', remote, 'main', cwd=w)
         has_main = bool(heads.stdout.strip())
@@ -217,7 +233,7 @@ def publish(snap, remote, matrix=None, orphan=False, src=None, subject=None, run
         emu = None
         if m:
             os.makedirs(os.path.join(w, '.ci'), exist_ok=True)
-            with open(os.path.join(w, *MATRIX_FILE.split('/')), 'w') as h:
+            with open(os.path.join(w, *MATRIX_FILE.split('/')), 'w', newline='\n') as h:  # NOTE 2 cloud_32: no CRLF on Windows
                 h.write(m + '\n')
             git('add', '-f', MATRIX_FILE, cwd=w)
             git(*BOT, 'commit', '-q', '-m', f'emulator {sha[:7]} (run {run_id}): {m}', cwd=w)
@@ -288,6 +304,23 @@ def self_test():
         assert e4 != e3 and git('show', f'emulator:{MATRIX_FILE}', cwd=bare).stdout == b'standard\n', 'the same request must start a new run'
         publish(d, bare, orphan=True, src='d' * 40, subject='wipe', run_id='5')
         assert count('main') == 1 and git('log', '-1', '--format=%s', 'main', cwd=bare).stdout.decode().strip() == 'snapshot ddddddd: wipe'
+        # 4b. NOTE 1 cloud_32: the name of a snapshot = the newest commit that changed a listed path, never a docs commit on top
+        r = os.path.join(t, 'named')
+        git('init', '-q', '-b', 'main', r, cwd=t)
+        def commit(path, body, msg):
+            f = os.path.join(r, *path.split('/'))
+            os.makedirs(os.path.dirname(f), exist_ok=True)
+            open(f, 'wb').write(body)
+            git('add', '-A', cwd=r)
+            git(*BOT, 'commit', '-q', '-m', msg, cwd=r)
+            return git('rev-parse', 'HEAD', cwd=r).stdout.decode().strip()
+        commit(LIST, b'src/\n' + LIST.encode() + b'\n', 'list')
+        code = commit('src/a.ts', b'1', 'code: the release')
+        commit('ref/x.md', b'his words', 'docs: his words')
+        assert source_commit('HEAD', r) == (code, 'code: the release'), source_commit('HEAD', r)
+        assert source_commit(code, r) == (code, 'code: the release')
+        # NOTE 2: the matrix file is LF on every OS (the request above compared b'standard\n')
+        assert b'\r' not in git('show', f'emulator:{MATRIX_FILE}', cwd=bare).stdout
         # 5. the matrix input
         assert check_matrix('') is None and check_matrix(' standard ') == 'standard'
         assert check_matrix('[{"api-level": 35, "target": "google_apis", "tag": "r1"}]') == '[{"api-level":35,"target":"google_apis","tag":"r1"}]'
@@ -297,7 +330,7 @@ def self_test():
                 raise AssertionError(f'matrix accepted: {bad}')
             except SystemExit:
                 pass
-        print(f'mirror_snapshot self-test: PASS ({len(plants)} planted files RED, HEAD snapshot {n} files green, publish x5 on a bare repo)')
+        print(f'mirror_snapshot self-test: PASS ({len(plants)} planted files RED, HEAD snapshot {n} files green, publish x5 on a bare repo, the snapshot named after the newest listed-path commit)')
     finally:
         shutil.rmtree(t, ignore_errors=True)
 
