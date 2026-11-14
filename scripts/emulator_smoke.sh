@@ -129,9 +129,9 @@ a11y_dumps() {
   A11Y=n/a; [ "${API%%-*}" -ge 35 ] || return 0
   local tb svc=com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService
   if adb shell pm list packages 2>/dev/null | grep -q 'com.google.android.marvin.talkback'; then
-    # cloud_33: on API 33+ TalkBack asks for POST_NOTIFICATIONS the moment it starts - that system dialog covered every page after Home
-    # (cloud_32 runs: «0/0» = the dialog's dump). Granted first, so the dumps see the app.
-    adb shell pm grant com.google.android.marvin.talkback android.permission.POST_NOTIFICATIONS 2>/dev/null || true
+    # cloud_33: on API 33+ TalkBack asks POST_NOTIFICATIONS as it starts; its dialog covers the pages after Home (a11y_dump.py says «covered by»).
+    # Granting it was TRIED (mirror 43626856972, 43628482267): with TalkBack fully running, `uiautomator dump` dropped adb («device offline»)
+    # at the 1st / 2nd dump, twice - so NOT granted; the honest «covered» line stays until a dump path that survives TalkBack (QUESTIONS cloud_33).
     adb shell settings put secure enabled_accessibility_services "$svc" || true; adb shell settings put secure accessibility_enabled 1 || true; tb=on; sleep 3
   else tb="absent-on-image"; fi
   adb shell am start -n $PKG/.MainActivity > /dev/null || true; sleep 6
