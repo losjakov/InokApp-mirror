@@ -1,0 +1,45 @@
+# Node / web build
+node_modules/
+dist/
+build/
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+
+# Capacitor / Android / iOS build outputs (platform folders are committed; outputs are not)
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/*.iml
+android/captures/
+ios/App/Pods/
+ios/App/build/
+ios/App/App.xcworkspace/xcuserdata/
+ios/DerivedData/
+
+# Secrets - NEVER committed (keystore, google-services, service accounts, API keys)
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+.secrets/
+.env
+.env.*
+!.env.example
+
+# Test/screenshot scratch
+tmp/
+playwright-report/
+test-results/
+screens/out/
+.claude/worktrees/
+
+# cloud_29: Python byte-code (a local import of scripts/*.py writes it)
+__pycache__/

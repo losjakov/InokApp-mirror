@@ -1,0 +1,61 @@
+name: screens
+on:
+  push:
+    branches: [main]
+    paths-ignore: # A-39: a push that changes ONLY docs runs nothing (code, fixtures, screens/, scripts/, android/, .github/ are never listed here)
+      - '**/*.md'
+      - 'reports/**'
+      - 'ref/**'
+      - 'store/**'
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: 'only the screens matching this (Playwright --grep); empty = all'
+        default: ''
+      repeat:
+        description: 'repeat each matching screen N times (--repeat-each; a flake hunt, D33)'
+        default: '1'
+concurrency: # A-39: a superseded run is cancelled, as build.yml
+  group: screens-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  playwright:
+    if: ${{ !github.event.repository.private || vars.MIRROR_LIVE != '1' }} # A-104 split (REF_public_mirror §3): MIRROR_LIVE=1 = it runs in the public mirror, SKIPPED here
+    runs-on: ubuntu-24.04 # pinned (A-39 / cloud_13 0b): every green build, screens and KVM emulator run is on 24.04; ubuntu-latest moves to 26.04 gradually 19.10-19.11.2026
+    timeout-minutes: 60 # the a11y gate (A-88, axe on every screen) made the ring ~45 min: run 43068777412 hit the old 45-min cap at test 649 of ~663
+    env: # A-87: no apt, no `--with-deps`; the browser from GitHub's cache (or Playwright's CDN, retried); every network step named
+      INOK_CI_DIR: /tmp/inok-ci
+      INOK_SUMMARY: /tmp/inok-ci/summary.md
+    steps:
+      - uses: actions/checkout@v7
+      - name: A-87 the planted dead Ubuntu mirror (no step may need apt)
+        run: bash scripts/ci_dead_mirror.sh
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - name: Install
+        run: bash scripts/ci_step.sh "npm ci" net -- npm ci
+      # ONE source of the browser's version: the Playwright npm ci just installed from package-lock.json (never typed in this file)
+      - id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" | tee -a "$GITHUB_OUTPUT"
+      # Playwright's docs call a browser cache «not recommended» for SPEED (restore ~ download); here it is for AVAILABILITY:
+      # GitHub's cache storage still answers when a CDN or a mirror does not (A-87). OS libraries: the runner image's own (Google Chrome is
+      # installed there with its dependencies) - checked by a real launch below, never installed by apt.
+      - id: pwcache
+        uses: actions/cache@v6
+        with: { path: ~/.cache/ms-playwright, key: "playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium" }
+      - name: Playwright's Chromium (cache miss only; three CDN mirrors inside Playwright + our retry)
+        if: steps.pwcache.outputs.cache-hit != 'true'
+        run: bash scripts/ci_step.sh "playwright chromium download" net -- npx playwright install chromium
+      - name: The browser starts on this runner image (its libraries, no apt)
+        run: |
+          echo "- Playwright ${{ steps.pw.outputs.version }}, browser cache hit: ${{ steps.pwcache.outputs.cache-hit || 'false' }}" | tee -a "$INOK_SUMMARY"
+          node -e "require('@playwright/test').chromium.launch().then(b => { console.log('chromium', b.version()); return b.close(); })" 2>&1 | tee /tmp/pw-launch.txt \
+            || { python3 -I scripts/ci_infra.py mark IMAGE "Chromium cannot start: $(grep -m1 -oE "(lib[a-z0-9._+-]+\.so[0-9.]*|Executable doesn't exist).*" /tmp/pw-launch.txt | cut -c1-160)" "browser check"; exit 1; }
+      - name: Screens (fixtures mode)
+        run: bash scripts/ci_step.sh "screens" test -- npm run screens -- --repeat-each=${{ inputs.repeat || '1' }} ${{ inputs.grep && format('--grep "{0}"', inputs.grep) || '' }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: screens, path: screens/out/, retention-days: 30 }
+      - name: Verdict - the job summary's FIRST line (A-87 (1c)) - OK / INFRA (re-run) / CODE (fix) / UNCLASSIFIED (read the action's log)
+        if: always()
+        run: python3 -I scripts/ci_infra.py verdict "${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"

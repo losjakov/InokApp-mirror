@@ -1,0 +1,124 @@
+name: emulator
+on:
+  workflow_dispatch:
+    inputs:
+      matrix:
+        description: 'JSON list of {api-level, target, required, tag} (e.g. three runs of one image: tags r1 r2 r3); empty = the standard three (26, 31 old engine, 34)'
+        required: false
+        default: ''
+  push: # the public mirror: mirror.yml pushes the snapshot + .ci/emulator_matrix.json to this branch (REF_public_mirror §2); no pull-request trigger
+    branches: [emulator]
+# One job per API level, each with its own conclusion (REF_app_testing.md → Ring 2):
+#   required: true  → the job fails the run (the full path: live import, FTS5, screens);
+#   required: false → informational: `continue-on-error`, the run stays green, the verdict is in the job summary
+#   (the API 26 image — and 28, measured once in run 41233405498 — ships WebView 69 < Chromium 89 = Ionic 9 minimum, so only install/launch/error.html
+#   can be proven there — see scripts/emulator_smoke.sh).
+jobs:
+  plan: # the matrix: the dispatch input, or .ci/emulator_matrix.json on a push; empty / «standard» = the standard list below (its ONE home)
+    if: ${{ !github.event.repository.private || vars.MIRROR_LIVE != '1' }} # A-104 split: MIRROR_LIVE=1 = SKIPPED here (and so is `smoke`)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs: { matrix: '${{ steps.m.outputs.matrix }}' }
+    steps:
+      - uses: actions/checkout@v7
+      - id: m
+        env:
+          INPUT: ${{ inputs.matrix }}
+          STANDARD: '[{"api-level":26,"target":"google_apis","required":false},{"api-level":31,"target":"google_apis","required":true},{"api-level":34,"target":"default","required":true}]'
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then RAW="$(cat .ci/emulator_matrix.json 2>/dev/null || true)"; else RAW="$INPUT"; fi
+          M="$(python3 -I scripts/mirror_snapshot.py check-matrix "$RAW")" # the same validation as mirror.yml's; a bad list = red here
+          case "$M" in standard | '(none'*) M="$STANDARD" ;; esac
+          echo "matrix=$M" | tee -a "$GITHUB_OUTPUT"
+  smoke:
+    name: API ${{ matrix.api-level }} ${{ matrix.target }} ${{ matrix.tag }} ${{ matrix.required && '(required)' || '(informational)' }}
+    needs: plan
+    runs-on: ubuntu-24.04 # pinned (A-39 / cloud_13 0b): every green build, screens and KVM emulator run is on 24.04; ubuntu-latest moves to 26.04 gradually 19.10-19.11.2026
+    timeout-minutes: 80 # cloud_22: API 34 also shoots A-68's 60 store screenshots (3 sets x 3 languages) + the launcher
+    continue-on-error: ${{ !matrix.required }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # google_apis = Play services on board: FCM token registration + topic subscription (stage 3) are proven only here
+        # A-48: API 31 google_apis ships WebView 91 (measured, run 41834500477) = the old engine of the reference phone class (89-98) - required
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env: # A-87: no run-time apt; every network step = scripts/ci_step.sh (cached + retried; «INFRA» named as the summary's FIRST line)
+      INOK_CI_DIR: /tmp/inok-ci
+      INOK_SUMMARY: /tmp/inok-ci/summary.md
+      # cloud_23: two runner-network timeouts in a row (kotlin-compiler-embeddable, the wrapper zip) - patient HTTP + Gradle's own retries
+      GRADLE_OPTS: -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.repository.max.retries=5 -Dorg.gradle.internal.repository.initial.backoff=1000
+    steps:
+      - name: Enable KVM group perms (pattern from android/nowinandroid)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+      - uses: actions/checkout@v7
+      - name: A-87 the planted dead Ubuntu mirror (no step may need apt; the DB reads are Python's own sqlite3 - scripts/db_read.py)
+        run: bash scripts/ci_dead_mirror.sh
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm }
+      - name: Install + web build
+        run: bash scripts/ci_step.sh "npm ci" net -- npm ci && bash scripts/ci_step.sh "web build" test -- npm run build
+        env: { VITE_PUSH_TEST: '1', VITE_BRIDGE_PROBE: '1' }
+      - name: google-services.json from the GOOGLE_SERVICES_JSON_B64 secret (never in git)
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON_B64" ]; then echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > android/app/google-services.json; echo "google-services.json present";
+          else echo "::warning::GOOGLE_SERVICES_JSON_B64 is not set - push registration cannot be proven in this run"; fi
+      - uses: actions/setup-java@v6
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - uses: android-actions/setup-android@v4
+        with: { packages: 'platform-tools platforms;android-36 build-tools;36.0.0', log-accepted-android-sdk-licenses: false }
+      - run: npx cap sync android
+      # the APKs BEFORE the emulator boots: a compile error is CODE in 3 min, not after the boot; the smoke's own Gradle call is then up to date
+      - name: Build the qa + debug APKs
+        run: |
+          cd android && bash ../scripts/ci_step.sh "gradle: qa + debug APKs" net -- ./gradlew --no-daemon assembleQa assembleDebug
+      # the system image fetched by US (retried, named) - the emulator action then finds it installed; no image cache (REF_gotchas: the
+      # AVD / image tarballs filled the runner's disk)
+      - name: Emulator + system image (dl.google.com)
+        run: |
+          bash scripts/ci_step.sh "sdkmanager: emulator image" net -- bash -c 'yes | sdkmanager --install emulator "system-images;android-$0;$1;x86_64"' "${{ matrix.api-level }}" "${{ matrix.target }}"
+      - name: Pillow for the store set only (PyPI, never apt; API 34 default = the store set, scripts/emu_store.sh)
+        if: matrix.api-level == 34 && matrix.target == 'default'
+        run: |
+          bash scripts/ci_step.sh "pip: pillow" net -- python3 -m pip install --user --break-system-packages --retries 5 --timeout 60 pillow
+      # the google_apis image + the SDK leave ~7.1 GB free on ubuntu-latest and the emulator wants a 7.2 GB userdata partition
+      # («FATAL | Not enough space to create userdata partition», run 41241264448) → a small userdata and some freed disk
+      - name: Free runner disk (dotnet, ghc, codeql — not used here)
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL 2>/dev/null; df -h / | tail -1
+      - name: Smoke on emulator
+        id: smoke
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: ${{ matrix.target }}
+          emulator-boot-timeout: 1200
+          disk-size: 2048M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+          # cloud_29 (A-66): a Play Store image (no root) = the Play Integrity token through our plugin on the qa build (scripts/emu_integrity.sh)
+          script: bash scripts/${{ matrix.target == 'google_apis_playstore' && 'emu_integrity.sh' || 'emulator_smoke.sh' }} ${{ matrix.api-level }}-${{ matrix.target }}${{ matrix.tag }}
+      - name: Verdict (job summary; its FIRST line = OK / INFRA re-run / CODE fix / UNCLASSIFIED, A-87)
+        if: always()
+        run: |
+          D=screens/emu-${{ matrix.api-level }}-${{ matrix.target }}${{ matrix.tag }}
+          R="$(cat $D/result.txt 2>/dev/null || echo 'FAIL (no result.txt — emulator or build did not reach the smoke)')"
+          WV="$(grep '^webview_major=' $D/webview.txt 2>/dev/null | cut -d= -f2)"
+          { echo "## API ${{ matrix.api-level }} (${{ matrix.target }}, ${{ matrix.required && 'required' || 'informational' }})"
+            echo "- smoke step: **${{ steps.smoke.outcome }}**"
+            echo "- WebView major: **${WV:-unknown}** (the engine floor, package.json browserslist)"
+            echo "- result: \`$R\`"
+            echo "- push: \`$(cat $D/push.txt 2>/dev/null || echo 'n/a')\`"
+            echo "- artifact: emulator-screens-${{ matrix.api-level }}-${{ matrix.target }} (home.png, webview.txt, logcat_filtered.txt, push.txt, r8.txt, notify.txt + notify_shade_{light,dark}.png (cloud_27), native.txt, e2e_*.png (API 35+), db_meta.txt, live_fields.txt, streams.png, home_live.png, card_37*.png, card_98*.png, articles.png, article.png, ask.txt + ask_articles.png (A-73: both in one launch) when FULL; API 31+: links.txt + link_*.png (A-76); API 34: store/<lang>/<set>/*.png + sizes.txt + home-label.png)"; } >> "$INOK_SUMMARY"
+          python3 -I scripts/ci_infra.py verdict "${{ job.status }}" >> "$GITHUB_STEP_SUMMARY" # A-87 (1c): the FIRST line = OK / INFRA / CODE
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: emulator-screens-${{ matrix.api-level }}-${{ matrix.target }}${{ matrix.tag }}
+          path: screens/emu-${{ matrix.api-level }}-${{ matrix.target }}${{ matrix.tag }}/
+          retention-days: 30

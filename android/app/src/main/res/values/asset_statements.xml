@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A-92 (InokSite 321): the app declares the site, so inok.info's `navigator.getInstalledRelatedApps()` (Chrome Android 80+, the site's
+     web manifest `related_applications` play / info.inok.app) sees the installed app and hides its install banner. The SAME relation the
+     site's /.well-known/assetlinks.json states for this app (R-7); App Links' filter in AndroidManifest.xml is unchanged. -->
+<resources>
+    <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://inok.info\"}}]</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A-83 (cloud_27): resources a plugin or Firebase may look up BY NAME survive `shrinkResources` (release + qa). Audit 11.11.2026: the only
+     getIdentifier() caller among the installed plugins is Capacitor's AssetUtil (local-notification icons; not used by us); the push icon is
+     named in the manifest (default_notification_icon) and the splash in the theme. Kept explicitly anyway; build.yml reads each back from
+     app-qa.apk (aapt2 dump resources). -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_push,@drawable/splash,@mipmap/ic_launcher,@mipmap/ic_launcher_round,@mipmap/ic_launcher_foreground" />

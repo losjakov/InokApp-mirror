@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="push_title_stream">Зараз в ефірі</string>
+    <string name="push_title_article">Нове на inok.info</string>
+    <!-- A-84: the two notification channels, the summary (plurals) and its action - in the APP's language (InokNotifications) -->
+    <string name="push_channel_articles">Нові публікації</string>
+    <string name="push_channel_live">Ефір</string>
+    <string name="push_mark_read">Позначити прочитаним</string>
+    <string name="push_summary_more">ще %d</string>
+    <plurals name="push_summary_articles">
+        <item quantity="one">%d нова публікація</item>
+        <item quantity="few">%d нові публікації</item>
+        <item quantity="many">%d нових публікацій</item>
+        <item quantity="other">%d нових публікацій</item>
+    </plurals>
+</resources>

@@ -1,0 +1,505 @@
+/* Layout rules: system font (spec §1), font scaling respected (rem/em only), ≥600 dp two-pane (spec §2). */
+html { font-family: -apple-system, BlinkMacSystemFont, Roboto, 'Segoe UI', system-ui, sans-serif; }
+
+/* ONE type scale for the whole app (REVIEW cloud_02 D10; Material 3 body/title/label sizes), in rem so the system
+   font scaling applies: list title 17 sp · secondary 14 sp · body 16 sp · section heading 20 sp · caption 12 sp. */
+:root {
+  --inok-type-title: 1.0625rem;      /* 17 sp — list row title, card rows */
+  --inok-type-secondary: 0.875rem;   /* 14 sp — second line, notes, chips */
+  --inok-type-body: 1rem;            /* 16 sp — history, texts */
+  --inok-type-heading: 1.25rem;      /* 20 sp — section heading, card title, toolbar title */
+  --inok-type-caption: 0.75rem;      /* 12 sp — badges, attribution, hints */
+  --inok-line: 1.4;
+  /* the app's CHROME (toolbar title, tab labels) follows the system font up to this factor — the content keeps the full scale.
+     Android 14 scales large text non-linearly for the same reason: at 200 % a title broke inside its word and the tab bar ran off the screen */
+  --inok-chrome-max: 1.25;
+}
+ion-title { font-size: var(--inok-type-heading); }
+.more__theme-box { flex: 1 1 auto; min-width: 0; padding: 8px 0 6px; }
+.more__theme-label { margin-bottom: 4px; }
+/* A-52: the directory's own date under the last check - small text (the type scale's caption) */
+.more__dir-date.more__dir-date.more__dir-date { font-size: var(--inok-type-caption); }
+.more__theme { width: 100%; }
+.more__theme ion-label { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.15; }
+.more__theme ion-segment-button { min-width: 0; --padding-start: 4px; --padding-end: 4px; text-transform: none; font-size: var(--inok-type-caption); }
+.toolbar__home { display: flex; align-items: center; background: none; border: 0; padding: 8px 0; margin: 0; cursor: pointer; border-radius: 50%; }
+.toolbar__logo { width: 28px; height: 28px; margin-inline: 12px 0; display: block; flex: none; }
+ion-back-button + .toolbar__logo { margin-inline-start: 0; }
+/* the title wraps (owner 31.10: no ellipses) - Ionic's ion-title truncates inside its shadow DOM, so a plain heading */
+.toolbar__title--fit { white-space: nowrap; overflow: hidden; flex: 1 1 auto; min-width: 0; } /* A-97: one line or nothing */
+.toolbar__title--fit[data-dropped="1"] { color: transparent; } /* dropped: not drawn, still the heading TalkBack reads */
+.toolbar__title { margin: 0; padding: 6px 16px 6px 12px; font-size: min(var(--inok-type-heading), calc(20px * var(--inok-chrome-max))); font-weight: 500; line-height: 1.2; color: inherit; overflow-wrap: break-word; }
+/* `.item ion-label > h2` outranks Ionic's own `.sc-ion-label-md-s > h2` */
+.item ion-label > h2, .inok-title { font-size: var(--inok-type-title); font-weight: 500; line-height: 1.3; }
+.item ion-label > p, ion-note, .inok-secondary { font-size: var(--inok-type-secondary); line-height: var(--inok-line); }
+ion-item ion-label { font-size: var(--inok-type-body); }
+ion-tab-button ion-label { font-size: min(var(--inok-type-caption), calc(12px * var(--inok-chrome-max))); white-space: nowrap; }
+/* the tabs share the bar by their labels' length (a long «Трансляції» beside a short «Ще»), never wider than the screen */
+/* the toolbar's icon buttons are chrome too (at 200 % each took 96 px of a 360 px bar and the title broke) */
+ion-toolbar ion-buttons { font-size: min(1rem, calc(16px * var(--inok-chrome-max))); }
+ion-toolbar ion-button.button-has-icon-only { --chrome-btn: min(3rem, calc(48px * var(--inok-chrome-max))); max-width: var(--chrome-btn) !important; max-height: var(--chrome-btn) !important; } /* only a ceiling: Ionic sizes it in rem from inside; at 100 % its own size stays */
+ion-tab-button { flex: 1 1 auto; min-width: 0; --padding-start: 2px; --padding-end: 2px; }
+ion-chip { font-size: var(--inok-type-secondary); }
+h2.inok-heading, .inok-heading { font-size: var(--inok-type-heading); font-weight: 600; margin: 16px 16px 6px; line-height: 1.25; }
+/* all caps only where Ionic's platform style demands it (the solid primary button); none in our own labels */
+ion-button, ion-chip { text-transform: none; letter-spacing: normal; } /* D10 / D21: no all-caps label anywhere — every button, any fill, one type scale */
+
+/* home (D3): one compact tile row (≤ 96 dp), then the sections that change */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px 12px 4px; }
+.tiles[data-wrap="1"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } /* D56: a label that does not fit with the padding: two per row (tileRow) */
+.tile {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 68px; padding: 6px; border-radius: 12px; background: var(--inok-tile-bg); color: var(--ion-color-primary);
+  font-size: min(var(--inok-type-caption), calc(12px * var(--inok-chrome-max))); font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.tile ion-icon { font-size: min(1.6rem, calc(25.6px * var(--inok-chrome-max))); } /* the tiles are navigation: the chrome rule */
+.tile:active { opacity: 0.8; }
+.tile__dot { position: absolute; top: 6px; right: 8px; width: 9px; height: 9px; border-radius: 50%; background: var(--ion-color-live); }
+@media (min-width: 600px) { .tiles { max-width: 960px; margin: 0 auto; } .home__list { max-width: 960px; margin: 0 auto; } }
+.home__h { --color: var(--ion-color-primary); font-size: var(--inok-type-heading); font-weight: 600; min-height: 40px; padding-top: 8px; align-items: baseline; }
+.home__h ion-label { margin: 0; flex: 1 1 auto; }
+.home__all { font-size: var(--inok-type-secondary); font-weight: 500; color: var(--ion-color-primary); text-decoration: none; padding-inline-end: 16px; }
+.home__quiet { color: var(--ion-color-medium); font-size: var(--inok-type-secondary) !important; white-space: normal !important; }
+.home__fresh { --min-height: 40px; }
+
+/* the «ефір» badge — the app's pulse */
+/* the tab bar says «ефір» with a red dot at the icon's top-left corner, no text (owner 31.10) */
+ion-tab-button { position: relative; }
+.tab-live-dot { position: absolute; top: 6px; left: calc(50% - 22px); width: 10px; height: 10px; border-radius: 50%; background: var(--ion-color-live); box-shadow: 0 0 0 2px var(--ion-tab-bar-background, var(--ion-background-color)); opacity: 1; z-index: 1; pointer-events: none; }
+
+/* list rows (D5 + owner 31.10: NO ellipses — the name and the second line wrap in full, the row grows) */
+.mrow { --min-height: 64px; --padding-top: 4px; --padding-bottom: 4px; }
+.mrow ion-label { white-space: normal; margin: 6px 0; min-width: 0; overflow-wrap: break-word; } /* cloud_20 font 200 %: a word longer than the row breaks inside the row (min-width 0: the label never grows past it) */
+.item ion-label > .mrow__title { line-height: 1.25; margin: 0 0 2px; white-space: normal; }
+.mrow__cover { --size: 56px; width: 56px; height: 40px; margin-inline-end: 12px; flex: none; border-radius: 6px; overflow: hidden; background: var(--inok-cover-bg); }
+.mrow__type { display: inline-block; margin-inline-end: 6px; padding: 0 5px; border-radius: 4px; font-size: var(--inok-type-caption); font-weight: 600; line-height: 1.5; background: var(--inok-tile-bg); color: var(--ion-color-primary); vertical-align: 1px; }
+.mrow__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* A-29: the house rows show the site's square list picture; «no photo» = the app's own sign on the same square */
+.mrow__cover--square { height: 56px; }
+.mrow__nophoto { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: var(--ion-color-medium); font-size: 26px; }
+/* A-25 #0: the eparchy's map picture in the list at twice the house thumbnail (the zone must read); a map is shown whole, never cropped */
+.mrow__cover--map { --size: 112px; width: 112px; height: 80px; }
+.mrow__cover--map img { object-fit: contain; }
+.meta__g { display: inline-block; max-width: 100%; } /* D38: a meta group never breaks inside (MetaLine) - an atomic box moves to the next line whole; only a group wider than the whole line (200 % font, the tablet's list pane: «26 жовтня 2026 р.») wraps inside itself instead of running off the row (cloud_21) */
+.meta__stick { white-space: nowrap; } /* N7 (REVIEW cloud_22): «· 👁 N» - the dot and the last group of a MetaLine `stickyLast` in one box */
+.mrow__sub { font-size: var(--inok-type-secondary); color: var(--ion-color-medium); white-space: normal; }
+.mrow__eparchy { color: var(--ion-color-primary); }
+.item ion-label > .mrow__dist { font-size: var(--inok-type-secondary); color: var(--ion-color-primary); font-weight: 500; }
+
+/* two-pane (≥600 dp): list left, card right */
+.split { display: flex; height: 100%; }
+/* the phone's list grows with its rows (not the screen's height): a sticky row inside it (A-87 (2), the kind tabs) stays pinned to the end */
+.split__list { flex: 1 1 0; min-width: 0; align-self: flex-start; min-height: 100%; }
+.split__detail { display: none; }
+@media (min-width: 600px) {
+  .split__list { flex: 0 0 min(42%, 420px); border-inline-end: 1px solid var(--inok-divider); }
+  .split__detail { display: block; flex: 1 1 0; min-width: 0; }
+  .split__detail ion-header { display: none; }
+  /* F2 (A-79 2): each pane its own scroller (SplitContent) - the list never moves with the detail, the detail opens at its top */
+  .split__pane { height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+}
+.split__hint { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--ion-color-medium); padding: 24px; text-align: center; }
+
+/* card (D6): cover with the photo-count badge, one icon action row, label-over-value fact rows */
+.card__cover-wrap { position: relative; }
+.card__cover { width: 100%; aspect-ratio: 16 / 9; max-height: 40vh; background: var(--inok-cover-bg); overflow: hidden; }
+/* D49: ONE family for every control drawn over a picture (the A-31 open sign, the card's «Фотогалерея»): the same dark translucent
+   surface and shadow, 40 dp tall, a 1.25rem icon, 8 dp from the picture's corner; only the gallery carries words (it leaves the app) */
+.over-photo { position: absolute; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 40px; min-height: 40px;
+  padding: 0; border: 0; border-radius: 20px; background: rgba(0, 0, 0, 0.6); color: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+.over-photo ion-icon { font-size: 1.25rem; }
+.card__photos { /* A-23 #6: a real button — label + where it leads (open_in_new); 48 dp tall to tap */
+  right: 8px; bottom: 8px; padding: 6px 12px; font: inherit; font-size: var(--inok-type-secondary); font-weight: 600; cursor: pointer; }
+.card__photos::after { content: ''; position: absolute; inset: -4px; } /* the touch target reaches 48 dp */
+.card__title-row { display: flex; align-items: flex-start; }
+.card__title-row .card__title { flex: 1 1 auto; min-width: 0; }
+.card__title-row ion-button { flex: 0 0 auto; margin: 4px 4px 0 -8px; }
+/* D34 + D48 (one rule for 5 and 6 actions, the pattern of Google Maps' place actions / Material 3): icon over a ONE-line label; the
+   buttons touch (each one IS its tap target, ≥ 48 dp) and share the spare width equally; the visible gap between two labels is the
+   buttons' own 4 + 4 dp inner padding, so the gaps shrink to that minimum BEFORE the row scrolls; the first and last LABEL keep 16 dp
+   to the screen (12 dp row + 4 dp button). Five fit a 360 dp phone; only when the labels truly do not fit (six, a large system font)
+   the row scrolls sideways and its end fades (sideRow: data-overflow) — a label never wraps, a word never splits (D24) */
+.actions { display: flex; gap: 0; padding: 4px 10px 8px; overflow-x: auto; scroll-padding-inline: 12px;
+  scrollbar-width: none; border-bottom: 1px solid var(--inok-divider); }
+.actions::-webkit-scrollbar { display: none; }
+/* ONE sideways-row edge (A-15): the card's actions and the active filter chips (D43) — faded only while they overflow (D48) */
+.actions[data-overflow="1"], .filters__chips[data-overflow="1"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.actions__btn {
+  flex: 1 0 auto; min-width: 48px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px 6px; border: 0; border-radius: 12px;
+  background: none; color: var(--ion-color-primary); font: inherit; font-size: min(var(--inok-type-caption), calc(12px * var(--inok-chrome-max))); font-weight: 500; line-height: 1.2; cursor: pointer;
+  text-align: center; white-space: nowrap;
+}
+.actions__btn ion-icon { font-size: min(1.5rem, calc(24px * var(--inok-chrome-max))); } /* D56: the actions are chrome - each its own column with a visible gap at every scale */
+.actions__btn:active { background: var(--inok-tile-bg); }
+.infos { padding: 4px 0; }
+/* D36: ONE alignment for every fact row — a grid: label (row 1) over value (row 2) over caption (row 3); the lead sits on the
+   value's FIRST line (an hours list of 5 lines no longer centres its clock), the end mark in the middle of the row */
+.info { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr) auto; column-gap: 12px; align-items: start; align-content: center;
+  width: 100%; padding: 7px 16px; border: 0; background: none; color: inherit; font: inherit; text-align: start; }
+.info--tap { cursor: pointer; }
+.info--tap:active { background: var(--inok-tile-bg); }
+/* D25: the leading column is on EVERY fact row (empty when the row has no icon) — all labels and values share one text edge */
+.info__lead { grid-column: 1; grid-row: 2; height: calc(var(--inok-type-body) * 1.35); display: flex; align-items: center; justify-content: center; }
+.info__icon { font-size: 1.25rem; color: var(--ion-color-primary); }
+.info__text { display: contents; }
+.info__text > * { grid-column: 2; }
+.info__text > .info__label:first-child { grid-row: 1; }
+.info__value { grid-row: 2; }
+.info__value ~ .info__label { grid-row: 3; }
+.info__label { font-size: var(--inok-type-caption); color: var(--ion-color-medium); line-height: 1.3; }
+.info__value { font-size: var(--inok-type-body); line-height: 1.35; overflow-wrap: anywhere; }
+.info--tap .info__value { color: var(--ion-color-primary); }
+.card__site { margin: 0 0 16px; }
+.card__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card__title { margin: 12px 16px 4px; font-size: var(--inok-type-heading); font-weight: 700; line-height: 1.25; }
+.card__sub { margin: 0 16px 8px; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); }
+/* the monastery card (owner 12.11.2026): the place line + the eye at the right edge, bottoms (= baselines: one font size) on its last line */
+.card__subrow { display: flex; align-items: flex-end; gap: 12px; margin: 0 16px 8px; font-size: var(--inok-type-secondary); }
+.card__subrow > .card__sub { flex: 1 1 auto; min-width: 0; margin: 0; }
+.card__subrow > .views { flex: none; margin-inline-start: auto; }
+.card__place1 { display: block; } /* A-96 W-2: the eparchy link always starts its own line */
+/* A-96 W-2: alone on its line, the link's OWN box is the 24 px target (axe measures the box): padding 4 + 4, the same negative margin keeps the line */
+.card__place1 + .card__eparchy { display: inline-block; padding: 4px 0; margin: -4px 0; }
+/* A-81 (3): the card's eparchy = a link in the link colour; its tap target is widened to >= 24 px (WCAG 2.5.8) by an empty absolute
+   ::before 6 px above and below - not a box of the line, so the line does not move and the meta group stays whole (D38) */
+.card__eparchy { position: relative; color: var(--ion-color-primary); text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.card__eparchy::before { content: ''; position: absolute; inset: -6px 0; }
+/* A-96 W-3: a compact button with a 48 dp target - the same empty absolute box, around a button that draws smaller (Material: 48 x 48 dp) */
+.btn-target48 { position: relative; overflow: visible; }
+.btn-target48::after { content: ''; position: absolute; inset: min(0px, calc((100% - 50px) / 2)) 0; } /* 50: >= 48 after rounding */
+.card__actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 8px; } /* the map card's two buttons */
+.card__actions ion-button { --padding-start: 10px; --padding-end: 10px; }
+.history { padding: 0 16px 24px; font-size: var(--inok-type-body); line-height: 1.55; }
+.history p { margin: 0 0 0.8em; }
+.history sup { font-size: 0.7em; }
+/* A-50 #3 (R-33): THE heading scale of html-lite text - article bodies and card histories share `.history` (A-15). Sizes in em of the
+   text, so they follow the system font and the article's A-/A+; h2 > h3 > h4 >= h5 = the text size (weight sets h5 apart); below the
+   article title (20 sp) at A=100 %. Material 3 Title Large/Medium steps (22/16) fitted to a 16-sp text; proximity: more space BEFORE
+   than after (the heading belongs to the text below it); line height tighter than the text (1.55). Margins collapse with a <p>'s. */
+.history :is(h2, h3, h4, h5) { margin: 1.25em 0 0.4em; line-height: 1.3; font-weight: 700; overflow-wrap: break-word; }
+.history h2 { font-size: 1.1875em; line-height: 1.25; }
+.history h3 { font-size: 1.125em; }
+.history h4 { font-size: 1.0625em; font-weight: 600; }
+.history h5 { font-size: 1em; font-weight: 600; margin-top: 1.1em; }
+.history > :is(h2, h3, h4, h5):first-child { margin-top: 0; }
+.history :is(h2, h3, h4, h5) + :is(h2, h3, h4, h5) { margin-top: 0.4em; } /* stacked headings: one gap, not two */
+/* R-37 (A-53): the page's right / centred paragraphs (verse, signatures, captions) - one rule for article bodies and card histories */
+.al-r { text-align: right; }
+.al-c { text-align: center; }
+.sources, .links { padding: 0 0 8px; }
+.first-run { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; gap: 12px; text-align: center; }
+.first-run__icon { font-size: 4rem; color: var(--ion-color-medium); }
+.first-run h1 { font-size: var(--inok-type-heading); }
+.first-run ion-button { align-self: stretch; }
+.first-run__code { font-family: monospace; font-size: var(--inok-type-secondary); letter-spacing: 0.04em; user-select: all; }
+/* A-48: THE error screen (src/app/crash.tsx) - plain DOM over everything, the first-run column; the code and the error line for a photo */
+.crash { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 12px; padding: 24px;
+  padding-top: max(24px, var(--inok-safe-top)); padding-bottom: max(24px, var(--inok-safe-bottom)); text-align: center; overflow-y: auto;
+  background: var(--ion-background-color, #fff); color: var(--ion-text-color, #000); font-family: var(--ion-font-family, sans-serif); font-size: var(--inok-type-body); }
+/* D63: the crash icon = the first-run icon (`.first-run__icon`, an ion-icon), centred in the stretched column */
+.crash .first-run__icon { align-self: center; }
+.crash__title { font-size: var(--inok-type-heading); margin: 0; }
+.crash__text { margin: 0; color: var(--ion-color-medium); line-height: 1.45; }
+.crash__btn { min-height: 48px; padding: 12px 20px; border: 0; border-radius: 8px; font: inherit; font-weight: 600; background: var(--ion-color-primary); color: var(--ion-color-primary-contrast); }
+.crash__code, .crash__line { margin: 0; }
+.crash__line { font-family: monospace; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); overflow-wrap: anywhere; user-select: all; }
+/* D4: the search field lives in the toolbar */
+.toolbar--search ion-searchbar { --background: rgba(255, 255, 255, 0.92); --color: #1a1a1a; --placeholder-color: #555; --icon-color: #555; --clear-button-color: #555; --border-radius: 10px; --box-shadow: none; padding: 0 4px 0 8px; height: 44px; }
+.toolbar--search ion-searchbar .searchbar-input-container { height: 40px; }
+/* A-28: the placeholder «Пошук монастирів» whole beside the filter button — Ionic md reserves 55 px each side; the icon needs 44, the clear «×» 36 */
+.toolbar--search ion-searchbar.searchbar-left-aligned .searchbar-input { padding-inline-start: 44px; padding-inline-end: 36px; }
+.toolbar--search ion-searchbar .searchbar-search-icon { inset-inline-start: 12px; }
+.toolbar__search { display: flex; align-items: center; min-width: 0; }
+.toolbar__search ion-searchbar { flex: 1 1 auto; min-width: 0; }
+@media (min-width: 600px) { .toolbar__search { width: min(42vw, 420px); } } /* about the list pane's width, the button at its end */
+.search-wrap { position: relative; }
+.filters__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px 2px; } /* D26: every item centred; cloud_31 (REVIEW 30 N1): at a large font the button wraps below, never the count */
+.filters__row ion-chip { flex: 0 0 auto; white-space: nowrap; }
+.filters__count { flex: 1 0 auto; white-space: nowrap; } /* «18 обителей» = ONE unbreakable unit (cloud_30 tablet x 200 %: «обителе / й»); it keeps its width, the row wraps */
+/* D43: the active chips — one line, sideways scroll, no scrollbar */
+.filters__chips { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; padding: 6px 12px 4px; overflow-x: auto; scrollbar-width: none; }
+.filters__chips::-webkit-scrollbar { display: none; }
+.filters__row + .filters__chips { padding-top: 2px; }
+.filters__chips { padding-inline-end: 28px; } /* the fade lies over the end inset while the chips fit */
+.filters__chips ion-chip, .filters__chips .filters__count { flex: 0 0 auto; white-space: nowrap; } /* a count in the chips' row stays one word, never a letter column */
+.toolbar__filters { position: relative; } /* A-28 */
+/* D46: inside the button's box, its 2-px ring ≥ 4 px from the screen's edge, over the glyph's top-right tip only (≤ 20 % of it).
+   Its containing block is Ionic's `.button-inner` (position: relative) = the icon's 24-px box; the button reaches 12 px beyond it. */
+.toolbar__badge { position: absolute; top: -8px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; box-shadow: 0 0 0 2px var(--ion-color-primary); background: var(--ion-color-primary-contrast); color: var(--ion-color-primary); font-size: 12px; font-weight: 700; line-height: 18px; text-align: center; pointer-events: none; }
+.toolbar__badge--dot { min-width: 10px; height: 10px; padding: 0; top: -2px; right: -2px; } /* A-97: the sort is not the default */
+.filters__count { font-size: var(--inok-type-secondary); line-height: 1.2; }
+.empty { padding: 40px 24px; text-align: center; color: var(--ion-color-medium); }
+/* streams (D7): one calendar strip that expands on tap; groups Онлайн / Заплановані / Не в ефірі; one second line + the place in small */
+.streams__cal {
+  display: block; width: calc(100% - 24px); margin: 8px 12px 4px; padding: 8px 12px; border: 0; border-radius: 10px; text-align: start;
+  background: var(--inok-tile-bg); color: inherit; font: inherit; font-size: var(--inok-type-secondary); line-height: var(--inok-line); cursor: pointer;
+}
+.streams__more { color: var(--ion-color-primary); font-weight: 500; white-space: nowrap; }
+/* A-25 #5: the calendar's paragraphs as /live/ on a phone (the emphasis comes in the markup), tight; the 16:00 note muted above */
+.cal__body p { margin: 0 0 4px; }
+.cal__body p:last-child { margin-bottom: 0; }
+.cal .more-btn { padding: 8px 0 2px; } /* D41: THE more button inside the calendar's tile */
+.cal__note { margin: 0 0 4px; font-size: var(--inok-type-caption); color: var(--ion-color-medium); }
+.srow__group { --color: var(--ion-color-medium); font-size: var(--inok-type-caption); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; min-height: 32px; padding-top: 6px; }
+.srow__group ion-label { margin: 0; }
+.srow ion-label { white-space: normal; margin: 6px 0; }
+.item ion-label > .srow__second { color: var(--ion-text-color, #000); opacity: 0.85; margin: 0 0 2px; }
+.item ion-label > .srow__place { font-size: var(--inok-type-caption); color: var(--ion-color-medium); margin: 0; }
+/* the channel avatar (A-17): round, live = red ring + red dot at the top-right; one size everywhere */
+.chav { position: relative; flex: none; width: 40px; height: 40px; margin-inline-end: 12px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--inok-cover-bg); color: var(--ion-color-primary); font-size: 22px; }
+.chav__img { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; display: grid; place-items: center; }
+.chav__img img { width: 100%; height: 100%; object-fit: cover; }
+/* D65: the ring = box-shadow (follows border-radius on every engine; `outline` does only from Chrome 94 - square on the 89 floor) */
+.chav--live { box-shadow: 0 0 0 2px var(--ion-background-color, #fff), 0 0 0 4px var(--ion-color-live); }
+.chav--live::after { content: ''; position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--ion-color-live); border: 2px solid var(--ion-background-color, #fff); }
+.about__row { font-size: var(--inok-type-secondary); }
+
+/* map (stage 2): the canvas fills the pane; «near me» adds a list below (phone) or beside (≥600 dp) */
+.map-split { display: flex; flex-direction: column; height: 100%; }
+.map-pane { position: relative; flex: 1 1 0; min-height: 0; }
+.map-canvas.maplibregl-map { position: absolute; inset: 0; } /* maplibre's own css sets position: relative */
+.map-split--near .map-pane { flex: 0 0 45%; }
+.map-near { flex: 1 1 0; min-height: 0; overflow-y: auto; border-top: 1px solid var(--inok-divider); }
+@media (min-width: 600px) {
+  .map-split { flex-direction: row; }
+  .map-split--near .map-pane { flex: 1 1 0; }
+  .map-near { flex: 0 0 min(42%, 400px); border-top: 0; border-inline-start: 1px solid var(--inok-divider); }
+}
+/* D47: ONE surface for everything drawn over a map (the scope chip, the banners, the house card; the mini-map too): opaque, the theme's
+   page colour, one elevation — the base map's labels never print through. `.ion-color` beats Ionic's translucent chip tint (0.08 alpha). */
+.over-map, ion-chip.over-map.ion-color { background: var(--ion-background-color, #fff); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25); }
+.map-banner, .map-card { color: var(--ion-text-color, #000); }
+.map-banner {
+  position: absolute; top: 8px; left: 8px; right: 56px; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border-radius: 10px; font-size: var(--inok-type-secondary);
+}
+.map-banner--error { color: var(--ion-color-danger); }
+.map-card {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 6; padding: 12px 12px 6px; border-radius: 14px;
+}
+.map-card__title { margin: 0 36px 2px 0; font-size: var(--inok-type-title); font-weight: 700; line-height: 1.3; }
+.map-card__sub { margin: 0 0 4px; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); }
+.map-card__close { position: absolute; top: 2px; right: 2px; margin: 0; }
+.map-card .card__actions { padding: 0; }
+.maplibregl-ctrl-attrib { font-size: var(--inok-type-caption); }
+.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner { max-width: calc(100vw - 80px); }
+.ion-palette-dark .maplibregl-ctrl-group { filter: invert(0.9) hue-rotate(180deg); }
+
+/* notifications (stage 3) */
+.notifications__status { display: block; padding-top: 10px; padding-bottom: 4px; }
+
+/* A-11: the three article kinds sit under «Нові статті», indented */
+.push__kind { --padding-start: 56px; --min-height: 40px; }
+.push__search { padding: 0 8px; }
+
+/* stage 4: the feed and the article */
+/* A-87 (2): the kind tabs stay under the toolbar, only the list scrolls - sticky INSIDE the list's own scroller (the phone's ion-content,
+   the tablet's list pane), so the refresher, «Показати більше», the kept place and the A-79 two scrollers stay as they were; opaque */
+/* A-96 W-3: THE pinned head of a list (the kind tabs, the monasteries' count + «Єпархії» + chips) - one rule for both */
+.list-pin { position: sticky; top: 0; z-index: 2; background: var(--ion-background-color, #fff); }
+.kinds { padding: 4px 8px 0; }
+.kinds ion-segment-button { min-width: auto; text-transform: none; }
+.item ion-label > .arow__subtitle { font-size: var(--inok-type-secondary); color: var(--ion-text-color); opacity: 0.85; margin: 0 0 2px; white-space: normal; }
+.arow__cover { height: 56px; }
+.aview { padding-bottom: 16px; }
+.aview__cover { width: 100%; aspect-ratio: 16 / 9; max-height: 320px; background: var(--inok-cover-bg); overflow: hidden; }
+.aview__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* A-40: the lead as the site sets it off - italic, a thin brand line at the left; the same type scale as the body (text-size control included) */
+.aview__lead { margin: 4px 16px 16px; padding: 2px 0 2px 12px; border-inline-start: 3px solid var(--ion-color-primary); font-style: italic; line-height: 1.55; }
+.aview__lead p { margin: 0 0 0.6em; }
+.aview__lead p:last-child { margin-bottom: 0; }
+.aview__subtitle { margin: 0 16px 4px; font-size: var(--inok-type-body, 1rem); font-style: italic; }
+.aview ion-button { margin: 8px 16px; }
+.aview__rate { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 16px; padding: 10px 12px; border-radius: 12px; background: var(--inok-tile-bg); }
+.aview__stars button { background: none; border: 0; padding: 4px; font-size: 1.6rem; color: var(--inok-star); cursor: pointer; } /* A-78: THE star token */
+.star-mark { color: var(--inok-star); } /* A-78: a list row's «★» (the glyph = an icon, 3:1; its number stays the grey meta text, 4.5:1) */
+.aview__stars button:disabled { cursor: default; }
+.aview__avg { color: var(--ion-color-medium); font-size: var(--inok-type-secondary); }
+.aview__comments { margin: 0 16px; }
+.comment { padding: 8px 0; border-bottom: 1px solid var(--inok-divider); }
+.comment--reply { margin-inline-start: 20px; border-bottom: 0; }
+.comment__head { margin: 0 0 2px; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); }
+.comment__text { margin: 0; white-space: pre-line; }
+/* A-34: the site's vote toggles — a thumb + its count (the dislike = the same thumb turned), filled when pressed; 44 px targets */
+.comment__votes { display: flex; gap: 4px; margin: 2px 0 0 -8px; }
+.vote { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; border-radius: 22px;
+  background: none; color: var(--ion-color-medium); font: inherit; font-size: var(--inok-type-secondary); cursor: pointer; }
+.vote ion-icon { font-size: 1.15rem; }
+.vote--down ion-icon { transform: rotate(180deg); }
+.vote[aria-pressed='true'] { color: var(--ion-color-primary); }
+.vote[aria-disabled='true'] { opacity: 0.55; cursor: default; }
+.comment__none { margin: 4px 0 8px; color: var(--ion-color-medium); }
+/* A-49: the comment's bar = the votes at the start, «Поскаржитися» / «Приховати» at the end (quiet text buttons, 44 dp); wraps at large fonts;
+   a report's short line under the bar; a hidden comment = one muted line + «Показати» in place; the site's rules above «Додати коментар» */
+.comment__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-inline-end: -6px; }
+.comment__acts { display: inline-flex; margin-inline-start: auto; } /* the two go together: at a large font they wrap as one, to the end */
+.comment__act { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 6px; border: 0; border-radius: 22px; background: none;
+  color: var(--ion-color-medium); font: inherit; font-size: var(--inok-type-secondary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.comment__act ion-icon { font-size: 1rem; flex: none; }
+.comment__act:disabled { opacity: 0.55; cursor: default; }
+.comment__note--act { margin: 0 0 4px; }
+.comment__hidden { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; margin: 0; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); font-style: italic; }
+.comment__hidden .comment__act { padding-inline: 0; font-style: normal; color: var(--ion-color-primary); text-decoration: underline; }
+.comment__rules { margin: 12px 0 0; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); line-height: 1.4; }
+.comment__rules p { margin: 0; }
+.comment__rules-h { font-weight: 600; color: var(--ion-text-color); }
+.comment__note:empty { display: none; }
+/* every «why it is quiet» line of the comments block (vote closed, pending, offline): ONE look (D54) */
+.comment__note { margin: 8px 0; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); }
+.aview__comments > .inok-heading { margin-inline: 0; } /* the block's own 16 px inset: heading, text and button on one edge */
+.aview .comment__add { margin: 12px 0 4px; }
+/* A-20: the ONE photo placeholder — the reason, the load button, the settings link (large slots); the icon only in rows */
+.photo-wait { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px;
+  text-align: center; color: var(--ion-color-medium); font-size: var(--inok-type-body); }
+.photo-wait__icon { font-size: 36px; color: var(--ion-color-primary); opacity: .7; }
+.photo-wait__reason { color: var(--ion-text-color); }
+/* A-50 #2: the settings link at the body text size (the owner: «сделать покрупней»), still a link */
+.photo-wait__link { background: none; border: 0; padding: 4px; color: var(--ion-color-primary); font: inherit; text-decoration: underline; }
+.photo-wait--icon { padding: 0; }
+.photo-wait--icon ion-icon { font-size: 20px; }
+.photos-all { margin: 4px 16px 8px; }
+/* A-18: the history collapsed to its first paragraphs (≈ 12 lines), faded, with «Читати повністю» */
+.collapsible__box { max-height: 18em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.more-btn { padding: 4px 16px 12px; } /* THE more button's place (feed, card blocks, history) */
+.card__updated { margin: 8px 16px; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); }
+.filter__clear { margin-inline-start: 0; --padding-start: 4px; --padding-end: 4px; }
+
+/* R-18: body pictures in their place — the frame keeps the file's proportions before it arrives (inline aspect-ratio) */
+.body-pic { width: 100%; margin: 12px 0; background: var(--inok-cover-bg); border-radius: 4px; overflow: hidden; }
+.body-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-open { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+/* A-31: the sign that a picture opens — one TOP-right corner badge (the bottom-right is the card's «Фотогалерея») on every openable picture (card / article header, body pictures, the eparchy's map) */
+.photo-open__hint { right: 8px; top: 8px; pointer-events: none; }
+/* A-96 W-4 (R-45): a site gallery - thumbnails at their own size (never upscaled), a centred even grid; `auto-fit` re-flows the columns
+   with the width / rotation; one cell never wider than the text column */
+.gallery { display: grid; grid-template-columns: repeat(auto-fit, min(var(--gallery-cell, 150px), 100%)); justify-content: center; gap: 8px; margin: 0 0 1em; }
+.gallery__cell { min-width: 0; }
+.gallery__pic { width: 100%; overflow: hidden; border-radius: 4px; background: var(--inok-divider); }
+.gallery__pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* the full-screen viewer: black in both themes (a picture, not a page) */
+.viewer { --width: 100%; --height: 100%; --border-radius: 0; --background: #000; }
+.viewer__box { position: relative; height: 100%; display: flex; flex-direction: column; background: #000; }
+.viewer__scroll { flex: 1; overflow: auto; display: flex; align-items: center; touch-action: none; } /* A-96 W-4: at 1x the viewer's own swipes */
+.viewer__scroll--zoomed { touch-action: pan-x pan-y; } /* zoomed: the picture pans natively */
+.viewer__scroll img { display: block; margin: auto; max-width: none; height: auto; }
+.viewer__caption { margin: 0; padding: 8px 16px calc(12px + var(--inok-safe-bottom)); color: #ddd; font-size: var(--inok-type-caption); }
+.viewer__close { position: absolute; top: calc(4px + var(--inok-safe-top)); right: calc(4px + var(--inok-safe-right)); --color: #fff; --background: rgba(0,0,0,.45); --border-radius: 50%;
+  width: 48px; height: 48px; }
+.viewer__nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; --color: #fff; --background: rgba(0,0,0,.45); --border-radius: 50%; margin: 0; }
+.viewer__nav--prev { left: calc(4px + var(--inok-safe-left, 0px)); }
+.viewer__nav--next { right: calc(4px + var(--inok-safe-right)); }
+.viewer__nav[disabled] { opacity: 0; }
+.viewer__count { position: absolute; top: calc(16px + var(--inok-safe-top)); left: 50%; transform: translateX(-50%); color: #fff; background: rgba(0,0,0,.45); border-radius: 12px; padding: 2px 10px; font-size: var(--inok-type-secondary); }
+.viewer__note { margin: 0; padding: 8px 16px 0; color: #ddd; font-size: var(--inok-type-caption); }
+
+/* A-23 #4: the search's matches as the site marks them — its yellow, dark text on it in both themes, bold for accessibility */
+mark.hl { background: var(--inok-highlight); color: #000; font-weight: 700; border-radius: 2px; padding: 0 1px; }
+.mrow__head strong { font-weight: 600; color: var(--ion-text-color); }
+
+.empty__hint { color: var(--ion-color-medium); font-size: var(--inok-type-secondary); margin: 4px 0 12px; }
+
+/* A-23 #1: a link that leaves the app = a fact row + the external mark at the end; ≥ 48 dp */
+.info--ext { min-height: 48px; }
+.info__ext { grid-column: 3; grid-row: 1 / span 3; align-self: center; font-size: 1.1rem; color: var(--ion-color-medium); }
+.info__num { text-align: center; font-size: var(--inok-type-secondary); font-weight: 600; color: var(--ion-color-medium); }
+
+/* A-23 #8: the article's own text follows «A−/A+» (× the system scale, rem); the interface around it does not */
+.aview { --inok-article-scale: 1; }
+.aview .aview__body { font-size: calc(var(--inok-type-body) * var(--inok-article-scale)); }
+.aview .aview__subtitle, .aview .aview__lead { font-size: calc(var(--inok-type-body) * var(--inok-article-scale)); }
+/* A-56: at a LARGE system text scale (state/textScale.ts) a long word breaks WITH a hyphen where the engine has the language's dictionary
+   (the document `lang` = the interface language, AppContext); without one the cloud_20 break (overflow-wrap) stays; normal scale: as before. */
+[data-text-large="1"] .mrow ion-label, [data-text-large="1"] .aview .aview__subtitle, [data-text-large="1"] .aview .aview__lead,
+[data-text-large="1"] .aview .aview__body { -webkit-hyphens: auto; hyphens: auto; }
+
+/* R-21 «Контакти»: a multi-line value (the hours) = one line per item; the page's closing line, muted */
+.info__line { display: block; }
+.info__line + .info__line { margin-top: 2px; }
+.contacts__note { margin: 12px 16px 24px; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); line-height: 1.4; }
+/* D27: why a row was found when nothing visible marks it — one muted line, the match in the site's yellow */
+.mrow__why { font-style: italic; }
+
+/* PLAN 7: the eparchies' entry sits at the right end of the list's filter row; the eparchy's own map picture */
+.filters__end { margin-inline-start: auto; }
+/* PLAN 5: THE mini-map (an eparchy's houses, the office of «Контакти»): one button, its label on the .over-map surface (D47) at the
+   bottom-left; the stub keeps the size and says why there is no map. D57: ONE frame 3 : 2 (was 2 : 1) - D53's fit keeps every mark's drawn
+   size clear of the label, and the 2 : 1 phone frame (328 × 164) left the houses ~20 dp: Kyiv zoomed out to Europe (z 2.47); 3 : 2 gives z 3.63 */
+.minimap { margin: 8px 16px 12px; }
+.minimap__box { position: relative; display: block; width: 100%; aspect-ratio: 3 / 2; max-height: 320px; padding: 0; border: 0; border-radius: 12px;
+  overflow: hidden; background: var(--inok-cover-bg); color: inherit; font: inherit; cursor: pointer; }
+.minimap__canvas { position: absolute; inset: 0; }
+.minimap__canvas.maplibregl-map { position: absolute; } /* maplibre's own css sets position: relative */
+.minimap__chip { position: absolute; left: 8px; bottom: 8px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px;
+  border-radius: 18px; color: var(--ion-color-primary); font-size: var(--inok-type-secondary); font-weight: 600; }
+.minimap__chip ion-icon { font-size: 1.25rem; }
+.minimap__stub { position: absolute; inset: 0 0 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px;
+  color: var(--ion-color-medium); font-size: var(--inok-type-secondary); text-align: center; }
+.minimap__stub ion-icon { font-size: 2rem; }
+.minimap__credit { margin: 4px 2px 0; color: var(--ion-color-medium); font-size: var(--inok-type-caption); line-height: 1.3; }
+.eparchy__map { width: 100%; max-height: 50vh; background: var(--inok-cover-bg); overflow: hidden; }
+.eparchy__map img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.map-scope { position: absolute; top: 8px; left: 8px; right: 56px; z-index: 2; pointer-events: none; }
+.map-scope ion-chip { pointer-events: auto; margin: 0; }
+.list__more { display: flex; justify-content: center; padding: 12px 0 24px; }
+
+/* D60: the photo-setting hint = two short lines (`photos.hint` carries one \n) — the choice is the dialog's job */
+ion-alert.inok-dialog.md, ion-alert.inok-dialog { --max-width: min(312px, calc(100vw - 48px)); } /* Material dialog 280-560 dp: the first line fits whole at 360 dp */
+.inok-dialog .alert-message { white-space: pre-line; } /* THE app dialog (the photos choice, A-49 report): one width, line breaks kept */
+/* any dialog (the class doubled: Ionic's scoped `.alert-title.sc-ion-alert-md` is 0,2,0): its title is chrome (the chrome rule: a word never breaks at the largest font); its message never hides behind a scroll of its own -
+   the choices below scroll instead (font200-more-photos) */
+ion-alert .alert-title.alert-title { font-size: min(1.25rem, calc(20px * var(--inok-chrome-max))); }
+ion-alert .alert-message.alert-message { max-height: none; overflow: visible; }
+
+/* A-43: «Поділитися» at the end of a list / item screen - the content's own side inset, a breath above the tab bar */
+.share-footer { padding: 16px 16px 24px; }
+.share-footer ion-button { margin: 0; }
+/* A-64 / A-67: the soft notification question - its answers stacked, the main one first (three never fit a 360 dp row whole) */
+ion-alert.soft-ask .alert-button-group.alert-button-group { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+ion-alert.soft-ask .alert-button.alert-button { margin-inline: 0; text-align: end; }
+ion-alert.soft-ask .alert-message.alert-message:empty { display: none; } /* no message (the plain question): no empty band under the title */
+/* N6 (REVIEW cloud_22): the plain question (no message) - the head's bottom 15 px + the buttons' top 8 px were a band; the answers sit under the title */
+ion-alert.soft-ask--plain .alert-head.alert-head { padding-bottom: 8px; }
+ion-alert.soft-ask--plain .alert-button-group.alert-button-group { padding-top: 0; }
+/* A-65: the site's eye - an eye and a number, no word, the meta line's own size. A-78 (owner 09.11): gold (`--inok-eye`, icon AND number) and ON
+   the line: plain inline text, so the number shares the meta text's baseline (1.0.2's inline-flex took the icon's bottom edge as its baseline
+   and lifted the number); the icon's middle on the digits' middle (the glyph is centred in its 1.1em box: -0.2em ≈ 0.36em digit middle) */
+.views { display: inline; white-space: nowrap; color: var(--inok-eye); }
+.views ion-icon { font-size: 1.1em; vertical-align: -0.2em; margin-inline-end: 0.25em; }
+/* F3 (REVIEW cloud_25): the banner's action in THE token (variables.css); «×» keeps Ionic's own cancel colour (11:1) */
+ion-toast.app-banner { --button-color: var(--inok-banner-action); }
+.streams__add { padding: 8px 16px 0; }
+.streams__add ion-button { margin: 0; }
+/* A-85 (2): THE smart «up» / «down» arrows (ScrollArrows) - in the page's `ion-content` fixed layer, bottom-right (tablet: the detail pane's
+   corner), the drawn circle 16 px from the edge + the safe-area inset, above a shown message / update banner (--arrows-lift); a 40 px circle
+   drawn inside a 48 px target, the theme's tonal surface at 75 % + a soft shadow, the arrow in the link colour; fade + slide 180 ms */
+.scroll-arrows { position: absolute; right: calc(12px + var(--inok-safe-right)); bottom: calc(12px + var(--arrows-lift, 0px));
+  display: flex; flex-direction: column; z-index: 10; pointer-events: none; }
+.scroll-arrows__btn { position: relative; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin: 0; padding: 0;
+  border: 0; background: none; color: var(--ion-color-primary); font-size: 24px; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent;
+  transition: opacity 180ms ease-out, transform 180ms ease-out, visibility 0s; }
+.scroll-arrows__btn::before { content: ''; position: absolute; top: 4px; right: 4px; bottom: 4px; left: 4px; border-radius: 50%;
+  background: var(--inok-tile-bg); opacity: 0.75; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+.scroll-arrows__btn ion-icon { position: relative; }
+.scroll-arrows__btn[data-shown="0"] { opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(8px);
+  transition: opacity 180ms ease-in, transform 180ms ease-in, visibility 0s linear 180ms; }
+.scroll-arrows__tip { position: absolute; right: calc(100% + 4px); top: 50%; transform: translateY(-50%); padding: 6px 10px; border-radius: 4px; white-space: nowrap;
+  background: var(--ion-text-color, #000); color: var(--ion-background-color, #fff); font-size: min(var(--inok-type-secondary), calc(14px * var(--inok-chrome-max))); }
+[data-arrow-target]:focus:not(:focus-visible) { outline: none; }
+/* item 5 (REVIEW cloud_27): on a tablet the arrows own the detail pane's right edge - its content ends before their column (12 px margin +
+   48 px target), the 4 px air beside; no link, button or icon ever sits under them; the cover picture alone stays full-bleed. A phone keeps its full width. */
+@media (min-width: 600px) {
+  .split__detail .arrows-host { --arrows-gutter: 64px; padding-inline-end: var(--arrows-gutter); }
+  .split__detail .arrows-host > .aview__cover, .split__detail .arrows-host > .card__cover-wrap {
+    width: calc(100% + var(--arrows-gutter)); margin-inline-end: calc(-1 * var(--arrows-gutter)); }
+}
+
+@media (prefers-reduced-motion: reduce) { .scroll-arrows__btn, .scroll-arrows__btn[data-shown="0"] { transition: none; transform: none; } }
+/* A-88: words for a screen reader only (the standard visually-hidden pattern: in the accessibility tree, not on screen),
+   pinned to its containing block's corner (top / left 0): at its static place deep in a scrolled pane an absolute box would widen an outer
+   scroller's overflow, and `scrollIntoView` then moved the whole page (cloud_28, the store ring's tablet article frame) */
+.sr-only { position: absolute; top: 0; left: 0; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+/* A-88 (WCAG 2.5.8): Ionic's searchbar «clear» is 22 px wide - at least 24 x 24 to tap */
+ion-searchbar .searchbar-clear-button { min-width: 24px; }

@@ -1,0 +1,6 @@
+{
+  "phone-light": { "viewport": { "width": 360, "height": 780 }, "deviceScaleFactor": 3, "colorScheme": "light", "locale": "uk-UA" },
+  "phone-dark":  { "viewport": { "width": 360, "height": 780 }, "deviceScaleFactor": 3, "colorScheme": "dark",  "locale": "uk-UA" },
+  "phone-ru":    { "viewport": { "width": 393, "height": 852 }, "deviceScaleFactor": 3, "colorScheme": "light", "locale": "ru-RU" },
+  "tablet":      { "viewport": { "width": 800, "height": 1280 }, "deviceScaleFactor": 2, "colorScheme": "light", "locale": "uk-UA" }
+}

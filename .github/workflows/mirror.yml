@@ -1,0 +1,65 @@
+name: mirror
+# A-104 / A-105 / A-106 (ref/REF_public_mirror.md §2): the code snapshot -> the PUBLIC mirror, where the free CI runs. PRIVATE home only:
+# in the mirror (this same file arrives there) every job is SKIPPED by its `if`, and the mirror holds no key anyway.
+on:
+  push:
+    branches: [main]
+    tags: ['probe-*'] # CD's probe of a TAG event without a release (the `probe` job only; no workflow builds anything on it)
+    paths-ignore: # A-39: as build.yml / screens.yml - a docs-only push sends nothing (path filters are not evaluated for tags)
+      - '**/*.md'
+      - 'reports/**'
+      - 'ref/**'
+      - 'store/**'
+  workflow_dispatch:
+    inputs:
+      emulator_matrix:
+        description: 'emulator run in the mirror: empty = none; «standard» = emulator.yml''s standard list; or a JSON list of {api-level, target, required, tag}'
+        required: false
+        default: ''
+concurrency: # snapshots are pushed one after another (the mirror's history is linear), never cancelled
+  group: mirror
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  probe:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Facts - `github.event.repository.private` on a TAG push (REF_public_mirror §3)
+        env: { EXPR_PRIVATE: '${{ github.event.repository.private }}', MIRROR_LIVE: '${{ vars.MIRROR_LIVE }}' }
+        run: python3 -I scripts/ci_infra.py facts | tee -a "$GITHUB_STEP_SUMMARY"
+  snapshot:
+    if: ${{ github.ref_type != 'tag' && github.event.repository.private }}
+    runs-on: ubuntu-24.04 # pinned as build.yml
+    timeout-minutes: 10
+    env:
+      INOK_CI_DIR: /tmp/inok-ci
+      INOK_SUMMARY: /tmp/inok-ci/summary.md
+    steps:
+      - uses: actions/checkout@v7
+      - name: Facts - which repository and event run this (A-104 split)
+        env: { EXPR_PRIVATE: '${{ github.event.repository.private }}', MIRROR_LIVE: '${{ vars.MIRROR_LIVE }}' }
+        run: python3 -I scripts/ci_infra.py facts
+      - name: Doc budgets (the private docs; moved here from build.yml - the mirror has none)
+        run: bash scripts/ci_step.sh "doc budgets" test -- python3 scripts/doc_budget_check.py
+      - name: The guard's self-test (planted private files and secrets must turn it red)
+        run: bash scripts/ci_step.sh "mirror guard self-test" test -- python3 -I scripts/mirror_snapshot.py --self-test
+      - name: Snapshot of this commit (scripts/mirror_paths.txt; the NEVER guard + the secret scan)
+        run: |
+          bash scripts/ci_step.sh "mirror snapshot" test -- python3 -I scripts/mirror_snapshot.py build "$RUNNER_TEMP/snapshot"
+          tail -2 "$INOK_CI_DIR/mirror_snapshot.log" | sed 's/^/- /' >> "$INOK_SUMMARY"
+      - name: Push the snapshot to the mirror (deploy key; «mirror not configured» = green, nothing pushed)
+        env:
+          MIRROR_DEPLOY_KEY: ${{ secrets.MIRROR_DEPLOY_KEY }}
+          MIRROR_REPO: ${{ vars.MIRROR_REPO }}
+          EMULATOR_MATRIX: ${{ inputs.emulator_matrix }}
+        run: bash scripts/mirror_push.sh "$RUNNER_TEMP/snapshot"
+      - name: Remove the key file (second layer; mirror_push.sh removes it on exit)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/mirror_key"
+      - name: Verdict - the job summary's FIRST line (A-87 (1c))
+        if: always()
+        run: python3 -I scripts/ci_infra.py verdict "${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"

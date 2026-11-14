@@ -1,0 +1,182 @@
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore: # A-39: a push that changes ONLY docs runs nothing (code, fixtures, screens/, scripts/, android/, .github/ are never listed here)
+      - '**/*.md'
+      - 'reports/**'
+      - 'ref/**'
+      - 'store/**'
+  workflow_dispatch:
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android:
+    # A-104 split (ref/REF_public_mirror.md §3; one file for both repositories): a TAG run (the signed AAB, the upload key) only in the private
+    # home and never gated by MIRROR_LIVE; every other run here only while MIRROR_LIVE != '1' (then it runs in the public mirror and this job is SKIPPED)
+    if: ${{ (startsWith(github.ref, 'refs/tags/v') && github.event.repository.private) || (!startsWith(github.ref, 'refs/tags/v') && (!github.event.repository.private || vars.MIRROR_LIVE != '1')) }}
+    runs-on: ubuntu-24.04 # pinned (A-39 / cloud_13 0b): every green build, screens and KVM emulator run is on 24.04; ubuntu-latest moves to 26.04 gradually 19.10-19.11.2026
+    timeout-minutes: 40
+    env: # A-87: every network step = scripts/ci_step.sh (cached + retried; an unreachable host = «INFRA» as the summary's FIRST line)
+      INOK_CI_DIR: /tmp/inok-ci
+      INOK_SUMMARY: /tmp/inok-ci/summary.md
+      GRADLE_OPTS: -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.repository.max.retries=5 -Dorg.gradle.internal.repository.initial.backoff=1000
+    steps:
+      - uses: actions/checkout@v7
+      - name: Facts - which repository and event run this (A-104 split; the line goes to the job summary)
+        env: { EXPR_PRIVATE: '${{ github.event.repository.private }}', MIRROR_LIVE: '${{ vars.MIRROR_LIVE }}' }
+        run: python3 -I scripts/ci_infra.py facts
+      - name: A-87 the planted dead Ubuntu mirror (no step may need apt)
+        run: bash scripts/ci_dead_mirror.sh
+      - uses: actions/setup-node@v7
+        with: { node-version: 22, cache: npm } # the npm cache (~/.npm) keyed by package-lock.json
+      - name: Install
+        run: bash scripts/ci_step.sh "npm ci" net -- npm ci
+      - name: Lint, types, unit tests
+        run: bash scripts/ci_step.sh "lint, types, unit" test -- bash -c 'npm run lint && npm run typecheck && npm test'
+      - name: Build web (debug builds subscribe to the push topic `test` — the owner's proof, PHONE_TEST_BACKLOG; the release bundle never)
+        env:
+          VITE_PUSH_TEST: ${{ startsWith(github.ref, 'refs/tags/v') && '0' || '1' }}
+        run: |
+          npm run build
+          # cloud_21 (5г): measured on the BUILT bundle - PUSH_TEST_MARK (src/native/push.ts) exists only where the `test` branch survived
+          if grep -lq 'InokPush-test-topic-on' dist/assets/*.js; then has=1; else has=0; fi
+          echo "push topic \`test\` in the built bundle: $has (VITE_PUSH_TEST=$VITE_PUSH_TEST)" | tee -a "$INOK_SUMMARY"
+          [ "$has" = "$VITE_PUSH_TEST" ] || { echo "::error::the bundle's \`test\` topic ($has) does not match VITE_PUSH_TEST=$VITE_PUSH_TEST"; exit 1; }
+      - uses: actions/setup-java@v6
+        with: { distribution: temurin, java-version: 21, cache: gradle } # ~/.gradle/caches + wrapper keyed by the Gradle files
+      - uses: android-actions/setup-android@v4
+        with: { packages: 'platform-tools platforms;android-36 build-tools;36.0.0', log-accepted-android-sdk-licenses: false }
+      - name: google-services.json from the GOOGLE_SERVICES_JSON_B64 secret (never in git)
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON_B64" ]; then
+            echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > android/app/google-services.json
+            python3 -c "import json;j=json.load(open('android/app/google-services.json'));print('google-services.json ok, project', j['project_info']['project_id'])"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON_B64 is not set - building without Firebase config"
+          fi
+      - name: Capacitor sync
+        run: npx cap sync android
+      - name: Debug APK + the qa build (R8 as release, debug key - cloud_27, A-83) + the JVM unit tests (Notifier, A-84)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: |
+          cd android && bash ../scripts/ci_step.sh "gradle: debug, qa, JVM tests" net -- ./gradlew --no-daemon assembleDebug assembleQa bundleQa testDebugUnitTest
+          # A-62: versionCode computed by build.gradle from package.json (1.0.0 -> 10000), read back from the APK
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging app/build/outputs/apk/debug/app-debug.apk > /tmp/badging.txt
+          head -1 /tmp/badging.txt | tee -a "$INOK_SUMMARY"
+          # A-69: the phone's name = «inok.info» for the application AND the launcher (scripts/release_check.py reads the same lines on a tag)
+          python3 -I ../scripts/release_check.py --labels /tmp/badging.txt | tee -a "$INOK_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        with: { name: app-debug.apk, path: android/app/build/outputs/apk/debug/app-debug.apk, retention-days: 30 }
+      - name: qa build read-backs (A-83 R8 %, sizes, keep.xml, the DEX search; A-84 the debug-only push entry) - scripts/apk_check.sh
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: |
+          set -o pipefail
+          O=android/app/build/outputs
+          bash scripts/apk_check.sh "$ANDROID_HOME/build-tools/36.0.0" "$O/apk/debug/app-debug.apk" "$O/apk/qa/app-qa.apk" "$O/bundle/qa/app-qa.aab" "$O/mapping/qa/mapping.txt" | tee -a "$INOK_SUMMARY"
+          grep -h -E 'tests=|failures=' android/app/build/test-results/testDebugUnitTest/*.xml | head -3 | sed 's/^/JVM unit: /' | tee -a "$INOK_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        with: { name: app-qa.apk, path: android/app/build/outputs/apk/qa/app-qa.apk, retention-days: 30 }
+      - uses: actions/upload-artifact@v7
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        with: { name: mapping-qa, path: android/app/build/outputs/mapping/qa/mapping.txt, retention-days: 30 }
+      - uses: actions/upload-artifact@v7
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        with: { name: r8-analyze, path: r8-analyze/, retention-days: 30, if-no-files-found: ignore } # android analyze JSON (qa AAB + debug APK)
+      - name: Release signing secrets present (names only; the values never leave GitHub Secrets)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          miss=""; for n in ANDROID_KEYSTORE_B64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do [ -n "${!n}" ] || miss="$miss $n"; done
+          if [ -n "$miss" ]; then echo "::error::missing GitHub Secrets:$miss (store/play_console_steps_RU.md, step 5)"; exit 1; fi
+          echo "$ANDROID_KEYSTORE_B64" | base64 -d > /tmp/upload.keystore
+          # the UPLOAD certificate's SHA-256 (public) for the record; R-7 (assetlinks) needs the APP SIGNING one from Play Console
+          keytool -list -v -keystore /tmp/upload.keystore -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | grep -m1 'SHA256:' | tee -a "$INOK_SUMMARY"
+          rm -f /tmp/upload.keystore
+      - name: Release AAB (signed from Secrets)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_B64" | base64 -d > android/release.keystore
+          cd android && bash ../scripts/ci_step.sh "gradle: release AAB" net -- ./gradlew --no-daemon bundleRelease \
+            -Pandroid.injected.signing.store.file=$PWD/release.keystore \
+            -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+          rm -f release.keystore
+      - name: R-9 — the merged manifest (debug, and RELEASE on a tag) carries no advertising-ID permission and disables ad-id collection
+        env:
+          V: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || 'debug' }}
+        run: |
+          M="$(find android/app/build/intermediates -path "*$V*" -name AndroidManifest.xml | grep -i merged | head -1)"
+          echo "merged manifest ($V): $M"; [ -n "$M" ] || { echo "::error::no merged $V manifest"; exit 1; }
+          mkdir -p manifest-merged; cp "$M" manifest-merged/AndroidManifest.merged.$V.xml
+          grep -n 'adid_collection_enabled' "$M" || { echo "::error::google_analytics_adid_collection_enabled missing from the merged manifest"; exit 1; }
+          if grep -n 'AD_ID' "$M"; then echo "::error::AD_ID permission present in the merged manifest (R-9)"; exit 1; fi
+          if grep -nE 'USE_BIOMETRIC|USE_FINGERPRINT' "$M" | grep -v 'tools:node'; then echo "::error::a biometric permission in the merged manifest (N5)"; exit 1; fi
+          echo "R-9 ok ($V): no AD_ID permission; adid collection disabled" | tee -a "$INOK_SUMMARY"
+          grep -n 'android:name="asset_statements"' "$M" | tee -a "$INOK_SUMMARY" || { echo "::error::A-92 asset_statements missing from the merged $V manifest"; exit 1; }
+          grep -n 'MESSAGING_EVENT' -B3 "$M" | tee -a "$INOK_SUMMARY"
+      - name: Release readiness (tag only) — 16 KB pages, the release manifest, the facts for Play (scripts/release_check.py)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -o pipefail
+          A=android/app/build/outputs/bundle/release/app-release.aab
+          python3 -I scripts/release_check.py --self-test
+          # a TOOL that fails = «not checked» in the summary (the tag is never moved, cloud_21); a CHECK that fails = red
+          BT=/tmp/bundletool.jar; MAN=manifest-merged/AndroidManifest.merged.release.xml; SRC='merged release manifest (bundletool unavailable)'
+          if curl -sSfL -o $BT https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar \
+             && java -jar $BT dump manifest --bundle="$A" > manifest-merged/AndroidManifest.release-aab.xml; then
+            MAN=manifest-merged/AndroidManifest.release-aab.xml; SRC='the AAB (bundletool dump manifest)'
+          else echo "::warning::bundletool unavailable - the facts below come from the merged release manifest"; BT=''; fi
+          # the zip side of 16 KB: the APKs Play derives from this AAB (bundletool, a throwaway key - never the upload key) pass zipalign -P 16
+          if [ -n "$BT" ]; then
+            keytool -genkeypair -keystore /tmp/check.jks -storepass checkonly -keypass checkonly -alias check -dname CN=check -keyalg RSA -validity 1 -noprompt
+            if java -jar $BT build-apks --bundle="$A" --output=/tmp/check.apks --mode=universal \
+                 --ks=/tmp/check.jks --ks-pass=pass:checkonly --ks-key-alias=check --key-pass=pass:checkonly \
+               && rm -rf /tmp/apks && mkdir /tmp/apks && unzip -q /tmp/check.apks -d /tmp/apks; then
+              # A-69: both labels from the APK Play derives (aapt2 badging), read by release_check below
+              "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging /tmp/apks/universal.apk > /tmp/badging.txt || rm -f /tmp/badging.txt
+              for apk in /tmp/apks/*.apk; do
+                "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$apk" > /tmp/za.txt || { tail -20 /tmp/za.txt; echo "::error::$apk is not 16 KB zip-aligned"; exit 1; }
+                echo "zipalign -c -P 16 $(basename "$apk"): $(tail -1 /tmp/za.txt); .so stored uncompressed: $(unzip -v "$apk" | grep -c ' Stored .*\.so$' || true) of $(unzip -l "$apk" | grep -c '\.so$' || true)" | tee -a "$INOK_SUMMARY"
+              done
+            else echo "::warning::bundletool build-apks failed - 16 KB zip alignment NOT CHECKED (ELF alignment below is)" | tee -a "$INOK_SUMMARY"; fi
+            rm -f /tmp/check.jks
+          else echo "16 KB zip alignment: NOT CHECKED (no bundletool); ELF alignment below is" | tee -a "$INOK_SUMMARY"; fi
+          echo "manifest facts from $SRC" | tee -a "$INOK_SUMMARY"
+          BADGING=(); [ -s /tmp/badging.txt ] && BADGING=(/tmp/badging.txt)
+          # A-66 (cloud_29): Play Integrity judged in the DEX + the R8 path through this build's mapping (the old class-name mark failed on R8)
+          M=android/app/build/outputs/mapping/release/mapping.txt
+          python3 -I scripts/release_check.py "$A" "$MAN" package.json "${BADGING[@]}" --mapping "$M" | tee -a "$INOK_SUMMARY"
+          # A-83: Google's R8 numbers for the AAB Play gets + the DEX search of the APK Play derives (a tool failure = NOT CHECKED)
+          if [ -s /tmp/apks/universal.apk ]; then python3 -I scripts/dex_check.py "$ANDROID_HOME/build-tools/36.0.0/dexdump" /tmp/apks/universal.apk "$M" | tee -a "$INOK_SUMMARY"; fi
+          if curl -fsSL -o /tmp/android-cli https://dl.google.com/android/cli/latest/linux_x86_64/android && chmod +x /tmp/android-cli \
+             && timeout 600 /tmp/android-cli --sdk="$ANDROID_HOME" analyze --analysis=optimization --format=json "$A" > /tmp/analyze.json; then
+            python3 -I scripts/r8_stats.py "$A" /tmp/analyze.json | tee -a "$INOK_SUMMARY" || true
+          else echo "android analyze: NOT CHECKED" | tee -a "$INOK_SUMMARY"; fi
+      - uses: actions/upload-artifact@v7
+        with: { name: manifest-merged, path: manifest-merged/, retention-days: 30 }
+      - uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/v')
+        with: { name: app-release.aab, path: android/app/build/outputs/bundle/release/app-release.aab, retention-days: 90 }
+      - uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/v')
+        with: { name: mapping-release, path: android/app/build/outputs/mapping/release/mapping.txt, retention-days: 90 } # A-83: never in git; the AAB carries it to Play too
+      - name: Verdict - the job summary's FIRST line (A-87 (1c)) - OK / INFRA (re-run) / CODE (fix) / UNCLASSIFIED (read the action's log)
+        if: always()
+        run: python3 -I scripts/ci_infra.py verdict "${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"

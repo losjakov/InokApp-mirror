@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DEBUG BUILD ONLY (src/debug is never in qa / release; build.yml reads it back from both APKs): the emulator feeds push data
+     payloads into the SAME handler as InokMessagingService (A-84 proof, scripts/emu_notify.sh). Exported so `adb shell am broadcast` reaches it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver android:name=".PushTestReceiver" android:exported="true" />
+    </application>
+</manifest>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 120 120" style="shape-rendering: geometricprecision;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <radialGradient id="id0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1.14385 -0 -0 1.14388 -145 -98)" cx="1008.16" cy="681.835" r="654.32">
+      <stop offset="0" style="stop-opacity:1; stop-color:#FEFEFE"/>
+      <stop offset="0.502" style="stop-opacity:1; stop-color:#FECC00"/>
+      <stop offset="1" style="stop-opacity:1; stop-color:#B2B3B3"/>
+    </radialGradient>
+    <radialGradient id="id1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1.14378 -0 -0 1.14384 -64 -142)" cx="447.445" cy="986.771" r="654.32">
+      <stop offset="0" style="stop-opacity:1; stop-color:#FEFEFE"/>
+      <stop offset="0.502" style="stop-opacity:1; stop-color:#EBECEC"/>
+      <stop offset="1" style="stop-opacity:1; stop-color:#B2B3B3"/>
+    </radialGradient>
+    <radialGradient id="id2" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1.14381 -0 -0 1.14383 -228 -142)" cx="1582.62" cy="986.771" r="654.32" xlink:href="#id1"/>
+    <bx:guide x="60" y="45.939" angle="0"/>
+    <radialGradient gradientUnits="userSpaceOnUse" cx="61.841" cy="68.407" r="38.159" id="gradient-0" gradientTransform="matrix(1.484216, 0, 0, 1.519184, -31.339146, -43.39378)">
+      <stop offset="0" style="stop-color: rgba(0, 0, 0, 1)"/>
+      <stop offset="1" style="stop-color: rgba(0, 0, 0, 1)"/>
+    </radialGradient>
+  </defs>
+  <ellipse style="stroke-width: 0px; stroke: url(#gradient-0); fill: rgb(20, 110, 55);" cx="60.446" cy="60.529" rx="56.636" ry="57.971"/>
+  <g id="Слой_x0020_1" transform="matrix(0.069804, 0, 0, 0.069399, -10.01384, 8.572582)" style="">
+    <path class="fil0 str0" d="M1263 911c-170,-116 -180,-124 -216,-226 -94,-271 -58,-362 -272,-362 -70,0 -71,90 0,90 182,0 272,-90 272,-271 0,-70 -90,-71 -90,0 0,181 90,271 272,271 75,0 73,-90 0,-90 -219,0 -176,90 -272,362 -33,91 -26,102 -233,226 -280,485 870,484 539,0z" style="fill: url(#id0); stroke: rgb(211, 212, 212); stroke-width: 14.4002px;"/>
+    <path class="fil1 str1" d="M1791 1174c-139,-95 -148,-102 -177,-185 -77,-221 -47,-296 -221,-296 -58,0 -59,74 0,74 147,0 221,-74 221,-221 0,-57 -74,-58 -74,0 0,147 74,221 223,221 61,0 59,-74 0,-74 -179,0 -144,74 -223,296 -26,75 -20,83 -189,185 -229,396 710,395 440,0z" style="fill: url(#id2); stroke: rgb(255, 211, 64); stroke-width: 14.4002px;"/>
+    <path class="fil2 str1" d="M656 1174c-140,-95 -148,-102 -177,-185 -77,-221 -47,-296 -222,-296 -57,0 -58,74 0,74 148,0 222,-74 222,-221 0,-57 -74,-58 -74,0 0,147 74,221 223,221 61,0 59,-74 0,-74 -179,0 -144,74 -223,296 -26,75 -20,83 -190,185 -228,396 711,395 441,0z" style="fill: url(#id1); stroke: rgb(255, 211, 64); stroke-width: 14.4002px;"/>
+    <path class="fil3 str2" d="M1004 546c-47,-164 -57,-223 -229,-223 -70,0 -71,90 0,90 182,0 272,-90 272,-271 0,-70 -90,-71 -90,0 0,181 90,271 272,271 75,0 73,-90 0,-90 -176,0 -183,58 -229,223l4 0z" style="fill: rgb(255, 211, 64); stroke: rgb(220, 221, 221); stroke-width: 14.4002px;"/>
+    <path class="fil4 str1" d="M1575 862c-35,-123 -47,-169 -182,-169 -58,0 -59,74 0,74 147,0 221,-74 221,-221 0,-57 -74,-58 -74,0 0,147 74,221 223,221 61,0 59,-74 0,-74 -139,0 -149,45 -183,169l-5 0z" style="fill: rgb(220, 221, 221); stroke: rgb(255, 211, 64); stroke-width: 14.4002px;"/>
+    <path class="fil4 str1" d="M442 870c-36,-130 -47,-177 -185,-177 -57,0 -58,74 0,74 148,0 222,-74 222,-221 0,-57 -74,-58 -74,0 0,147 74,221 223,221 61,0 59,-74 0,-74 -142,0 -149,47 -185,177l-1 0z" style="fill: rgb(220, 221, 221); stroke: rgb(255, 211, 64); stroke-width: 14.4002px;"/>
+  </g>
+</svg>

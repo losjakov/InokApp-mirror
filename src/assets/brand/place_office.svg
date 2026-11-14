@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+ <!-- D51: the editorial office — the site's pin shape (mapicons/*.svg), the brand colour, a white sheet with the text lines -->
+ <path d="M24 1c7,0 14,6 14,14 0,8 -9,13 -14,30 -6,-17 -14,-22 -14,-30 0,-8 6,-14 14,-14z" fill="#0c6486" stroke="#fff" stroke-width="1.89"/>
+ <rect x="16.5" y="7.5" width="15" height="15" rx="1.8" fill="#fff"/>
+ <path d="M19 11.5h10M19 14.5h10M19 17.5h6.5" stroke="#0c6486" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

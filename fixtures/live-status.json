@@ -1,0 +1,82 @@
+{
+ "at": "2026-11-01T17:30:08Z",
+ "live": [
+  {
+   "channel_id": 1686,
+   "video_id": "HzazQCqXxyE",
+   "title": {
+    "uk": "Пряма трансляція богослужіння † Свято-Успенська Почаївська Лавра",
+    "ru": "Пряма трансляція богослужіння † Свято-Успенська Почаївська Лавра",
+    "en": "Пряма трансляція богослужіння † Свято-Успенська Почаївська Лавра"
+   },
+   "started_at": "2026-10-31T19:00:15Z",
+   "thumbnail": {
+    "url": "https://inok.info/images/live/1686/video/comb_thumbnail360_HzazQCqXxyE.webp",
+    "w": 360,
+    "h": 200
+   }
+  },
+  {
+   "channel_id": 1685,
+   "video_id": "eIkR26WEzCk",
+   "title": {
+    "uk": "Пряма трансляція користувача Трансляція Іонінський",
+    "ru": "Пряма трансляція користувача Трансляція Іонінський",
+    "en": "Пряма трансляція користувача Трансляція Іонінський"
+   },
+   "started_at": "2026-10-30T14:09:00Z",
+   "thumbnail": {
+    "url": "https://inok.info/images/live/1685/video/comb_thumbnail360_eIkR26WEzCk.webp",
+    "w": 360,
+    "h": 200
+   }
+  },
+  {
+   "channel_id": 1703,
+   "video_id": "Ke-DbpH1soQ",
+   "title": {
+    "uk": "01.11 Акафіст",
+    "ru": "01.11 Акафіст",
+    "en": "01.11 Акафіст"
+   },
+   "started_at": "2026-11-01T15:57:56Z",
+   "thumbnail": {
+    "url": "https://inok.info/images/live/1703/video/comb_thumbnail360_Ke-DbpH1soQ.webp",
+    "w": 360,
+    "h": 200
+   }
+  }
+ ],
+ "scheduled": [
+  {
+   "channel_id": 1692,
+   "video_id": "sK7JF1F6BiA",
+   "title": {
+    "uk": "Трансляция: Литургия, 02.11.2026",
+    "ru": "Трансляция: Литургия, 02.11.2026",
+    "en": "Трансляция: Литургия, 02.11.2026"
+   },
+   "scheduled_at": "2026-11-02T06:00:00Z",
+   "thumbnail": {
+    "url": "https://inok.info/images/live/1692/video/comb_thumbnail360_sK7JF1F6BiA.webp",
+    "w": 360,
+    "h": 200
+   }
+  }
+ ],
+ "calendar": {
+  "date": "2026-11-02",
+  "title": {
+   "uk": "Cедмиця 23-тя після П’ятидесятниці. Вмч. Артемія (362). Прав. отрока Артемія Веркольського (1545). Сщмч. Миколая Любомудрова пресвітера (1918); сщмчч. Зосими Пепеніна, Іоанна Ганчева, Іоанна Рєчкіна, Іоанна Родіонова, Миколая Фігурова, Леоніда Нікольського, Іоанна Тализіна й Олександра Орлова пресвітерів, Михаїла Ісаєва і Петра Кравця дияконів і мч. Павла Бочарова (1937). Прп. Гавриїла Самтаврійського (1995). Знайдення мощей прп. вел. кн. Анастасії Києво-Покровської (2009).",
+   "ru": "Седмица 23-я по Пятидесятнице. Вмч. Артемия (362). Прав. отрока Артемия Веркольского (1545). Сщмч. Николая Любомудрова пресвитера (1918); сщмчч. Зосимы Пепенина, Иоанна Ганчева, Иоанна Речкина, Иоанна Родионова, Николая Фигурова, Леонида Никольского, Иоанна Тализина и Александра Орлова пресвитеров, Михаила Исаева и Петра Кравца диаконов и мч. Павла Бочарова (1937). Прп. Гавриила Самтаврийского (1995). Обретение мощей прп. вел. кн. Анастасии Киево-Покровской (2009).",
+   "en": "Week 23rd after Pentecost. 1. Great Martyr Artemius (362). 2. Righteous Youth Artemius of Verkola (1545). 3. Hieromartyr Nicholas Lyubomudrov, Presbyter (1918); 4. Hieromartyrs Zosima Pepenin, John Ganchev, John Rechkin, John Rodionov, Nicholas Figurov, Leonid Nikolsky, John Talyzin, and Alexander Orlov, Presbyters, 5. Michael Isayev and Peter Kravets, Deacons, and Martyr Paul Bocharov (1937). 6. Venerable Gabriel of Samtavro (1995). 7. The Finding of the Relics of Venerable Grand Princess Anastasia of Kyiv-Pokrovsky (2009)."
+  },
+  "site_url": "https://inok.info/live/",
+  "body": {
+   "uk": "<p><strong>2 листопада 2026 р. (20 жовтня ст. ст.), понеділок</strong></p><p><u>Cедмиця 23-тя після П’ятидесятниці.</u></p><p>Вмч. Артемія (362). Прав. отрока Артемія Веркольського (1545). Сщмч. Миколая Любомудрова пресвітера (1918); сщмчч. Зосими Пепеніна, Іоанна Ганчева, Іоанна Рєчкіна, Іоанна Родіонова, Миколая Фігурова, Леоніда Нікольського, Іоанна Тализіна й Олександра Орлова пресвітерів, Михаїла Ісаєва і Петра Кравця дияконів і мч. Павла Бочарова (1937). Прп. Гавриїла Самтаврійського (1995). Знайдення мощей прп. вел. кн. Анастасії Києво-Покровської (2009).</p><p><strong>Посту немає.</strong></p><p><em>На літургії: - Апостол: 1Сол. 1:1-5 (зач. 262) і за вівторок (під зачало): 1Сол. 2:1-8 (зач. 264). Євангеліє.: Лк. 9:18-22 (зач. 43).</em></p>",
+   "ru": "<p><strong>2 ноября 2026 г. (20 октября ст. ст.), понедельник</strong></p><p><u>Седмица 23-я по Пятидесятнице.</u></p><p>Вмч. Артемия (362). Прав. отрока Артемия Веркольского (1545). Сщмч. Николая Любомудрова пресвитера (1918); сщмчч. Зосимы Пепенина, Иоанна Ганчева, Иоанна Речкина, Иоанна Родионова, Николая Фигурова, Леонида Никольского, Иоанна Тализина и Александра Орлова пресвитеров, Михаила Исаева и Петра Кравца диаконов и мч. Павла Бочарова (1937). Прп. Гавриила Самтаврийского (1995). Обретение мощей прп. вел. кн. Анастасии Киево-Покровской (2009).</p><p><strong>Поста нет.</strong></p><p><em>На литургии: - Апостол: 1Сол. 1:1-5 (зач. 262) и за вторник (под зачало): 1Сол. 2:1-8 (зач. 264). Евангелие: Лк. 9:18-22 (зач. 43).</em></p>",
+   "en": "<p><strong>November 2, 2026 A.D. (October 20, O.S.), Monday</strong></p><p><u>Week 23rd after Pentecost.</u></p><p>1. Great Martyr Artemius (362). 2. Righteous Youth Artemius of Verkola (1545). 3. Hieromartyr Nicholas Lyubomudrov, Presbyter (1918); 4. Hieromartyrs Zosima Pepenin, John Ganchev, John Rechkin, John Rodionov, Nicholas Figurov, Leonid Nikolsky, John Talyzin, and Alexander Orlov, Presbyters, 5. Michael Isayev and Peter Kravets, Deacons, and Martyr Paul Bocharov (1937). 6. Venerable Gabriel of Samtavro (1995). 7. The Finding of the Relics of Venerable Grand Princess Anastasia of Kyiv-Pokrovsky (2009).</p><p><strong>There is no fast.</strong></p><p><em>At the Divine Liturgy: - Epistle: 1 Thessalonians 1:1-5 (pericope 262) and for Tuesday (under pericope): 1 Thessalonians 2:1-8 (pericope 264). Gospel: Luke 9:18-22 (pericope 43).</em></p>"
+  },
+  "summary_paragraphs": 2
+ }
+}

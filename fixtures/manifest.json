@@ -1,0 +1,24 @@
+{
+  "contract_version": 1,
+  "export_version": "2026-11-04T06:32:48Z",
+  "generated_at": "2026-11-04T06:32:48Z",
+  "files": [
+    {
+      "name": "directory_v1.json.gz",
+      "sha256": "e4af80256e73ec44ad2136a5d1b85a47a0b41cd303b5dd24760bba2a1408878a",
+      "bytes": 149776
+    }
+  ],
+  "languages": [
+    "uk",
+    "ru",
+    "en"
+  ],
+  "counts": {
+    "monasteries": 18,
+    "eparchies": 53,
+    "channels": 25,
+    "oblasts": 25
+  },
+  "content_sha256": "8f955c8544d3e15b1a730c43d40759b473035e26caab138db14f5f87bbc17220"
+}

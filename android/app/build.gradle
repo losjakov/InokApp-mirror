@@ -1,0 +1,82 @@
+apply plugin: 'com.android.application'
+
+// A-62 (ref/REF_app_release.md): ONE version - package.json "version" X.Y.Z (SemVer); versionName = it, versionCode is COMPUTED from it,
+// never written by hand: X*10000 + Y*100 + Z (1.0.0 -> 10000, 1.2.3 -> 10203). The build FAILS on anything but X.Y.Z or on Y / Z > 99.
+def appVersion = new groovy.json.JsonSlurper().parse(file("../../package.json")).version as String
+def appVersionCode = { String v ->
+    def m = v =~ /^(\d+)\.(\d+)\.(\d+)$/
+    if (!m.matches()) throw new GradleException("package.json version '${v}' is not X.Y.Z (A-62, ref/REF_app_release.md)")
+    int x = m.group(1) as int, y = m.group(2) as int, z = m.group(3) as int
+    if (y > 99 || z > 99) throw new GradleException("package.json version '${v}': Y and Z must be 0..99 (versionCode X*10000 + Y*100 + Z, A-62)")
+    return x * 10000 + y * 100 + z
+}
+
+android {
+    namespace = "info.inok.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "info.inok.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode appVersionCode(appVersion)
+        versionName appVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildTypes {
+        // A-83 (ref/FUTURE_play_quality.md §3): R8 = shrinking + optimization + obfuscation on the RELEASE build only (debug stays plain for
+        // the screen tests). `proguard-android-optimize.txt` (never `proguard-android.txt`: its -dontoptimize). Library consumer rules
+        // (Capacitor plugins, SQLCipher JNI, Firebase, Play) come with the libraries; `proguard-rules.pro` adds a rule only for a crash
+        // reproduced in the minified build. Resources looked up BY NAME: `res/raw/keep.xml`. mapping.txt = a CI artifact, never in git.
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        // cloud_27 (item 3): THE release build's code (initWith = the same R8 files, one source), signed with the debug key, not debuggable -
+        // what the emulator and the owner's phone run (`app-qa.apk`) so R8 is proven before the tag. Same applicationId: it installs over
+        // the debug APK (same key). Libraries have no `qa` type -> their release variant.
+        qa {
+            initWith release
+            signingConfig signingConfigs.debug
+            debuggable false
+            matchingFallbacks = ['release']
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+    implementation "com.google.firebase:firebase-messaging:$firebaseMessagingVersion" // FcmTopicsPlugin, InokMessagingService
+    implementation "com.google.firebase:firebase-analytics:$firebaseAnalyticsVersion" // AnalyticsPlugin (A-36: screens only, no ad id)
+    implementation "com.google.android.play:integrity:$playIntegrityVersion" // IntegrityPlugin (A-66: a token on every write)
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

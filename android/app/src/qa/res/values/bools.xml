@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- the qa build (R8 like release, debug key, not debuggable): the emulator drives its WebView through DevTools (scripts/emu_nav.mjs) -->
+    <bool name="inok_webview_inspectable">true</bool>
+</resources>

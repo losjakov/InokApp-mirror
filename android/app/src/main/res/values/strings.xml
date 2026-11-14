@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- A-69: the ONE name on the phone (launcher + Settings → Apps + notification header), one form in every language: no values-uk / values-ru copy -->
+    <string name="app_name">inok.info</string>
+    <string name="package_name">info.inok.app</string>
+    <string name="custom_url_scheme">info.inok.app</string>
+    <string name="push_title_stream">Live now</string>
+    <string name="push_title_article">New on inok.info</string>
+    <!-- A-84: the two notification channels, the summary (plurals) and its action - in the APP's language (InokNotifications) -->
+    <string name="push_channel_articles">New publications</string>
+    <string name="push_channel_live">Live</string>
+    <string name="push_mark_read">Mark as read</string>
+    <string name="push_summary_more">%d more</string>
+    <plurals name="push_summary_articles">
+        <item quantity="one">%d new publication</item>
+        <item quantity="other">%d new publications</item>
+    </plurals>
+</resources>

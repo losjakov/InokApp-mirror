@@ -1,0 +1,68 @@
+import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonNote, IonPage } from '@ionic/react';
+import { Busy } from '@/components/Busy';
+import { cloudDownloadOutline, eyeOffOutline, shareSocialOutline, starOutline } from 'ionicons/icons';
+import { useRef, useState } from 'react';
+import { PageHeader } from '@/components/PageHeader';
+import { APP_VERSION } from '@/app/version';
+import { openLink } from '@/native/intents';
+import { SITE_URL } from '@/data/api/client';
+import { checkUpdate, immediateUpdate, openListing, shareApp, storeLinksShown, type UpdateCheck } from '@/native/play';
+import { useApp } from '@/state/AppContext';
+
+const OWN_TAPS = 7;
+const OWN_TAPS_MS = 4000;
+
+export function AboutPage() {
+  const { t, lang, exportVersion, config, settings, setSettings } = useApp();
+  // A-65: the hidden «own device» mark - 7 taps on the version line toggle it (local only, nothing sent); while on, a small badge
+  const taps = useRef<number[]>([]);
+  const tap = () => {
+    const now = Date.now();
+    taps.current = [...taps.current.filter((x) => now - x < OWN_TAPS_MS), now];
+    if (taps.current.length >= OWN_TAPS) { taps.current = []; void setSettings({ ownDevice: !settings.ownDevice }); }
+  };
+  const dataDate = exportVersion ? new Intl.DateTimeFormat(lang, { dateStyle: 'long', timeStyle: 'short' }).format(new Date(exportVersion)) : null;
+  const privacy = config?.privacy_url; // A-8: only from config, never hard-coded
+  // A-80: «Перевірити оновлення» - Play's answer under the row; an update -> Google's own flow; not from Play -> said, nothing opens
+  const [check, setCheck] = useState<UpdateCheck | 'busy' | null>(null);
+  const runCheck = async () => {
+    setCheck('busy');
+    const c = await checkUpdate();
+    setCheck(c);
+    if (c.state === 'available') await immediateUpdate(c.info, config);
+  };
+  const checkNote = check === 'busy' ? t('about.checking') : check?.state === 'none' ? t('about.latest', { v: APP_VERSION })
+    : check?.state === 'not_play' ? t('about.not_play') : check?.state === 'error' ? t('about.check_error') : null;
+  return (
+    <IonPage>
+      <PageHeader title={t('about.title')} />
+      <IonContent>
+        <IonList>
+          <IonItem><IonLabel>{t('app.name')}</IonLabel></IonItem>
+          <IonItem onClick={tap} data-testid="version-line"><IonLabel>{t('about.version')}</IonLabel>
+            <IonNote slot="end" data-testid="app-version">{APP_VERSION}</IonNote>
+            {settings.ownDevice && <IonIcon slot="end" icon={eyeOffOutline} className="own-device" aria-label={t('views.own_device')} data-testid="own-device" />}
+          </IonItem>
+          {storeLinksShown(config) && <>
+            <IonItem button detail={false} onClick={() => void shareApp(t('app.name'), t('about.share_text'), config)} data-testid="about-share">
+              <IonIcon slot="start" icon={shareSocialOutline} aria-hidden="true" /><IonLabel>{t('about.share')}</IonLabel>
+            </IonItem>
+            <IonItem button detail={false} onClick={() => void openListing(config)} data-testid="about-rate">
+              <IonIcon slot="start" icon={starOutline} aria-hidden="true" /><IonLabel>{t('about.rate')}</IonLabel>
+            </IonItem>
+          </>}
+          <IonItem button detail={false} disabled={check === 'busy'} onClick={() => void runCheck()} data-testid="about-update">
+            <IonIcon slot="start" icon={cloudDownloadOutline} aria-hidden="true" />
+            <IonLabel className="ion-text-wrap">{t('about.check')}{checkNote && <p data-testid="about-update-note" aria-live="polite">{checkNote}</p>}</IonLabel>
+            {check === 'busy' && <Busy slot="end" name="dots" />}
+          </IonItem>
+          <IonItem><IonLabel className="ion-text-wrap">{dataDate ? `${t('about.data')} ${dataDate}` : t('about.data_none')}</IonLabel></IonItem>
+          {privacy && (
+            <IonItem button detail onClick={() => openLink(privacy, lang)}><IonLabel>{t('about.privacy')}</IonLabel></IonItem>
+          )}
+          <IonItem button detail onClick={() => openLink(SITE_URL, lang)}><IonLabel>{t('about.site')}</IonLabel></IonItem>
+        </IonList>
+      </IonContent>
+    </IonPage>
+  );
+}

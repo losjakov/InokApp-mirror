@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- cloud_27: true ONLY in the qa build (android/app/src/qa/res/values/bools.xml) - its WebView is inspectable for the emulator smoke -->
+    <bool name="inok_webview_inspectable">false</bool>
+</resources>

@@ -1,0 +1,114 @@
+{
+ "2869": {
+  "items": [
+   {
+    "id": 109,
+    "author": "Hanomov",
+    "text": "владика молиться за батьків, які покинули цих дітей, а не засуджує їх",
+    "at": "2026-11-01T19:52:00Z",
+    "votes": {
+     "likes": 1,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": []
+   },
+   {
+    "id": 108,
+    "author": "Сергий",
+    "text": "дельный совет тем, кто впервые идёт в храм: постоять пять–десять минут и помолиться своими словами. можно отправлять тем кто еще не решился",
+    "at": "2026-11-01T18:42:00Z",
+    "votes": {
+     "likes": 1,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": []
+   },
+   {
+    "id": 107,
+    "author": "Сергій",
+    "text": "оце я розумію любов на ділі",
+    "at": "2026-11-01T18:31:00Z",
+    "votes": {
+     "likes": 1,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": []
+   },
+   {
+    "id": 106,
+    "author": "Kristina",
+    "text": "Дай Бог владыке здоровья и сил!",
+    "at": "2026-11-01T15:39:00Z",
+    "votes": {
+     "likes": 1,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": []
+   }
+  ],
+  "total": 4,
+  "rating": {
+   "value": 5,
+   "count": 6
+  },
+  "comments_count": 4,
+  "rules": {
+   "uk": "Пишіть доброзичливо, по суті та з повагою до інших читачів. Посилання на сторонні сайти не допускаються. Коментар з'явиться після перевірки адміністратором.",
+   "ru": "Пишите доброжелательно, по существу и с уважением к другим читателям. Ссылки на сторонние сайты не допускаются. Комментарий появится после проверки администратором.",
+   "en": "Please be kind, stay on topic and respect other readers. Links to other websites are not allowed. Your comment will appear after an administrator has reviewed it."
+  },
+  "rules_url": {
+   "uk": "https://inok.info/about/comment-rules/",
+   "ru": "https://inok.info/about/comment-rules/?lang=ru",
+   "en": "https://inok.info/about/comment-rules/?lang=en"
+  }
+ },
+ "1892": {
+  "items": [
+   {
+    "id": 49,
+    "author": "Лонгин",
+    "text": "Наконец-то Пастернаковское «я один, все тонет в фарисействе» перестало звучать так грозно. Теперь то уж точно не один. Поклон отцу Герману.",
+    "at": "2026-10-07T04:36:00Z",
+    "votes": {
+     "likes": 2,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": [
+     {
+      "id": 80,
+      "author": "Серафим",
+      "text": "Аминь! Очень годная история",
+      "at": "2026-10-08T12:40:00Z",
+      "votes": {
+       "likes": 0,
+       "dislikes": 0,
+       "mine": 0
+      }
+     }
+    ]
+   }
+  ],
+  "total": 2,
+  "rating": {
+   "value": 5,
+   "count": 2
+  },
+  "comments_count": 2,
+  "rules": {
+   "uk": "Пишіть доброзичливо, по суті та з повагою до інших читачів. Посилання на сторонні сайти не допускаються. Коментар з'явиться після перевірки адміністратором.",
+   "ru": "Пишите доброжелательно, по существу и с уважением к другим читателям. Ссылки на сторонние сайты не допускаются. Комментарий появится после проверки администратором.",
+   "en": "Please be kind, stay on topic and respect other readers. Links to other websites are not allowed. Your comment will appear after an administrator has reviewed it."
+  },
+  "rules_url": {
+   "uk": "https://inok.info/about/comment-rules/",
+   "ru": "https://inok.info/about/comment-rules/?lang=ru",
+   "en": "https://inok.info/about/comment-rules/?lang=en"
+  }
+ }
+}

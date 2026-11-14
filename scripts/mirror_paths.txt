@@ -1,0 +1,22 @@
+# mirror_paths.txt - THE list of what leaves for the public code mirror (A-104 / A-105; one source, read by scripts/mirror_snapshot.py).
+# One entry per line: a directory ends with «/» (taken whole: every TRACKED file under it at HEAD), anything else is one tracked file.
+# A path not listed here does not leave. A second, hard-coded guard inside mirror_snapshot.py refuses private paths and secrets
+# whatever this list says. The public README.md is added by the tool from scripts/mirror_README.md.
+src/
+android/
+tests/
+screens/
+fixtures/
+scripts/
+.github/
+store/release_notes/
+package.json
+package-lock.json
+tsconfig.json
+vite.config.ts
+capacitor.config.ts
+eslint.config.js
+index.html
+.gitignore
+.gitattributes
+.prettierrc

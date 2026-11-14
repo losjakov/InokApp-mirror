@@ -1,0 +1,85 @@
+/* The site's palette (spec §1): primary #0c6486, accent #ffe082. Dark mode follows the system (dark.system.css). */
+:root {
+  --ion-color-primary: #0c6486;
+  --ion-color-primary-rgb: 12, 100, 134;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #0b5876;
+  --ion-color-primary-tint: #247492;
+
+  --ion-color-secondary: #ffe082;
+  --ion-color-secondary-rgb: 255, 224, 130;
+  --ion-color-secondary-contrast: #1f1a00;
+  --ion-color-secondary-contrast-rgb: 31, 26, 0;
+  --ion-color-secondary-shade: #e0c572;
+  --ion-color-secondary-tint: #ffe38f;
+
+  --ion-color-live: #c62828;
+  --ion-color-live-rgb: 198, 40, 40;
+  --ion-color-live-contrast: #ffffff;
+  --ion-color-live-contrast-rgb: 255, 255, 255;
+  --ion-color-live-shade: #ae2323;
+  --ion-color-live-tint: #cc3e3e;
+
+  --inok-tile-bg: #e8f1f5;
+  --inok-cover-bg: #dfe8ec;
+  /* D30: THE divider of every hand-made rule = Ionic's own list-item border chain (light: rgba .13; dark: its step-150 grey) */
+  --inok-divider: var(--ion-item-border-color, var(--ion-border-color, var(--ion-color-step-150, var(--ion-background-color-step-150, rgba(0, 0, 0, 0.13)))));
+  --inok-highlight: yellow;           /* the site's search mark (/monasteries/: span.highlight { background-color: yellow }) — one colour in both themes */
+  /* A-78 (owner 09.11.2026, CD S284's contrast audit): THE eye (icon + number, A-65) gold, 5.06:1 on #fff; THE rating stars (outlines, lit,
+     a list row's «★»), 3.59:1 on #fff (1.0.2's #f2a900 = 2.01:1 failed WCAG 1.4.11). Dark: below. No other shade anywhere. */
+  --inok-eye: #8a6a12;
+  --inok-star: #b37d00;
+  /* F3 (REVIEW cloud_25): THE action of the update banner (useBanner: «Оновити», «Перезапустити») - Material's «inverse primary»: the banner
+     is Ionic's inverted surface (light: #333, dark: #d0d0d0), so the link blue of the OTHER theme. Drawn: 4.97:1 on #333 (1.0.4 rc: 2.00:1). */
+  --inok-banner-action: #61acca;
+}
+.ion-color-live {
+  --ion-color-base: var(--ion-color-live);
+  --ion-color-base-rgb: var(--ion-color-live-rgb);
+  --ion-color-contrast: var(--ion-color-live-contrast);
+  --ion-color-contrast-rgb: var(--ion-color-live-contrast-rgb);
+  --ion-color-shade: var(--ion-color-live-shade);
+  --ion-color-tint: var(--ion-color-live-tint);
+}
+/* Dark theme: text/links in the lighter primary tint (legible on black); the TOOLBAR keeps the site's #0c6486 with white
+   in both themes (REVIEW cloud_02 D11) — one brand colour, and the amber accent of the map's location button stays legible. */
+/* dark = the class Ionic's dark.class.css keys on, set by src/state/theme.ts (system / light / dark, A-16) */
+  :root.ion-palette-dark {
+    --ion-color-primary: #4fa3c4;
+    --ion-color-primary-rgb: 79, 163, 196;
+    --ion-color-primary-contrast: #06212d;
+    --ion-color-primary-contrast-rgb: 6, 33, 45;
+    --ion-color-primary-shade: #468fac;
+    --ion-color-primary-tint: #61acca;
+    --inok-tile-bg: #1c2a31;
+    --inok-cover-bg: #22333b;
+    --inok-eye: #c4a24e;   /* A-78: 7.69:1 on #121212 */
+    --inok-star: #f2a900;  /* A-78: 9.3:1 on #121212 (unchanged) */
+    --inok-banner-action: #0b5876; /* F3: 5.10:1 on the banner's #d0d0d0 (1.0.4 rc: 1.90:1) */
+  }
+:root { --inok-toolbar-bg: #0c6486; --inok-toolbar-fg: #ffffff; }
+ion-toolbar.ion-color-primary {
+  --ion-color-base: var(--inok-toolbar-bg) !important;
+  --ion-color-contrast: var(--inok-toolbar-fg) !important;
+  --ion-color-base-rgb: 12, 100, 134 !important;
+  --ion-color-contrast-rgb: 255, 255, 255 !important;
+}
+
+/* A-83 edge-to-edge (ref/FUTURE_play_quality.md §4): ONE rule per edge. Capacitor 8 (SystemBars, insetsHandling 'css') injects
+   --safe-area-inset-* : the real insets on WebView >= 140, 0 below it (it pads the window itself there - env() alone would double it);
+   env() serves iOS / the browser. Ionic's --ion-safe-area-* (toolbar, tab bar, toasts, sheets, items) read the same values, and every
+   own fixed element uses --inok-safe-* - never a bare env() (tests/unit/safeArea.test.ts).
+   1.0.5 round 2 (owner 11.11.2026, Huawei P30 Pro, Android 10, 3 buttons): Capacitor 8.6.0 injects bottom = 0 on API < 30 with WebView >= 140
+   (capacitor#8603, fixed upstream by #8707, not released) - the tab bar lay under the buttons. --inok-nav-X = how far the WebView REALLY lies
+   under the navigation bar, measured natively (MainActivity / NavOverlap.java); max() never adds it twice (0 wherever the window is padded). */
+:root {
+  --inok-safe-top: max(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)), var(--inok-nav-top, 0px));
+  --inok-safe-right: max(var(--safe-area-inset-right, env(safe-area-inset-right, 0px)), var(--inok-nav-right, 0px));
+  --inok-safe-bottom: max(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)), var(--inok-nav-bottom, 0px));
+  --inok-safe-left: max(var(--safe-area-inset-left, env(safe-area-inset-left, 0px)), var(--inok-nav-left, 0px));
+  --ion-safe-area-top: var(--inok-safe-top);
+  --ion-safe-area-right: var(--inok-safe-right);
+  --ion-safe-area-bottom: var(--inok-safe-bottom);
+  --ion-safe-area-left: var(--inok-safe-left);
+}

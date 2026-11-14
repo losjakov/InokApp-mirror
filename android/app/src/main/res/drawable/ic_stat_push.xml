@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- status-bar icon: white silhouette of the app's dome-with-cross (same shape as src/components/icons.ts) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="512" android:viewportHeight="512">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M240,40h32v48h32v32h-32v24c56,48 112,100 112,160v16h-16v136h-32v-136h-160v136h-32v-136h-16v-16c0,-60 56,-112 112,-160v-24h-32v-32h32z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M104,440h304v32h-304z"/>
+</vector>
