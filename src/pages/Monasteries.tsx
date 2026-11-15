@@ -1,4 +1,5 @@
-import { IonButton, IonIcon, IonLabel, IonList, IonNote, IonPage, IonSearchbar } from '@ionic/react';
+import { IonButton, IonIcon, IonLabel, IonList, IonNote, IonPage } from '@ionic/react';
+import { SearchField } from '@/components/SearchField';
 import { ChipButton } from '@/components/ChipButton';
 import { Busy } from '@/components/Busy';
 import { closeCircle, mapOutline, optionsOutline } from 'ionicons/icons';
@@ -100,7 +101,7 @@ export function MonasteriesPage() {
   }, [fs, facets, dict, lang, t]);
 
   const searchbar = (
-    <IonSearchbar value={q} placeholder={t('monasteries.search')} debounce={0} onIonInput={(e) => setQ(e.detail.value ?? '')} inputmode="search" data-testid="search" />
+    <SearchField value={q} placeholder={t('monasteries.search')} debounce={0} onIonInput={(e) => setQ(e.detail.value ?? '')} inputmode="search" data-testid="search" />
   );
   const list = (
     <>

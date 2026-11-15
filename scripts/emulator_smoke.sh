@@ -134,6 +134,9 @@ a11y_dumps() {
   local tb=off-dump
   adb shell am start -n $PKG/.MainActivity > /dev/null || true; sleep 6
   A11Y="talkback=$tb"
+  # REVIEW cloud_34 Q4 (a): the FIRST dump of a run is empty (the WebView builds its tree when the first a11y client connects) - one warm-up
+  # dump, thrown away, so Home is measured like every other page. Red on this step = revert this line, not fix it (A-108).
+  adb shell uiautomator dump /sdcard/a11y.xml > /dev/null 2>&1 || true; sleep 2
   # cloud_30 (A-95): + the 1.0.6 screens - the gallery viewer, the search header, the sort sheet, «Ще» (incognito), the monasteries' strip
   # cloud_33 (1.0.8, A-109): + the card's gallery - the viewer opened from the card 242's «Фотогалерея» (its cover loaded by hand on a metered emulator)
   for spec in home:/home streams:/streams card:/monasteries/37 article:/articles viewer:/articles?id=1714 search:/articles sort:/articles more:/more monasteries:/monasteries cardgallery:/monasteries/242; do
@@ -351,18 +354,33 @@ if [ "$WV" -ge "$FLOOR" ]; then
   shot "$OUT/v107_video_youtube.png"
   echo "v107 1682=$V1 1892=$V2 sort_options=$S2" | tee "$OUT/v107.txt"
   # cloud_33 (1.0.8, A-109 / R-49), NOT gating (the browser ring gates): the live card 242 -> its cover loaded by hand when the network is
-  # metered -> «Фотогалерея» = the app's viewer «1 / 40» with the FULL file of photo 1 (the live list asked on the tap) -> Back closes it
+  # metered -> «Фотогалерея» = the app's viewer «1 / 40» (the live list asked on the tap) -> Back closes it.
+  # cloud_35 (1.0.10, A-112): the viewer obeys «Автозавантаження фото» (default «Тільки Wi-Fi»): on the emulator's network the REAL files of
+  # photos/ do not grow by opening or paging (the block's reason read back: «wifi» = the network is metered here); the block's button = one
+  # file; after it the next photo comes by itself (one more file, nothing ahead). A reason other than wifi / saver / manual = this check proves
+  # nothing on this image - said in v110.txt, the browser ring is then the only proof.
+  nfiles() { ( appls "files/$1" || true ) | wc -l | tr -d ' '; }
+  why() { ev "(document.querySelector('ion-modal.viewer [data-testid=photo-wait]')||{}).dataset?.why||'none'"; }
+  full() { ev "(document.querySelector('[data-testid=viewer-img]')||{}).dataset?.full||'none'"; }
   nav go '/monasteries/242'; sleep 8; nav click '[data-testid="card"] [data-testid="photo-load"]'; sleep 6
   nav wait '[data-testid="card"] [data-testid="gallery"]'; P0=$(ev "(document.querySelector('[data-testid=card] [data-testid=gallery]')||{}).dataset?.inApp||'none'")
+  N0=$(nfiles photos)
   nav click '[data-testid="card"] [data-testid="gallery"]'; sleep 8
-  P1=$(ev "(document.querySelector('[data-testid=viewer-count]')||{}).textContent||'none'"); P2=$(ev "(document.querySelector('[data-testid=viewer-img]')||{}).dataset?.full||'none'")
-  shot "$OUT/v108_card_gallery.png"; adb shell input keyevent 4; sleep 3
+  P1=$(ev "(document.querySelector('[data-testid=viewer-count]')||{}).textContent||'none'"); P2=$(full); W0=$(why); N1=$(nfiles photos)
+  shot "$OUT/v110_wait.png"
+  nav click 'ion-modal.viewer [data-testid="viewer-next"]'; sleep 6; W1=$(why); N2=$(nfiles photos)
+  nav click 'ion-modal.viewer [data-testid="viewer-prev"]'; sleep 3
+  nav click 'ion-modal.viewer [data-testid="photo-load"]'; sleep 8; P4=$(full); N3=$(nfiles photos); shot "$OUT/v108_card_gallery.png"
+  nav click 'ion-modal.viewer [data-testid="viewer-next"]'; sleep 8; P5=$(full); N4=$(nfiles photos); shot "$OUT/v110_allowed.png"
+  adb shell input keyevent 4; sleep 3
   P3=$(ev "document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed'")
-  echo "v108 in_app=$P0 viewer=$P1 full=$P2 back=$P3" | tee "$OUT/v108.txt"
+  echo "v108 in_app=$P0 viewer=$P1 back=$P3" | tee "$OUT/v108.txt"
+  case "$W0" in wifi|saver|manual) V110=proved;; *) V110="not-proved(reason=$W0: the full file was allowed on this network)";; esac
+  echo "v110 $V110 photos: before=$N0 open=$N1 (full=$P2 why=$W0) next=$N2 (why=$W1) -> tap full=$P4 photos=$N3 -> next full=$P5 photos=$N4" | tee "$OUT/v110.txt"
+  [ "$V110" = proved ] && { [ "$N1" = "$N0" ] && [ "$N2" = "$N0" ] || echo "::warning::API $API: A-112 the viewer saved a file before the tap ($OUT/v110.txt)"; }
   # cloud_34 (1.0.9, A-111), NOT gating (the browser ring gates): the REAL files. After v108's gallery photo, files/photos/ holds it (+ the
   # card's cover); «Ще» reads their bytes; «Очистити збережені фото» -> the dialog's confirm -> photos/ empty, kept/ (list thumbnails, avatars)
-  # the same count, «0 МБ», the button unavailable; the card's gallery again = its photo downloaded again into photos/
-  nfiles() { ( appls "files/$1" || true ) | wc -l | tr -d ' '; }
+  # the same count, «0 МБ», the button unavailable; the card's gallery again (+ the block's button, A-112) = its photo downloaded again into photos/
   K0=$(nfiles kept); C0=$(nfiles photos)
   tab more; sleep 3; nav scroll '[data-testid="more-photos-clear"]' || true; sleep 2
   U0=$(ev "(document.querySelector('[data-testid=photos-used]')||{}).textContent||'none'")
@@ -372,6 +390,7 @@ if [ "$WV" -ge "$FLOOR" ]; then
   D1=$(ev "document.querySelector('[data-testid=photos-clear]')?.shadowRoot?.querySelector('button')?.disabled ? 'off' : 'on'")
   shot "$OUT/v109_cleared.png"; K1=$(nfiles kept); C1=$(nfiles photos)
   nav go '/monasteries/242'; sleep 6; nav click '[data-testid="card"] [data-testid="gallery"]' || true; sleep 8
+  nav click 'ion-modal.viewer [data-testid="photo-load"]' || true; sleep 8 # A-112: a new opening asks again (consent per opening)
   F2=$(ev "(document.querySelector('[data-testid=viewer-img]')||{}).dataset?.full||'none'"); C2=$(nfiles photos)
   adb shell input keyevent 4; sleep 3
   echo "v109 photos=$C0 kept=$K0 used=[$U0] confirm=$OK -> photos=$C1 kept=$K1 used=[$U1] button=$D1 -> gallery full=$F2 photos=$C2" | tee "$OUT/v109.txt"

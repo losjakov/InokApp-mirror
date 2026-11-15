@@ -1,4 +1,5 @@
-import { IonContent, IonItem, IonLabel, IonList, IonNote, IonToggle, IonPage, IonSearchbar } from '@ionic/react';
+import { IonContent, IonItem, IonLabel, IonList, IonNote, IonToggle, IonPage } from '@ionic/react';
+import { SearchField } from '@/components/SearchField';
 import { ListBox, ListHeading } from '@/components/ListHeading';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -67,7 +68,7 @@ export function NotificationsPage() {
           <ListHeading headRef={channelsHead} testId="push-channels" label={t('notifications.streams')} />
           {/* D17: the channel list under its own header, with a search once it is longer than a screen */}
           {channels.length > SEARCH_FROM && (
-            <ListBox><IonSearchbar value={q} onIonInput={(e) => setQ(e.detail.value ?? '')} placeholder={t('notifications.search')} data-testid="channel-search" className="push__search" /></ListBox>
+            <ListBox><SearchField value={q} onIonInput={(e) => setQ(e.detail.value ?? '')} placeholder={t('notifications.search')} data-testid="channel-search" className="push__search" /></ListBox>
           )}
           {shown.map((c) => (
             <IonItem key={c.id}>

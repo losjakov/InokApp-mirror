@@ -1,4 +1,5 @@
-import { IonButton, IonContent, IonIcon, IonLabel, IonList, IonPage, IonSearchbar, IonSegment, IonSegmentButton, useIonActionSheet } from '@ionic/react';
+import { IonButton, IonContent, IonIcon, IonLabel, IonList, IonPage, IonSegment, IonSegmentButton, useIonActionSheet } from '@ionic/react';
+import { SearchField } from '@/components/SearchField';
 import { checkmark, searchOutline, swapVerticalOutline } from 'ionicons/icons';
 import { Busy } from '@/components/Busy';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -148,7 +149,7 @@ export function ArticlesPage() {
   );
   const header = searching && canQuery
     ? <PageHeader title={t('articles.title')} end={<>{sortBtn}{refresh.button}</>} search={
-        <IonSearchbar ref={searchbar} value={typed} placeholder={t('articles.search')} debounce={0} showClearButton="always" inputmode="search"
+        <SearchField ref={searchbar} value={typed} placeholder={t('articles.search')} debounce={0} showClearButton="always" inputmode="search"
           onIonInput={(e) => setTyped(e.detail.value ?? '')} onIonClear={closeSearch} data-testid="articles-search" />} />
     : <PageHeader title={t('articles.title')} fit end={<>
         {canQuery && <IonButton onClick={() => setSearching(true)} aria-label={t('articles.search_open')} data-testid="search-open"><IonIcon slot="icon-only" icon={searchOutline} aria-hidden="true" /></IonButton>}

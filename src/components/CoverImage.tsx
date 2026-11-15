@@ -1,11 +1,9 @@
 import { IonButton, IonIcon } from '@ionic/react';
-import { cloudDownloadOutline, cloudOfflineOutline, expandOutline, imageOutline } from 'ionicons/icons';
+import { cloudDownloadOutline, expandOutline } from 'ionicons/icons';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { photoSrc, type PhotoResult } from '@/native/covers';
-import { onNetChange } from '@/native/network';
 import { useApp } from '@/state/AppContext';
 import { onePhoto, PhotoViewer, type ViewerSet } from './PhotoViewer';
+import { PhotoWait, usePhoto } from './PhotoWait';
 import { scrollRoot } from './SplitContent';
 
 /**
@@ -64,22 +62,18 @@ interface Props {
   onShown?: (shown: boolean) => void;
 }
 
-/** ONE photo slot for the whole app: the cache + the A-20 rule through photoSrc(); the ONE placeholder when the photo waits. */
+/** ONE photo slot for the whole app: the cache + the A-20 rule through `usePhoto()`; the ONE placeholder when the photo waits. */
 export function CoverImage({ code, url, alt, className, version, small, keep, full, fallback, ratio, openable, onShown }: Props) {
-  const { settings, t } = useApp();
+  const { t } = useApp();
   const scope = useContext(PhotoScopeCtx);
-  const [res, setRes] = useState<PhotoResult | null>(null);
   // inside a card / an article (a few dozen photos at most) every photo is weighed at once, so «Завантажити всі фото» knows them all
   const inScope = !!scope;
   const [visible, setVisible] = useState(inScope);
   const [manual, setManual] = useState(false);
-  const [tick, setTick] = useState(0);
-  // A-111 P2: a shown file removed by «Очистити збережені фото» (or any lost file) asks the pipeline ONCE more - it comes back by the A-20 rule
-  const [retried, setRetried] = useState(false);
-  const lost = () => { setRes(null); if (!retried) { setRetried(true); setTick((x) => x + 1); } };
   const [viewer, setViewer] = useState<ViewerSet | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const want = manual || !!scope?.forced;
+  // A-111 P2: a shown file removed by «Очистити збережені фото» (or any lost file) is asked ONCE more (`lost`) - it comes back by the A-20 rule
+  const { res, lost } = usePhoto(code, url, { version, small, keep, manual: manual || !!scope?.forced, on: visible });
   // 300+ rows: touch the cache / network only for rows that scrolled into view
   useEffect(() => {
     const el = ref.current;
@@ -89,14 +83,6 @@ export function CoverImage({ code, url, alt, className, version, small, keep, fu
     io.observe(el);
     return () => io.disconnect();
   }, [inScope]);
-  // a waiting photo tries again when the network changes (Wi-Fi came back)
-  useEffect(() => (res && !res.src ? onNetChange(() => setTick((x) => x + 1)) : undefined), [res]);
-  useEffect(() => {
-    if (!visible) return;
-    let on = true;
-    photoSrc(code, url, settings.photos, { version, small, keep, manual: want }).then((r) => on && setRes(r));
-    return () => { on = false; };
-  }, [visible, code, url, settings.photos, version, small, keep, want, tick]);
   const shown = !!res?.src;
   useEffect(() => { onShown?.(shown); }, [onShown, shown]);
   const key = `${code}|${url}`;
@@ -116,26 +102,6 @@ export function CoverImage({ code, url, alt, className, version, small, keep, fu
         : wait && url && !(small && fallback) ? <PhotoWait r={wait} full={full} onLoad={() => setManual(true)} />
         : fallback}
       {openable && !(typeof openable === 'object' && 'open' in openable) && <PhotoViewer set={viewer} onClose={() => setViewer(null)} />}
-    </div>
-  );
-}
-
-/** The ONE placeholder (A-20): the reason line, «Завантажити (мобільний інтернет)», the link to «Автозавантаження фото». Rows: the icon only. */
-function PhotoWait({ r, full, onLoad }: { r: Exclude<PhotoResult, { src: string }>; full?: boolean; onLoad: () => void }) {
-  const { t } = useApp();
-  const navigate = useNavigate();
-  const reason = t(`photos.reason_${r.why}`);
-  if (!full) return <div className="photo-wait photo-wait--icon" role="img" aria-label={reason} data-testid="photo-wait"><IonIcon icon={r.why === 'offline' ? cloudOfflineOutline : imageOutline} aria-hidden="true" /></div>;
-  return (
-    <div className="photo-wait" data-testid="photo-wait" data-why={r.why}>
-      <IonIcon className="photo-wait__icon" icon={r.why === 'offline' ? cloudOfflineOutline : imageOutline} aria-hidden="true" />
-      <div className="photo-wait__reason">{reason}</div>
-      {r.canLoad && (
-        <IonButton size="small" onClick={onLoad} data-testid="photo-load">
-          <IonIcon slot="start" icon={cloudDownloadOutline} aria-hidden="true" />{t(r.metered ? 'photos.load_mobile' : 'photos.load')}
-        </IonButton>
-      )}
-      <button type="button" className="photo-wait__link" onClick={() => navigate('/more?photos=1')} data-testid="photo-settings">{t('photos.title')}</button>
     </div>
   );
 }

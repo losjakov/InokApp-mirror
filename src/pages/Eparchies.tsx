@@ -1,4 +1,5 @@
-import { IonContent, IonItem, IonLabel, IonList, IonNote, IonPage, IonSearchbar } from '@ionic/react';
+import { IonContent, IonItem, IonLabel, IonList, IonNote, IonPage } from '@ionic/react';
+import { SearchField } from '@/components/SearchField';
 import { Busy } from '@/components/Busy';
 import { bookOutline, globeOutline, peopleOutline, homeOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
@@ -58,7 +59,7 @@ export function EparchiesPage() {
   useEffect(() => { let on = true; void listEparchies(db, lang, q).then((r) => on && setRows(r)); return () => { on = false; }; }, [db, lang, q]);
 
   if (!wide && selected) return <IonPage><EparchyView id={selected} /></IonPage>;
-  const searchbar = <IonSearchbar value={q} placeholder={t('eparchies.search')} debounce={0} onIonInput={(e) => setQ(e.detail.value ?? '')} inputmode="search" data-testid="eparchy-search" />;
+  const searchbar = <SearchField value={q} placeholder={t('eparchies.search')} debounce={0} onIonInput={(e) => setQ(e.detail.value ?? '')} inputmode="search" data-testid="eparchy-search" />;
   return (
     <IonPage>
       <PageHeader title={t('more.eparchies')} search={searchbar} />

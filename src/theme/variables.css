@@ -45,7 +45,7 @@
 /* Dark theme: text/links in the lighter primary tint (legible on black); the TOOLBAR keeps the site's #0c6486 with white
    in both themes (REVIEW cloud_02 D11) — one brand colour, and the amber accent of the map's location button stays legible. */
 /* dark = the class Ionic's dark.class.css keys on, set by src/state/theme.ts (system / light / dark, A-16) */
-  :root.ion-palette-dark {
+  :root.ion-palette-dark, .photo-wait--viewer { /* A-112: the photo block inside the black viewer uses the same dark palette in both themes */
     --ion-color-primary: #4fa3c4;
     --ion-color-primary-rgb: 79, 163, 196;
     --ion-color-primary-contrast: #06212d;

@@ -549,6 +549,42 @@ const countGallery = async (p: Page) => {
   p.on('request', (q) => { const u = q.url(); if (u.includes('monastery_photos.json')) r.list.push(u); else { const m = /\/images\/monasteries\/(\d+\/[^/]+)$/.exec(u); if (m) r.photos.push(m[1]); } });
 };
 const gallery = (p: Page) => galleryReqs.get(p)!;
+/** A-112: Wi-Fi off = mobile data (metered); the setting stays the default «Тільки Wi-Fi» */
+const MOBILE = { connected: true, metered: true, dataSaver: false };
+/** the card's cover loads first (the way into the gallery), THEN Wi-Fi goes off, THEN «Фотогалерея» */
+const openCardGallery = async (p: Page) => {
+  const card = onShown(p, 'card');
+  await expect(card.getByTestId('gallery')).toHaveAttribute('data-in-app', '1', { timeout: 15_000 });
+  await p.evaluate((v) => localStorage.setItem('inok.net', v), JSON.stringify(MOBILE));
+  await card.getByTestId('gallery').click();
+  await expect(p.getByTestId('viewer-count')).toContainText('1 / 40');
+};
+/** publication 1714's gallery (thumbnails load on any network), the viewer on its 3rd photo; returns the full files asked from now on */
+const openArticleGallery = async (p: Page) => {
+  const grid = onShown(p, 'article').getByTestId('gallery-grid');
+  await expect(grid.locator('[data-testid="photo-open"]')).toHaveCount(5, { timeout: 15_000 });
+  await grid.scrollIntoViewIfNeeded();
+  const fulls: string[] = [];
+  p.on('request', (r) => { if (/\/images\/articles\/1714\/\d\d\.jpg$/.test(r.url())) fulls.push(r.url().split('/').pop()!); });
+  await grid.locator('[data-testid="photo-open"]').nth(2).click();
+  await expect(p.getByTestId('viewer-count')).toContainText('3 / 5');
+  return fulls;
+};
+/** A-112: THE standard block inside the open viewer */
+const viewerBlock = (p: Page) => p.locator('ion-modal.viewer [data-testid="photo-wait"]');
+/** the block never lies under the counter or «×» (or another control named) */
+const clearOf = async (p: Page, block: ReturnType<Page['locator']>, ids = ['viewer-count', 'viewer-close']) => {
+  await expect(block).toBeVisible();
+  for (const id of ids) await expect.poll(async () => {
+    const [b, o] = [await block.boundingBox(), await p.getByTestId(id).boundingBox()];
+    return !!b && !!o && (b.x >= o.x + o.width || o.x >= b.x + b.width || b.y >= o.y + o.height || o.y >= b.y + b.height);
+  }, `${id} clear of the block`).toBe(true);
+};
+/** a mouse swipe across the middle of an element (dx < 0 = to the next photo) */
+const swipe = async (p: Page, el: ReturnType<Page['locator']>, dx: number) => {
+  const r = (await el.boundingBox())!; const y = r.y + Math.min(r.height / 2, 30); const x = r.x + r.width / 2;
+  await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + dx, y, { steps: 6 }); await p.mouse.up();
+};
 /** A-111: the browser ring's stand-in of the device's photo files (src/native/covers.ts `__inokPhotoStore`): `seed` = files already there. */
 const photoStore = (seed: Record<string, number>) => async (p: Page) => { await p.addInitScript((s) => { (window as any).__inokPhotoStore = { bytes: 240_000, seed: s }; }, seed); };
 /** weeks of use: two list thumbnails kept, three large photos (a card's cover, a publication's picture, a gallery photo) = 12,4 MB */
@@ -735,6 +771,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
     } },
   { name: 'monasteries', path: '/monasteries', ready: async (p) => {
       await expect(p.getByTestId('list')).toBeVisible(); await expect(p.getByTestId('count')).toContainText('18');
+      // REVIEW cloud_34 Q4 (b): the search field is NAMED by its words (SearchField: aria-label = placeholder), every list's search
+      await expect(p.locator(SHOWN).getByTestId('search').locator('input')).toHaveAccessibleName((await words(p, ['monasteries.search']))[0]);
       // A-44 (R-31): the three lavras first - Kyiv, Pochaiv, Sviatohirsk - then the names as before
       expect(await p.getByTestId('list').locator('[data-testid^="mrow-"]').evaluateAll((rs) => rs.slice(0, 3).map((r) => r.getAttribute('data-testid')))).toEqual(['mrow-242', 'mrow-111', 'mrow-98']);
       // A-28 (withdraws D39): the filter button in the toolbar right of the search, the ONE way to the sheet (no «Фільтри» chip under it);
@@ -1204,6 +1242,88 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(gallery(p).list, 'the list held for this launch (no second list request)').toHaveLength(1);
       await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
     } },
+  // A-112: the viewer obeys «Автозавантаження фото» («Тільки Wi-Fi» by default; Wi-Fi off = mobile data). The card's gallery (R-49: no small
+  // copy) shows the photo's empty frame (its w / h) and THE standard block under it (owner 15.11, as in a publication); no full file is asked by
+  // opening or paging; the block clears the counter / «×» / the arrows
+  { name: 'viewer-wait-card', only: UK, path: '/monasteries/242', before: countGallery, ready: async (p) => {
+      await openCardGallery(p);
+      const frame = p.getByTestId('viewer-wait');
+      const block = viewerBlock(p);
+      await expect(block).toHaveAttribute('data-why', 'wifi');
+      await expect(block).toHaveAttribute('role', 'status'); // TalkBack hears the reason when it appears
+      const [mobile, reason, link] = await words(p, ['photos.load_mobile', 'photos.reason_wifi', 'photos.title']);
+      await expect(block.locator('.photo-wait__reason')).toHaveText(reason);
+      await expect(block.getByTestId('photo-load')).toHaveText(mobile);
+      await expect(block.getByTestId('photo-settings')).toHaveText(link);
+      const f = (await frame.boundingBox())!;
+      expect(Math.abs(f.width / f.height - 2045 / 1153), 'the frame keeps the photo shape').toBeLessThan(0.03);
+      expect((await block.boundingBox())!.y, 'owner 15.11: the block UNDER the frame, as in a publication').toBeGreaterThanOrEqual(f.y + f.height - 1);
+      await clearOf(p, block);
+      await clearOf(p, block.getByTestId('photo-load'), ['viewer-prev', 'viewer-next']); // the button at mid-height, beside the page arrows
+      // P11: a swipe on the waiting frame pages (the block's button is not a gesture), and back
+      await swipe(p, frame, -160);
+      await expect(p.getByTestId('viewer-count')).toContainText('2 / 40');
+      await expect(viewerBlock(p)).toHaveAttribute('data-why', 'wifi');
+      await p.waitForTimeout(400); // two presses within 300 ms are the viewer's double tap (zoom), not two swipes
+      await swipe(p, p.getByTestId('viewer-wait'), 160);
+      await expect(p.getByTestId('viewer-count')).toContainText('1 / 40');
+      expect(gallery(p).photos, 'opening and paging ask NO full file').toEqual([]);
+    } },
+  // A-112: the button = the manual request: the photo comes, the block leaves, the focus is on the picture; ONE file asked
+  { name: 'viewer-wait-loaded', only: UK, path: '/monasteries/242', before: countGallery, ready: async (p) => {
+      await openCardGallery(p);
+      await viewerBlock(p).getByTestId('photo-load').click();
+      const img = p.getByTestId('viewer-img');
+      await expect(img).toHaveAttribute('data-full', '1');
+      await expect(img).toHaveAttribute('src', /\/monasteries\/242\/00\.jpg$/);
+      await expect(viewerBlock(p)).toHaveCount(0);
+      await expect(img).toBeFocused(); // P10: the focus is not lost with the button
+      expect(gallery(p).photos).toEqual(['242/00.jpg']);
+      await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
+    } },
+  // A-112: WITHOUT a tap the next photo waits too - the count of asked files does not grow
+  { name: 'viewer-wait-next', only: UK, path: '/monasteries/242', before: countGallery, ready: async (p) => {
+      await openCardGallery(p);
+      await p.getByTestId('viewer-next').click();
+      await expect(p.getByTestId('viewer-count')).toContainText('2 / 40');
+      await expect(p.getByTestId('viewer-wait')).toHaveAttribute('data-index', '1');
+      await expect(viewerBlock(p)).toHaveAttribute('data-why', 'wifi');
+      expect(gallery(p).photos, 'no full file asked').toEqual([]);
+    } },
+  // A-112 (his «Одно нажатие - вся галерея»): after the tap the NEXT photo loads by itself (the current one only, no neighbour ahead); closed and
+  // opened again: the saved photos show at once (from the phone), the first unsaved one shows the block again (the consent is gone)
+  { name: 'viewer-wait-allowed', only: UK, path: '/monasteries/242', before: async (p) => { await countGallery(p); await photoStore({})(p); }, ready: async (p) => {
+      await openCardGallery(p);
+      const img = p.getByTestId('viewer-img');
+      const asked = () => p.evaluate(() => ((window as any).__inokPhotoStoreLive.downloads as string[]).filter((u) => /\/monasteries\/242\/\d\d\.jpg$/.test(u)).map((u) => u.split('/').pop()));
+      await viewerBlock(p).getByTestId('photo-load').click();
+      await expect(img).toHaveAttribute('data-full', '1');
+      await p.getByTestId('viewer-next').click();
+      await expect(p.getByTestId('viewer-count')).toContainText('2 / 40');
+      await expect(img).toHaveAttribute('src', /\/242\/01\.jpg$/);
+      await expect(img).toHaveAttribute('data-full', '1');
+      expect(await asked(), 'the tap + the paged one, nothing ahead').toEqual(['00.jpg', '01.jpg']);
+      await p.getByTestId('viewer-close').click();
+      await viewerGone(p);
+      await onShown(p, 'card').getByTestId('gallery').click();
+      await expect(p.getByTestId('viewer-count')).toContainText('1 / 40');
+      await expect(img).toHaveAttribute('data-full', '1'); // saved on the phone: shown at once
+      await p.getByTestId('viewer-next').click();
+      await expect(img).toHaveAttribute('src', /\/242\/01\.jpg$/);
+      await p.getByTestId('viewer-next').click();
+      await expect(p.getByTestId('viewer-count')).toContainText('3 / 40');
+      await expect(viewerBlock(p)).toHaveAttribute('data-why', 'wifi'); // asked again
+      expect(await asked(), 'nothing more after the reopening').toEqual(['00.jpg', '01.jpg']);
+    } },
+  // A-112 P7: Wi-Fi comes back while the viewer is open - the waiting photo loads by itself (the slot's network listener, the same hook)
+  { name: 'viewer-wait-netback', only: ['phone-light'], path: '/monasteries/242', before: countGallery, ready: async (p) => {
+      await openCardGallery(p);
+      await expect(viewerBlock(p)).toHaveAttribute('data-why', 'wifi');
+      await p.evaluate(() => { localStorage.setItem('inok.net', JSON.stringify({ connected: true, metered: false, dataSaver: false })); dispatchEvent(new Event('online')); });
+      await expect(p.getByTestId('viewer-img')).toHaveAttribute('data-full', '1');
+      expect(gallery(p).photos).toEqual(['242/00.jpg']);
+      await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
+    } },
   { name: 'monastery-favourite', path: '/monasteries/37', ready: async (p) => {
       await expect(p.getByTestId('card')).toBeVisible();
       const [added, removed] = await words(p, ['card.favourite_added', 'card.favourite_removed']);
@@ -1404,6 +1524,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(field).toBeFocused({ timeout: 3000 });
       const [ph, nothing] = await words(p, ['articles.search', 'articles.nothing']);
       await expect(field).toHaveAttribute('placeholder', ph);
+      await expect(field).toHaveAccessibleName(ph); // REVIEW cloud_34 Q4 (b): the field's NAME = its words (SearchField), not a hint only
       const word = (await onShown(p, 'articles').locator('[data-testid^="arow-"] .mrow__title').first().innerText()).split(/\s+/).find((w) => w.length >= 5)!.slice(0, 4);
       await field.pressSequentially(word, { delay: 60 }); // four letters, 60 ms apart: one pause -> one request
       await expect(onShown(p, 'kinds')).toHaveAttribute('data-query', new RegExp(`\\|all\\|${word}\\|published$`), { timeout: 5000 });
@@ -2172,7 +2293,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(img).toHaveAttribute('data-full', '1');
       await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
     } },
-  // A-96 W-4 + A-20: offline the viewer keeps the thumbnail and says why the full photo is not there (the A-20 reason line)
+  // A-96 W-4 + A-20: offline the viewer keeps the thumbnail and says why the full photo is not there (A-112: THE standard block)
   { name: 'article-gallery-offline', only: ['phone-light'], path: '/articles?id=1714', before: net({ connected: false, metered: false, dataSaver: false }), ready: async (p) => {
       const grid = onShown(p, 'article').getByTestId('gallery-grid');
       await expect(grid).toBeVisible({ timeout: 15_000 });
@@ -2180,8 +2301,40 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       const open = grid.locator('[data-testid="photo-open"]');
       if (await open.count() === 0) return; // offline before the thumbnails were ever cached: the cells show THE icon placeholder (no viewer)
       await open.first().click();
-      await expect(p.getByTestId('viewer-note')).toHaveText((await words(p, ['photos.reason_offline']))[0]);
+      // A-112: the reason is THE standard block (offline: no button - nothing to load; the settings link stays)
+      const block = viewerBlock(p);
+      await expect(block).toHaveAttribute('data-why', 'offline');
+      await expect(block.locator('.photo-wait__reason')).toHaveText((await words(p, ['photos.reason_offline']))[0]);
+      await expect(block.getByTestId('photo-load')).toHaveCount(0);
       await expect(p.getByTestId('viewer-img')).toHaveAttribute('data-full', '0');
+    } },
+  // A-112: a publication's gallery on mobile data: the small copy is shown (a list-size picture) and THE block under it - no full file asked
+  { name: 'viewer-wait-article', only: UK, path: '/articles?id=1714', before: net(MOBILE), ready: async (p) => {
+      const fulls = await openArticleGallery(p);
+      await expect(p.getByTestId('viewer-img')).toHaveAttribute('data-full', '0');
+      const block = viewerBlock(p);
+      await expect(block).toHaveAttribute('data-why', 'wifi');
+      await expect(p.getByTestId('viewer-wait')).toHaveCount(0); // the small copy stands in the photo's place
+      await expect(block.getByTestId('photo-load')).toHaveText((await words(p, ['photos.load_mobile']))[0]);
+      await clearOf(p, block);
+      const v = p.viewportSize()!;
+      await expect.poll(async () => { const b = await block.boundingBox(); return b ? b.y + b.height : 1e9; }, 'the block is on the screen').toBeLessThanOrEqual(v.height);
+      await p.getByTestId('viewer-next').click();
+      await expect(p.getByTestId('viewer-count')).toContainText('4 / 5');
+      await expect(block).toHaveAttribute('data-why', 'wifi');
+      await p.getByTestId('viewer-prev').click();
+      await expect(p.getByTestId('viewer-count')).toContainText('3 / 5');
+      expect(fulls, 'opening and paging ask NO full file').toEqual([]);
+      await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
+    } },
+  // A-112 P8: «Автозавантаження фото» from the viewer closes it and opens the choice in «Ще» - the publication's way
+  { name: 'viewer-wait-link', only: ['phone-light'], path: '/articles?id=1714', before: net(MOBILE), ready: async (p) => {
+      await openArticleGallery(p);
+      await p.locator('ion-modal.viewer [data-testid="photo-settings"]').click();
+      await viewerGone(p);
+      await expect(p).toHaveURL(/\/more\?photos=1$/);
+      await expect(p.locator('ion-alert')).toBeVisible();
+      await expect(p.locator('ion-alert .alert-radio-button[aria-checked="true"]')).toContainText(/Тільки Wi-Fi/);
     } },
   // A-29 (owner 02.11.2026): every list of houses shows the site's SQUARE list picture; a house without one shows the app's own sign
   { name: 'monasteries-thumbs', path: '/monasteries', before: withoutThumb([37]), ready: async (p) => {

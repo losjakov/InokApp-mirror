@@ -55,15 +55,16 @@ describe('A-111 the selection rule (census cloud_34)', () => {
     expect(live().downloads).toEqual([url]);
   });
 
-  it('every <CoverImage> / photoSrc( call site in src/ is in the census: a new one must choose its class here (P5)', () => {
+  it('every <CoverImage> / photoSrc( / usePhoto( call site in src/ is in the census: a new one must choose its class here (P5)', () => {
     const calls: string[] = [];
     const walk = (d: string): void => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else if (/\.tsx?$/.test(f)) {
-      for (const line of readFileSync(p, 'utf8').split('\n')) if (/<CoverImage\b|[^.]photoSrc\(/.test(line) && !/^\s*(\/?\*|\/\/|import|export async function photoSrc)/.test(line))
+      for (const line of readFileSync(p, 'utf8').split('\n')) if (/<CoverImage\b|[^.]photoSrc\(|[^.]usePhoto\(/.test(line) && !/^\s*(\/?\*|\/\/|import|export async function photoSrc|export function usePhoto)/.test(line))
         calls.push(`${p.replace(/^.*src\//, '')}: ${/\bkeep\b/.test(line) ? 'KEEP' : 'CLEAR'}`);
     } } };
     walk(join(__dirname, '../../src'));
     expect(calls.sort()).toEqual([
       'components/ArticleRow.tsx: KEEP', 'components/CoverImage.tsx: KEEP', // the slot passes its caller's class through
+      'components/PhotoWait.tsx: KEEP', // A-112: `usePhoto` = the ONE asker of the slot and the viewer (passes the class through)
       'components/Gallery.tsx: CLEAR', 'components/HtmlLite.tsx: CLEAR', 'components/MonasteryRow.tsx: KEEP',
       'components/PhotoViewer.tsx: CLEAR', 'components/PhotoViewer.tsx: CLEAR', 'components/StreamRow.tsx: KEEP',
       'data/repo/articles.ts: KEEP', // the row's cover keeps, the rest clears (keep: url === cover)
