@@ -1,7 +1,7 @@
 {
   "name": "inokapp",
   "private": true,
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Монастирський вісник України — official mobile app of inok.info (info.inok.app)",
   "type": "module",
   "scripts": {

@@ -33,7 +33,7 @@ describe('version (A-62)', () => {
     expect(gradle.match(/return x \* 10000 \+ y \* 100 \+ z/g)).toHaveLength(1);
   });
   it('the rule: 1.0.0 -> 10000, 1.2.3 -> 10203, X.99.99 the top of X; Y / Z > 99 and non-X.Y.Z fail', () => {
-    expect(oracle(APP_VERSION)).toBe(10010); // 1.0.10 (cloud_35, A-112); 1.0.9 = 10009 internal testing only, 1.0.8 = 10008 never reached Play, 1.0.7 = 10007 in production
+    expect(oracle(APP_VERSION)).toBe(10011); // 1.0.11 (cloud_36, A-117) - Play AND the first App Store build; 1.0.10 = 10010 internal testing, 1.0.7 = 10007 in production
     expect(oracle('1.0.1')).toBe(10001);
     expect(oracle('1.2.3')).toBe(10203);
     expect(oracle('1.99.99')).toBe(19999);
@@ -42,6 +42,10 @@ describe('version (A-62)', () => {
     // only grows as the version grows: every next version (any part up) has a bigger code
     const seq = ['1.0.0', '1.0.1', '1.0.99', '1.1.0', '1.99.99', '2.0.0'].map((v) => oracle(v) as number);
     expect(seq).toEqual([...seq].sort((a, b) => a - b));
+  });
+  it('iOS gets THE same pair (cloud_36): scripts/app_version.py = package.json + the rule (MARKETING_VERSION / CURRENT_PROJECT_VERSION)', () => {
+    expect(execFileSync('python3', ['-I', new URL('../../scripts/app_version.py', import.meta.url).pathname, new URL('../../package.json', import.meta.url).pathname], { encoding: 'utf8' }).trim())
+      .toBe(`${APP_VERSION} ${oracle(APP_VERSION)}`);
   });
   it('not below the live min_app_version', () => {
     expect(cmp(APP_VERSION, '1.0.0')).toBeGreaterThanOrEqual(0);
