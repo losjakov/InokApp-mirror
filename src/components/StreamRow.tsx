@@ -22,7 +22,7 @@ export function ChannelAvatar({ channel, live }: { channel: ChannelRow; live?: b
   return (
     <span className={`chav${live ? ' chav--live' : ''}`} slot="start" data-testid={live ? 'live-avatar' : undefined}
       role={live ? 'img' : undefined} aria-label={live ? t('home.live_hint') : undefined} aria-hidden={live ? undefined : true}>
-      <CoverImage code={`ch${channel.id}`} url={channel.avatar_url ?? null} version={channel.avatar_sha256} small alt="" className="chav__img"
+      <CoverImage code={`ch${channel.id}`} url={channel.avatar_url ?? null} version={channel.avatar_sha256} small keep alt="" className="chav__img"
         fallback={<IonIcon icon={churchOutline} aria-hidden="true" />} />
     </span>
   );

@@ -22,7 +22,7 @@ export function ArticleRow({ a, onSelect, selected, q }: { a: Article; onSelect:
   ];
   return (
     <IonItem button detail={false} onClick={() => onSelect(a.id)} color={selected ? 'light' : undefined} className="mrow" data-testid={`arow-${a.id}`} data-kind={a.kind}>
-      <CoverImage small code={`a${a.id}`} url={a.cover?.url ?? null} alt="" className="mrow__cover arow__cover" />
+      <CoverImage small keep code={`a${a.id}`} url={a.cover?.url ?? null} alt="" className="mrow__cover arow__cover" />
       <IonLabel>
         <h2 className="mrow__title"><Hl text={a.title} q={q} /></h2>
         {a.subtitle && <p className="arow__subtitle"><Hl text={a.subtitle} q={q} /></p>}

@@ -311,5 +311,9 @@
   "scroll.up": "Back to top",
   "scroll.down": "To the end",
   "articles.watch_facebook": "Watch on Facebook",
-  "articles.watch_other": "Watch the video"
+  "articles.watch_other": "Watch the video",
+  "photos.clear": "Clear saved photos",
+  "photos.clear_hint": "Photos will load again when you open them",
+  "photos.cleared": "Saved photos deleted",
+  "photos.mb": "MB"
 }

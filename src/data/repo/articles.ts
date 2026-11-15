@@ -145,9 +145,10 @@ export const readOnSite = (a: Pick<Article, 'body' | 'video' | 'youtube_video_id
 export const articlePictures = (a: Article): string[] => [...new Set([...(a.cover ? [a.cover.url] : []), ...(articleHeader(a) ? [articleHeader(a)!.url] : []), ...bodyPictures(a.body)])];
 
 /** A-19: with the text, its pictures — through the ONE pipeline (the A-20 rule decides): the row's thumbnail is SMALL (any network,
- *  so the feed has its pictures offline), the header and body pictures are large (the setting; nothing large on a metered network). */
+ *  so the feed has its pictures offline), the header and body pictures are large (the setting; nothing large on a metered network).
+ *  A-111: the row's cover is KEPT by «Очистити збережені фото», the header and body pictures are cleared (census, JOURNAL cloud_34). */
 async function keepPictures(items: Article[], mode: PhotoMode): Promise<void> {
-  for (const a of items.slice(0, CACHE_N)) for (const url of articlePictures(a)) await photoSrc(`a${a.id}`, url, mode, { small: url === a.cover?.url }).catch(() => undefined);
+  for (const a of items.slice(0, CACHE_N)) for (const url of articlePictures(a)) await photoSrc(`a${a.id}`, url, mode, { small: url === a.cover?.url, keep: url === a.cover?.url }).catch(() => undefined);
 }
 
 /** R-19: a kind tab pages the SERVER's section list (`articles?kind=`, the site's /articles/<section>/ order), not the cache. */

@@ -127,13 +127,11 @@ edge_shots() {
 # reached through DevTools (emu_nav go / click), never by taps (TalkBack turns a tap into «focus»). API 35+ only (the TalkBack job).
 a11y_dumps() {
   A11Y=n/a; [ "${API%%-*}" -ge 35 ] || return 0
-  local tb svc=com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService
-  if adb shell pm list packages 2>/dev/null | grep -q 'com.google.android.marvin.talkback'; then
-    # cloud_33: on API 33+ TalkBack asks POST_NOTIFICATIONS as it starts; its dialog covers the pages after Home (a11y_dump.py says «covered by»).
-    # Granting it was TRIED (mirror 43626856972, 43628482267): with TalkBack fully running, `uiautomator dump` dropped adb («device offline»)
-    # at the 1st / 2nd dump, twice - so NOT granted; the honest «covered» line stays until a dump path that survives TalkBack (QUESTIONS cloud_33).
-    adb shell settings put secure enabled_accessibility_services "$svc" || true; adb shell settings put secure accessibility_enabled 1 || true; tb=on; sleep 3
-  else tb="absent-on-image"; fi
+  # cloud_34 (REVIEW cloud_33 Q2, agreed): the tree is dumped with TalkBack OFF - `uiautomator dump` reads the accessibility tree itself (the
+  # names, roles and states TalkBack would be given). TalkBack ON (cloud_28 … 33) put its POST_NOTIFICATIONS dialog over the pages after Home
+  # («covered by»), and granting it made `uiautomator dump` drop adb (mirror 43626856972, 43628482267). TalkBack is started only where its
+  # SPEECH is checked - no such check exists in this smoke; the line names the mode. Undo = the cloud_33 lines (git show 547511b).
+  local tb=off-dump
   adb shell am start -n $PKG/.MainActivity > /dev/null || true; sleep 6
   A11Y="talkback=$tb"
   # cloud_30 (A-95): + the 1.0.6 screens - the gallery viewer, the search header, the sort sheet, «Ще» (incognito), the monasteries' strip
@@ -156,7 +154,6 @@ a11y_dumps() {
     [ "$after" = back ] && { adb shell input keyevent 4; sleep 2; }
     [ "$after" = clear ] && { node "$ROOT/scripts/emu_nav.mjs" click '[data-testid="articles-search"] .searchbar-clear-button' >> "$OUT/nav.txt" 2>&1 || true; sleep 2; }
   done
-  if [ "$tb" = on ]; then adb shell settings delete secure enabled_accessibility_services || true; adb shell settings put secure accessibility_enabled 0 || true; fi
   echo "a11y (TalkBack tree): $A11Y" | tee -a "$OUT/a11y.txt"
   grep -q 'covered by' "$OUT/a11y.txt" && echo "::warning::API $API: A-88 a page was covered by another app's window - its dump is not the app's ($OUT/a11y.txt)" || true
   grep -q 'unnamed=[1-9]' "$OUT/a11y.txt" && echo "::warning::API $API: A-88 actionable nodes without a name - $OUT/a11y.txt" || true
@@ -217,9 +214,10 @@ if [ "$WV" -ge "$FLOOR" ]; then
   grep -q '^fts|trigram' "$OUT/db_meta.txt" || echo "::warning::FTS mode on API $API is $(grep '^fts|' "$OUT/db_meta.txt") - not trigram (see REF_gotchas)"
   adb shell input tap 32 615; sleep 6    # tab «Монастирі» (1st of 5 on the 320x640 skin)
   shot "$OUT/monasteries.png"
-  COVERS=$( (appls files/covers || true) | wc -l | tr -d ' ')  # pipefail: the folder may not exist yet
-  echo "cover files cached on the device: $COVERS"
-  [ "$COVERS" -gt 0 ] || echo "::warning::API $API: no cover files were cached (covers/ mkdir or download failed — see logcat_filtered.txt)"
+  # cloud_34 (A-111): list thumbnails live in files/kept/ (files/covers/ = the legacy folder of 1.0.0 … 1.0.8, never written by 1.0.9)
+  COVERS=$( (appls files/kept || true) | wc -l | tr -d ' ')  # pipefail: the folder may not exist yet
+  echo "list thumbnails kept on the device: $COVERS"
+  [ "$COVERS" -gt 0 ] || echo "::warning::API $API: no list thumbnails were cached (kept/ mkdir or download failed — see logcat_filtered.txt)"
   # stage 2: the map tab (MapLibre in the WebView, tiles from the live config's style), then «near me» with the
   # emulator's GPS set to Kyiv, then the first row of the nearby list → the marker card over the map
   adb shell pm grant $PKG android.permission.ACCESS_FINE_LOCATION || true
@@ -251,7 +249,7 @@ if [ "$WV" -ge "$FLOOR" ]; then
   # in-page taps / URL through the WebView's DevTools socket (scripts/emu_nav.mjs); the tab buttons are real taps
   nav() { node "$ROOT/scripts/emu_nav.mjs" "$@" 2>>"$OUT/nav.txt" || echo "nav $* failed" >> "$OUT/nav.txt"; }
   tab() { case $1 in monasteries) X=32;; map) X=96;; streams) X=160;; articles) X=224;; more) X=288;; esac; adb shell input tap $X 615; sleep 4; }
-  # stage 3 streams with the channels' own avatars (R-16, cached under files/covers/ch*), then home by the toolbar icon (owner 01.11)
+  # stage 3 streams with the channels' own avatars (R-16, cached under files/kept/ch* since 1.0.9), then home by the toolbar icon (owner 01.11)
   adb shell input tap 160 615; sleep 12   # tab «Трансляції» (3rd of 5)
   shot "$OUT/streams.png"
   # A-67: the first open of «Трансляції» asks once (the soft question is in streams.png); «Ні, дякую» (the last answer) closes it
@@ -264,7 +262,7 @@ if [ "$WV" -ge "$FLOOR" ]; then
   tab articles; nav click '[data-testid^="arow-"]'; sleep 6; shot "$OUT/ask_articles.png"
   ASK="$ASK articles:$(answer)"; sleep 2
   echo "soft question $ASK" | tee "$OUT/ask.txt"; tab streams
-  AVATARS=$(appls files/covers | grep -c '^ch' || true)
+  AVATARS=$( (appls files/kept || true) | grep -c '^ch' || true)
   echo "avatar files cached on the device: $AVATARS" | tee -a "$OUT/live_fields.txt"
   adb shell input tap 26 52; sleep 6      # the brand icon left of the title → home
   shot "$OUT/home_live.png"
@@ -361,6 +359,22 @@ if [ "$WV" -ge "$FLOOR" ]; then
   shot "$OUT/v108_card_gallery.png"; adb shell input keyevent 4; sleep 3
   P3=$(ev "document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed'")
   echo "v108 in_app=$P0 viewer=$P1 full=$P2 back=$P3" | tee "$OUT/v108.txt"
+  # cloud_34 (1.0.9, A-111), NOT gating (the browser ring gates): the REAL files. After v108's gallery photo, files/photos/ holds it (+ the
+  # card's cover); «Ще» reads their bytes; «Очистити збережені фото» -> the dialog's confirm -> photos/ empty, kept/ (list thumbnails, avatars)
+  # the same count, «0 МБ», the button unavailable; the card's gallery again = its photo downloaded again into photos/
+  nfiles() { ( appls "files/$1" || true ) | wc -l | tr -d ' '; }
+  K0=$(nfiles kept); C0=$(nfiles photos)
+  tab more; sleep 3; nav scroll '[data-testid="more-photos-clear"]' || true; sleep 2
+  U0=$(ev "(document.querySelector('[data-testid=photos-used]')||{}).textContent||'none'")
+  nav click '[data-testid="photos-clear"]' || true; sleep 2; shot "$OUT/v109_confirm.png"
+  OK=$(ev "(() => { const b = document.querySelector('ion-alert.photos-confirm [data-testid=photos-confirm-do]'); if (!b) return 'none'; b.click(); return 'ok'; })()"); sleep 4
+  U1=$(ev "(document.querySelector('[data-testid=photos-used]')||{}).textContent||'none'")
+  D1=$(ev "document.querySelector('[data-testid=photos-clear]')?.shadowRoot?.querySelector('button')?.disabled ? 'off' : 'on'")
+  shot "$OUT/v109_cleared.png"; K1=$(nfiles kept); C1=$(nfiles photos)
+  nav go '/monasteries/242'; sleep 6; nav click '[data-testid="card"] [data-testid="gallery"]' || true; sleep 8
+  F2=$(ev "(document.querySelector('[data-testid=viewer-img]')||{}).dataset?.full||'none'"); C2=$(nfiles photos)
+  adb shell input keyevent 4; sleep 3
+  echo "v109 photos=$C0 kept=$K0 used=[$U0] confirm=$OK -> photos=$C1 kept=$K1 used=[$U1] button=$D1 -> gallery full=$F2 photos=$C2" | tee "$OUT/v109.txt"
   # owner 01.11 (after cloud_05): system Back on «Ще» did nothing. Now: tab root → «Головна»; Back on «Головна» folds the app
   adb shell input tap 288 615; sleep 3; adb shell input keyevent 4; sleep 3
   shot "$OUT/back_from_more.png"

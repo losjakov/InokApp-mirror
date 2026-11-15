@@ -30,7 +30,7 @@ function EparchyListRow({ e, onSelect, selected }: { e: EparchyRow; onSelect: (i
   const { t, lang } = useApp();
   return (
     <IonItem button detail={false} onClick={() => onSelect(e.id)} color={selected ? 'light' : undefined} className="mrow" data-testid={`erow-${e.id}`}>
-      <CoverImage small code={`ep-${e.id}`} url={e.image_url} alt="" className="mrow__cover mrow__cover--map" />
+      <CoverImage small keep code={`ep-${e.id}`} url={e.image_url} alt="" className="mrow__cover mrow__cover--map" />
       <IonLabel>
         {/* the owner 01.11 (after A-25 #0): the list prints the bare name — the screen is «Єпархії УПЦ», «єпархія» is said once */}
         <h2 className="mrow__title">{field(e, 'name', lang)}</h2>
@@ -113,7 +113,7 @@ function EparchyDetail({ id }: { id: number }) {
     <PhotoScope>
       <article data-testid="eparchy">
         {e.image_url && (
-          <CoverImage code={`ep-${e.id}`} url={e.image_url} alt={title} className="eparchy__map" full
+          <CoverImage keep code={`ep-${e.id}`} url={e.image_url} alt={title} className="eparchy__map" full
             ratio={e.image_w && e.image_h ? e.image_w / e.image_h : undefined} openable />
         )}
         <h1 className="card__title" data-testid="eparchy-title">{title}</h1>

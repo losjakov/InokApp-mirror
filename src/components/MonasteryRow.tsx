@@ -40,7 +40,7 @@ export function MonasteryRow({ row, onSelect, selected, q }: { row: Row; onSelec
   return (
     <IonItem button detail={false} onClick={() => onSelect(row.code)} color={selected ? 'light' : undefined} className="mrow" data-testid={`mrow-${row.code}`}>
       {/* A-29: the site's SQUARE list picture (R-25), cached by its sha256; a house the site has no photo of shows the app's own sign */}
-      <CoverImage small code={row.code} url={row.thumb_url} version={row.thumb_sha256} alt="" className="mrow__cover mrow__cover--square"
+      <CoverImage small keep code={row.code} url={row.thumb_url} version={row.thumb_sha256} alt="" className="mrow__cover mrow__cover--square"
         fallback={<div className="mrow__nophoto" data-testid="row-nophoto"><IonIcon icon={churchOutline} aria-hidden="true" /></div>} />
       <IonLabel>
         <h2 className="mrow__title"><Hl text={name} q={q} /></h2>

@@ -311,5 +311,9 @@
   "scroll.up": "Нагору",
   "scroll.down": "Донизу",
   "articles.watch_facebook": "Дивитися на Facebook",
-  "articles.watch_other": "Дивитися відео"
+  "articles.watch_other": "Дивитися відео",
+  "photos.clear": "Очистити збережені фото",
+  "photos.clear_hint": "Фото завантажаться знову, коли ви їх відкриєте",
+  "photos.cleared": "Збережені фото видалено",
+  "photos.mb": "МБ"
 }

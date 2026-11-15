@@ -1,5 +1,6 @@
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonToggle } from '@ionic/react';
 import { Busy } from '@/components/Busy';
+import { SavedPhotos } from '@/components/SavedPhotos';
 import { useEffect, useRef } from 'react';
 import { PHOTO_MODES, type PhotoMode } from '@/data/photos/policy';
 import { THEMES, type Theme } from '@/state/settings';
@@ -56,13 +57,15 @@ export function MorePage() {
             </div>
           </IonItem>
           {/* A-20: «Автозавантаження фото» in place (one select; the hint says what «Wi-Fi» means) */}
-          <IonItem data-testid="more-photos">
+          <IonItem lines="none" data-testid="more-photos">
             <IonIcon slot="start" icon={imagesOutline} aria-hidden="true" />
             <IonSelect ref={photosSel} value={settings.photos} interface="alert" cancelText={t('common.cancel')} onIonChange={(e) => void setSettings({ photos: e.detail.value as PhotoMode })}
               label={t('photos.title')} labelPlacement="stacked" interfaceOptions={{ header: t('photos.title'), message: t('photos.hint'), cssClass: 'inok-dialog' }} data-testid="photos-mode">
               {PHOTO_MODES.map((m) => <IonSelectOption key={m} value={m}>{t(`photos.mode_${m}`)}</IonSelectOption>)}
             </IonSelect>
           </IonItem>
+          {/* A-111: «Очистити збережені фото» inside the same block, under the choice (the line under the select is this row's) */}
+          <SavedPhotos />
           {/* A-96 W-7 (replaces A-36): «Режим інкогніто» — OFF at first (collection as before); ON stops it at once and is remembered */}
           <IonItem data-testid="more-incognito">
             <IonIcon slot="start" icon={eyeOffOutline} aria-hidden="true" />

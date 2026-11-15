@@ -20,6 +20,13 @@ ion-title { font-size: var(--inok-type-heading); }
 /* A-52: the directory's own date under the last check - small text (the type scale's caption) */
 .more__dir-date.more__dir-date.more__dir-date { font-size: var(--inok-type-caption); }
 .more__theme { width: 100%; }
+/* A-111: the clear row sits under «Автозавантаження фото», its text aligned with the select's (the item's start icon: 24 + 32 px in md) */
+.more__clear-box { flex: 1 1 auto; min-width: 0; padding: 0 0 10px 56px; }
+.more__clear-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; } /* a larger font wraps the number under the button */
+.more__clear-row ion-button { margin: 0; height: 40px; --padding-start: 12px; --padding-end: 12px; text-transform: none; font-size: var(--inok-type-secondary); } /* in an item Ionic shrinks it to 27 px */
+.more__used { white-space: nowrap; font-size: var(--inok-type-secondary); font-variant-numeric: tabular-nums; color: var(--ion-color-step-600, var(--ion-text-color)); }
+.more__clear-busy { width: 20px; height: 20px; }
+.more__clear-hint.more__clear-hint { margin: 6px 0 0; font-size: var(--inok-type-caption); color: var(--ion-color-step-600, var(--ion-text-color)); }
 .more__theme ion-label { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.15; }
 .more__theme ion-segment-button { min-width: 0; --padding-start: 4px; --padding-end: 4px; text-transform: none; font-size: var(--inok-type-caption); }
 .toolbar__home { display: flex; align-items: center; background: none; border: 0; padding: 8px 0; margin: 0; cursor: pointer; border-radius: 50%; }

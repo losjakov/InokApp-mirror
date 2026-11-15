@@ -47,6 +47,8 @@ interface Props {
   version?: string | null;
   /** a SMALL picture - list thumbnails, channel avatars, icons: loaded on any network (A-20 size class); offline a row keeps its icon */
   small?: boolean;
+  /** A-111: a picture a LIST needs offline (thumbnails, avatars, eparchy pictures) - «Очистити збережені фото» keeps it (census, JOURNAL cloud_34) */
+  keep?: boolean;
   /** a large slot (card / article cover, a body picture): the placeholder carries its reason, the button and the settings link */
   full?: boolean;
   /** what a row shows while there is no picture (avatar initials, the empty box) */
@@ -63,7 +65,7 @@ interface Props {
 }
 
 /** ONE photo slot for the whole app: the cache + the A-20 rule through photoSrc(); the ONE placeholder when the photo waits. */
-export function CoverImage({ code, url, alt, className, version, small, full, fallback, ratio, openable, onShown }: Props) {
+export function CoverImage({ code, url, alt, className, version, small, keep, full, fallback, ratio, openable, onShown }: Props) {
   const { settings, t } = useApp();
   const scope = useContext(PhotoScopeCtx);
   const [res, setRes] = useState<PhotoResult | null>(null);
@@ -72,6 +74,9 @@ export function CoverImage({ code, url, alt, className, version, small, full, fa
   const [visible, setVisible] = useState(inScope);
   const [manual, setManual] = useState(false);
   const [tick, setTick] = useState(0);
+  // A-111 P2: a shown file removed by «Очистити збережені фото» (or any lost file) asks the pipeline ONCE more - it comes back by the A-20 rule
+  const [retried, setRetried] = useState(false);
+  const lost = () => { setRes(null); if (!retried) { setRetried(true); setTick((x) => x + 1); } };
   const [viewer, setViewer] = useState<ViewerSet | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const want = manual || !!scope?.forced;
@@ -89,9 +94,9 @@ export function CoverImage({ code, url, alt, className, version, small, full, fa
   useEffect(() => {
     if (!visible) return;
     let on = true;
-    photoSrc(code, url, settings.photos, { version, small, manual: want }).then((r) => on && setRes(r));
+    photoSrc(code, url, settings.photos, { version, small, keep, manual: want }).then((r) => on && setRes(r));
     return () => { on = false; };
-  }, [visible, code, url, settings.photos, version, small, want, tick]);
+  }, [visible, code, url, settings.photos, version, small, keep, want, tick]);
   const shown = !!res?.src;
   useEffect(() => { onShown?.(shown); }, [onShown, shown]);
   const key = `${code}|${url}`;
@@ -105,9 +110,9 @@ export function CoverImage({ code, url, alt, className, version, small, full, fa
         ? <button type="button" className="photo-open" onClick={() => (typeof openable === 'object' && 'open' in openable ? openable.open(res.src!)
             : setViewer(onePhoto(code, url!, res.src!, alt, openable === true ? null : openable.full)))}
             aria-label={typeof openable === 'object' && 'open' in openable ? openable.label : alt ? `${t('photos.open')}: ${alt}` : t('photos.open')} data-testid="photo-open">
-            <img src={res.src} alt={alt} loading="lazy" onError={() => setRes(null)} />
+            <img src={res.src} alt={alt} loading="lazy" onError={lost} />
             <span className="over-photo photo-open__hint" aria-hidden="true"><IonIcon icon={expandOutline} aria-hidden="true" /></span></button>
-        : <img src={res.src} alt={alt} loading="lazy" onError={() => setRes(null)} />)
+        : <img src={res.src} alt={alt} loading="lazy" onError={lost} />)
         : wait && url && !(small && fallback) ? <PhotoWait r={wait} full={full} onLoad={() => setManual(true)} />
         : fallback}
       {openable && !(typeof openable === 'object' && 'open' in openable) && <PhotoViewer set={viewer} onClose={() => setViewer(null)} />}

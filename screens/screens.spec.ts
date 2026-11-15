@@ -549,6 +549,21 @@ const countGallery = async (p: Page) => {
   p.on('request', (q) => { const u = q.url(); if (u.includes('monastery_photos.json')) r.list.push(u); else { const m = /\/images\/monasteries\/(\d+\/[^/]+)$/.exec(u); if (m) r.photos.push(m[1]); } });
 };
 const gallery = (p: Page) => galleryReqs.get(p)!;
+/** A-111: the browser ring's stand-in of the device's photo files (src/native/covers.ts `__inokPhotoStore`): `seed` = files already there. */
+const photoStore = (seed: Record<string, number>) => async (p: Page) => { await p.addInitScript((s) => { (window as any).__inokPhotoStore = { bytes: 240_000, seed: s }; }, seed); };
+/** weeks of use: two list thumbnails kept, three large photos (a card's cover, a publication's picture, a gallery photo) = 12,4 MB */
+const SEED = { 'kept/242-t1.webp': 14_000, 'kept/a1714-t2.webp': 12_000, 'photos/242-c1.jpg': 3_100_000, 'photos/a1714-b1.jpg': 4_600_000, 'photos/242-g1.jpg': 4_700_000 };
+const stored = (p: Page) => p.evaluate(() => { const k = [...((window as any).__inokPhotoStoreLive.files as Map<string, unknown>).keys()];
+  return { kept: k.filter((x) => x.startsWith('kept/')).length, photos: k.filter((x) => x.startsWith('photos/')).length }; });
+/** Ionic's button: the state TalkBack reads is the inner (shadow) button's (gotcha: roles and states live on Ionic's inner element) */
+const innerDisabled = (b: ReturnType<Page['locator']>) => b.evaluate((h) => h.shadowRoot!.querySelector('button')!.disabled);
+/** «Ще»'s photo block in view; waits until «зайнято» reads `used` (the store measured) and returns the button */
+const photosBlock = async (p: Page, used: string | RegExp) => {
+  const row = onShown(p, 'more-photos-clear');
+  await row.scrollIntoViewIfNeeded();
+  await expect(onShown(p, 'photos-used')).toHaveText(typeof used === 'string' ? new RegExp(`^${used} `) : used, { timeout: 10_000 });
+  return onShown(p, 'photos-clear');
+};
 const viewerGone = (p: Page) => expect(p.locator('ion-modal.viewer')).toHaveCount(0, { timeout: 5000 }).catch(async () => expect(p.locator('ion-modal.viewer:not(.overlay-hidden)')).toHaveCount(0));
 
 /** A-55 (A-54 withdrawn): NO row in `scope` carries a lead line - each label holds only the title, the subtitle, «kind · date» and the badges line
@@ -1117,6 +1132,77 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(btn).toHaveAttribute('aria-label', (await words(p, ['card.gallery_hint']))[0]);
       expect(await opened(p, 'gallery')).toMatch(/^https:\/\/inok\.info\/monasteries\/242\/\?gallery=Y/);
       expect(gallery(p).list).toEqual([]);
+    } },
+  // A-111: «Очистити збережені фото» under «Автозавантаження фото» - the space read from the store (the browser ring's stand-in of the files:
+  // `__inokPhotoStore`), the confirmation, the message; kept pictures (list thumbnails) stay. The same stand-in counts what is asked again.
+  { name: 'settings-photos', only: UK, path: '/more', before: photoStore(SEED), ready: async (p) => {
+      const btn = await photosBlock(p, '12,4');
+      await expect.poll(() => innerDisabled(btn)).toBe(false);
+      await expect.poll(() => spokenName(btn)).toBe(`${(await words(p, ['photos.clear']))[0]}, ${await p.getByTestId('photos-used').textContent()}`);
+      await expect(p.locator('.more__clear-hint')).toHaveText((await words(p, ['photos.clear_hint']))[0]);
+      // the row sits UNDER the choice, inside its block: no line between them, the button's text aligned with the select's
+      const g = await p.evaluate(() => ({ sel: document.querySelector('[data-testid="photos-mode"]')!.getBoundingClientRect(), row: document.querySelector('[data-testid="more-photos-clear"]')!.getBoundingClientRect(),
+        btn: document.querySelector('[data-testid="photos-clear"]')!.getBoundingClientRect(), used: document.querySelector('[data-testid="photos-used"]')!.getBoundingClientRect() }));
+      expect(g.row.top).toBeGreaterThanOrEqual(g.sel.bottom - 1);
+      expect(Math.abs(g.btn.left - g.sel.left), 'the button under the select\'s text').toBeLessThanOrEqual(2);
+      expect(Math.abs((g.used.top + g.used.height / 2) - (g.btn.top + g.btn.height / 2)), `the space used beside the button, one line ${JSON.stringify(g)}`).toBeLessThanOrEqual(2);
+      expect(g.btn.height, 'Ionic\'s standard button (its ::after makes the target 48 dp)').toBeGreaterThanOrEqual(40);
+    } },
+  { name: 'settings-photos-confirm', only: UK, path: '/more', before: photoStore(SEED), ready: async (p) => {
+      const btn = await photosBlock(p, '12,4');
+      const [clear, cancel, hint] = await words(p, ['photos.clear', 'common.cancel', 'photos.clear_hint']);
+      const dlg = p.locator('ion-alert.photos-confirm:not(.overlay-hidden)');
+      await btn.click();
+      await expect(dlg.locator('.alert-title')).toHaveText(clear);
+      await expect(dlg.locator('.alert-message')).toHaveText(hint);
+      expect(await dlg.locator('.alert-button').evaluateAll((bs) => bs.map((b) => (b.textContent ?? '').trim()))).toEqual([cancel, clear]);
+      await dlg.getByTestId('photos-confirm-cancel').click(); // an accidental tap: «Скасувати» removes nothing
+      await expect(dlg).toHaveCount(0);
+      await expect(p.getByTestId('photos-used')).toHaveText(/^12,4 /);
+      expect(await stored(p)).toEqual({ kept: 2, photos: 3 });
+      await btn.click(); // the shot: the dialog
+      await expect(dlg.locator('.alert-button')).toHaveCount(2);
+      await p.waitForTimeout(400); // the dialog's entrance is over
+    } },
+  { name: 'settings-photos-cleared', only: UK, path: '/more', before: photoStore(SEED), ready: async (p) => {
+      const btn = await photosBlock(p, '12,4');
+      const toasts = p.locator('ion-toast[data-testid="photos-cleared"]:not(.overlay-hidden)');
+      // the shot: the page at its end, so the block stands above the message - the message, «0 МБ» and the unavailable button together
+      await p.locator(SHOWN).locator('ion-content').evaluate((c) => (c as unknown as { scrollToBottom: (ms: number) => Promise<void> }).scrollToBottom(0));
+      await btn.click();
+      await p.locator('ion-alert.photos-confirm:not(.overlay-hidden)').getByTestId('photos-confirm-do').click();
+      await expect(toasts).toHaveCount(1);
+      await expect(toasts.first()).toContainText((await words(p, ['photos.cleared']))[0]);
+      expect(await toasts.first().evaluate((t) => t.shadowRoot!.querySelector('[role="status"]')?.getAttribute('aria-live') ?? 'none')).toBe('polite');
+      await toastAboveTabs(p, 'ion-toast[data-testid="photos-cleared"]:not(.overlay-hidden)'); // D73
+      await expect(p.getByTestId('photos-used')).toHaveText(`0 ${(await words(p, ['photos.mb']))[0]}`);
+      await expect.poll(() => innerDisabled(btn), 'TalkBack: «недоступно» (the inner button is disabled)').toBe(true);
+      expect(await stored(p), 'the list thumbnails stay, the large photos go').toEqual({ kept: 2, photos: 0 });
+    } },
+  // A-111 + A-109: a gallery photo opened, «зайнято» grows, the clear, the same gallery again: its photo is ASKED AGAIN (the stand-in's
+  // downloads), the list thumbnails are not; the gallery still opens and shows the photo
+  { name: 'card-gallery-cleared', only: UK, path: '/monasteries/242', before: async (p) => { await countGallery(p); await photoStore({})(p); }, ready: async (p) => {
+      const card = onShown(p, 'card');
+      await expect(card.getByTestId('gallery')).toHaveAttribute('data-in-app', '1', { timeout: 15_000 });
+      await card.getByTestId('gallery').click();
+      await expect(p.getByTestId('viewer-img')).toHaveAttribute('data-full', '1');
+      await p.getByTestId('viewer-close').click();
+      await viewerGone(p);
+      const asked = () => p.evaluate(() => ((window as any).__inokPhotoStoreLive.downloads as string[]).filter((u) => /\/monasteries\/242\/00\.jpg$/.test(u)).length);
+      expect(await asked()).toBe(1);
+      await p.locator('ion-tab-button[tab="more"]').click();
+      const btn = await photosBlock(p, /^0,[1-9] |^[1-9]/); // the opened photo + the card's cover: more than 0
+      await btn.click();
+      await p.locator('ion-alert.photos-confirm:not(.overlay-hidden)').getByTestId('photos-confirm-do').click();
+      await expect(p.getByTestId('photos-used')).toHaveText(/^0 /);
+      await p.goBack();
+      await expect(onShown(p, 'card')).toBeVisible();
+      await settled(p);
+      await onShown(p, 'card').getByTestId('gallery').click();
+      await expect(p.getByTestId('viewer-img')).toHaveAttribute('data-full', '1');
+      expect(await asked(), 'the photo is asked again after the clear').toBe(2);
+      expect(gallery(p).list, 'the list held for this launch (no second list request)').toHaveLength(1);
+      await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
     } },
   { name: 'monastery-favourite', path: '/monasteries/37', ready: async (p) => {
       await expect(p.getByTestId('card')).toBeVisible();

@@ -311,5 +311,9 @@
   "scroll.up": "Наверх",
   "scroll.down": "Вниз",
   "articles.watch_facebook": "Смотреть на Facebook",
-  "articles.watch_other": "Смотреть видео"
+  "articles.watch_other": "Смотреть видео",
+  "photos.clear": "Очистить сохранённые фото",
+  "photos.clear_hint": "Фото загрузятся снова, когда вы их откроете",
+  "photos.cleared": "Сохранённые фото удалены",
+  "photos.mb": "МБ"
 }
