@@ -93,7 +93,7 @@ jobs:
         run: |
           miss=""; for n in ASC_API_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID APPLE_TEAM_ID; do [ -n "${!n}" ] || miss="$miss $n"; done
           if [ -n "$miss" ]; then echo "signed archive: SKIPPED - missing secrets:$miss" | tee -a "$GITHUB_STEP_SUMMARY"; echo "ok=0" >> "$GITHUB_OUTPUT"; else echo "ok=1" >> "$GITHUB_OUTPUT"; fi
-      - name: SIGNED archive + export (cloud-managed signing by the App Store Connect API key) - TestFlight upload on a release snapshot
+      - name: SIGNED for the App Store - the archive without a profile, the distribution signature by -exportArchive (cloud signing by the API key)
         if: steps.keys.outputs.ok == '1'
         env:
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
@@ -105,26 +105,43 @@ jobs:
           K="$RUNNER_TEMP/asc_key.p8"
           # the secret holds the .p8 as it is (PEM) or base64 of it - either way the FILE gets the PEM; nothing is printed
           if printf '%s' "$ASC_API_KEY_P8" | grep -q 'BEGIN PRIVATE KEY'; then printf '%s\n' "$ASC_API_KEY_P8" > "$K"; else printf '%s' "$ASC_API_KEY_P8" | base64 -D > "$K"; fi
-          # run 43743175824: automatic signing ARCHIVED with the development identity -> «Your team has no devices from which to generate a
-          # provisioning profile»; the archive is signed for DISTRIBUTION from the start (an App Store profile needs no device)
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$K" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
-          rc=0
-          xcodebuild -project "$PROJECT" -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            "${AUTH[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Distribution" \
-            MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C" archive > "$RUNNER_TEMP/signed.log" 2>&1 || rc=$?
-          if [ "$rc" = 0 ]; then
+          A="$RUNNER_TEMP/App.xcarchive"; COMMON=(-project "$PROJECT" -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath "$A" MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C")
+          # runs 43743175824 / 43744528943: automatic signing ARCHIVES for development (a registered device is required - the team has none) and
+          # refuses «Apple Distribution» with it. So the archive carries no profile: ad-hoc signed WITH the entitlements (they survive the
+          # re-signing), else not signed at all; the App Store signature comes from -exportArchive (cloud-managed, no device needed).
+          rc=0; HOW=ad-hoc
+          xcodebuild "${COMMON[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- PROVISIONING_PROFILE_SPECIFIER= \
+            CODE_SIGNING_REQUIRED=NO AD_HOC_CODE_SIGNING_ALLOWED=YES archive > "$RUNNER_TEMP/archive.log" 2>&1 || rc=$?
+          if [ "$rc" != 0 ]; then
+            echo "ad-hoc archive refused: $(grep -m2 'error:' "$RUNNER_TEMP/archive.log" | tr '\n' ' ' | cut -c1-400)" | tee -a "$GITHUB_STEP_SUMMARY"
+            rc=0; HOW=unsigned; rm -rf "$A"
+            xcodebuild "${COMMON[@]}" CODE_SIGNING_ALLOWED=NO archive > "$RUNNER_TEMP/archive.log" 2>&1 || rc=$?
+          fi
+          echo "archive for the App Store: $HOW (exit $rc)" | tee -a "$GITHUB_STEP_SUMMARY"
+          export_to() { # $1 = export | upload
             cp ios/ExportOptions.plist "$RUNNER_TEMP/eo.plist"
             plutil -replace teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/eo.plist"
-            plutil -replace destination -string "$([ "$UPLOAD" = true ] && echo upload || echo export)" "$RUNNER_TEMP/eo.plist"
-            xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportPath "$RUNNER_TEMP/export" -exportOptionsPlist "$RUNNER_TEMP/eo.plist" \
-              "${AUTH[@]}" > "$RUNNER_TEMP/export.log" 2>&1 || rc=$?
+            plutil -replace destination -string "$1" "$RUNNER_TEMP/eo.plist"
+            xcodebuild -exportArchive -archivePath "$A" -exportPath "$RUNNER_TEMP/export-$1" -exportOptionsPlist "$RUNNER_TEMP/eo.plist" "${AUTH[@]}" > "$RUNNER_TEMP/export-$1.log" 2>&1
+          }
+          [ "$rc" = 0 ] && { export_to export || rc=$?; }
+          if [ "$rc" = 0 ]; then
+            # the App Store signature + the entitlements that must survive it (push, Universal Links), read back from the IPA
+            rm -rf "$RUNNER_TEMP/x" && mkdir "$RUNNER_TEMP/x" && unzip -q "$RUNNER_TEMP/export-export/App.ipa" -d "$RUNNER_TEMP/x"
+            APP="$RUNNER_TEMP/x/Payload/App.app"
+            codesign -dvv "$APP" 2>&1 | grep -E '^Authority=' | head -2 | tee -a "$GITHUB_STEP_SUMMARY"
+            codesign -d --entitlements :- "$APP" 2>/dev/null > "$RUNNER_TEMP/ent.plist" || true
+            for k in aps-environment com.apple.developer.associated-domains; do
+              /usr/libexec/PlistBuddy -c "Print :$k" "$RUNNER_TEMP/ent.plist" > /dev/null 2>&1 && echo "entitlement $k: present" | tee -a "$GITHUB_STEP_SUMMARY" \
+                || { echo "::error::entitlement $k LOST in the App Store signature ($HOW archive)"; rc=1; }
+            done
+            echo "SIGNED IPA: $(stat -f%z "$RUNNER_TEMP/export-export/App.ipa") b" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+          if [ "$rc" = 0 ] && [ "$UPLOAD" = true ]; then export_to upload || rc=$?; [ "$rc" = 0 ] && echo "UPLOADED to App Store Connect: $V ($C) - TestFlight processes it (minutes)" | tee -a "$GITHUB_STEP_SUMMARY"; fi
           rm -f "$K"
           if [ "$rc" != 0 ]; then
             echo "SIGNED: FAILED (exit $rc) - Apple's words:" | tee -a "$GITHUB_STEP_SUMMARY"
-            cat "$RUNNER_TEMP/signed.log" "$RUNNER_TEMP/export.log" 2>/dev/null | grep -E 'error:|Error Domain|not allowed|permission|role|requires|No profiles|No Account' | sort -u | head -20 | tee -a "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP"/archive.log "$RUNNER_TEMP"/export-*.log 2>/dev/null | grep -E 'error:|Error Domain|not allowed|permission|role|requires|No profiles|No Account|IDEDistribution' | sort -u | head -20 | tee -a "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          if [ "$UPLOAD" = true ]; then echo "SIGNED and UPLOADED to App Store Connect: $V ($C) - TestFlight processes it (minutes)" | tee -a "$GITHUB_STEP_SUMMARY"
-          else echo "SIGNED: the IPA exported, $(stat -f%z "$RUNNER_TEMP/export/App.ipa" 2>/dev/null || echo '?') b (not uploaded: not a release snapshot)" | tee -a "$GITHUB_STEP_SUMMARY"; fi
-          grep -hE 'Signing Identity|Provisioning Profile' "$RUNNER_TEMP/signed.log" | sort -u | head -4 | tee -a "$GITHUB_STEP_SUMMARY" || true
