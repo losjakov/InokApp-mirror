@@ -70,7 +70,9 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
   it('no secret is echoed; the key file is removed; the build number is THE rule', () => {
     expect(wf).not.toMatch(/echo[^\n]*\$\{?(ASC_API_KEY_P8|ASC_KEY_ID|ASC_ISSUER_ID|APPLE_TEAM_ID)/);
     expect(wf).toMatch(/rm -f "\$K"/);
-    expect(wf).toMatch(/scripts\/app_version\.py package\.json/);
+    const setup = read('.github/actions/ios-setup/action.yml'); // THE preparation of every iOS job
+    expect(setup).toMatch(/scripts\/app_version\.py package\.json/);
+    expect(wf.match(/uses: \.\/\.github\/actions\/ios-setup/g)).toHaveLength(3);
     expect(wf).toMatch(/MARKETING_VERSION="\$V" CURRENT_PROJECT_VERSION="\$C"/);
   });
   it('ios/ leaves for the mirror; a .p8 never does', () => {

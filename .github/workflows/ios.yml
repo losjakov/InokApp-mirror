@@ -35,15 +35,7 @@ jobs:
       - name: Facts - which repository and event run this
         env: { EXPR_PRIVATE: '${{ github.event.repository.private }}', MIRROR_LIVE: '${{ vars.MIRROR_LIVE }}' }
         run: python3 -I scripts/ci_infra.py facts
-      - uses: actions/setup-node@v7
-        with: { node-version: 22, cache: npm }
-      - name: Install, build the web, copy it into the iOS project
-        run: npm ci && npm run build && npx cap sync ios
-      - name: Xcode and the version (package.json -> MARKETING_VERSION / CURRENT_PROJECT_VERSION, THE rule of scripts/app_version.py)
-        run: |
-          xcodebuild -version | tee -a "$GITHUB_STEP_SUMMARY"
-          read -r V C < <(python3 -I scripts/app_version.py package.json); echo "V=$V" >> "$GITHUB_ENV"; echo "C=$C" >> "$GITHUB_ENV"
-          echo "iOS version $V, build $C; Firebase on iOS: OFF in 1.0.11 (no Firebase SDK in the app; ref/REF_ios_state.md)" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: ./.github/actions/ios-setup
       - name: Build for the simulator (Debug, not signed)
         run: |
           set -o pipefail
@@ -58,25 +50,14 @@ jobs:
         if: always()
         with: { name: ios-simulator, path: ios-out/, retention-days: 30, if-no-files-found: ignore }
 
-  # the Release archive WITHOUT signing (always green when the code builds) + its size; then the SIGNED archive by the App Store Connect
-  # API key (cloud-managed signing) - exported as a signed IPA (proof), or UPLOADED to TestFlight on the release snapshot / a manual
-  # run with `upload`. A refusal by Apple is written as it comes (REPORT / QUESTIONS), never worked around.
+  # the Release archive WITHOUT signing (green whenever the code builds) + the size of the app
   archive:
     if: ${{ !github.event.repository.private }}
     runs-on: macos-26
     timeout-minutes: 60
-    env:
-      UPLOAD: "${{ (github.event_name == 'workflow_dispatch' && inputs.upload) || (github.event_name == 'push' && contains(github.event.head_commit.message, ': release: v')) }}"
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with: { node-version: 22, cache: npm }
-      - name: Install, build the web (the release bundle never listens to the push topic `test`), copy it into the iOS project
-        run: npm ci && npm run build && npx cap sync ios
-      - name: The version
-        run: |
-          read -r V C < <(python3 -I scripts/app_version.py package.json); echo "V=$V" >> "$GITHUB_ENV"; echo "C=$C" >> "$GITHUB_ENV"
-          echo "iOS $V ($C); upload to TestFlight in this run: $UPLOAD" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: ./.github/actions/ios-setup
       - name: Release archive, NOT signed (+ the size of the app)
         run: |
           set -o pipefail
@@ -87,6 +68,21 @@ jobs:
           mkdir -p "$RUNNER_TEMP/p/Payload" && cp -R "$A" "$RUNNER_TEMP/p/Payload/" && (cd "$RUNNER_TEMP/p" && zip -qry ../unsigned.ipa Payload)
           echo "Release App.app (arm64, not signed): $(du -sk "$A" | cut -f1) KB; zipped as an IPA: $(stat -f%z "$RUNNER_TEMP/unsigned.ipa") b" | tee -a "$GITHUB_STEP_SUMMARY"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' -c 'Print :CFBundleVersion' -c 'Print :MinimumOSVersion' "$A/Info.plist" | tr '\n' ' ' | sed 's/^/version build minimumOS: /' | tee -a "$GITHUB_STEP_SUMMARY"; echo >> "$GITHUB_STEP_SUMMARY"
+
+  # the SIGNED archive by the App Store Connect API key (cloud-managed signing), exported as a signed IPA (proof), or UPLOADED to
+  # TestFlight on the release snapshot / a manual run with `upload`. A refusal by Apple is written as it comes (REPORT / QUESTIONS),
+  # never worked around - and it never turns the unsigned archive red (its own job).
+  testflight:
+    if: ${{ !github.event.repository.private }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      UPLOAD: "${{ (github.event_name == 'workflow_dispatch' && inputs.upload) || (github.event_name == 'push' && contains(github.event.head_commit.message, ': release: v')) }}"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/ios-setup
+      - name: Upload in this run?
+        run: echo "upload to TestFlight in this run - $UPLOAD" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Signing secrets present (names only)
         id: keys
         env:
@@ -109,10 +105,13 @@ jobs:
           K="$RUNNER_TEMP/asc_key.p8"
           # the secret holds the .p8 as it is (PEM) or base64 of it - either way the FILE gets the PEM; nothing is printed
           if printf '%s' "$ASC_API_KEY_P8" | grep -q 'BEGIN PRIVATE KEY'; then printf '%s\n' "$ASC_API_KEY_P8" > "$K"; else printf '%s' "$ASC_API_KEY_P8" | base64 -D > "$K"; fi
+          # run 43743175824: automatic signing ARCHIVED with the development identity -> «Your team has no devices from which to generate a
+          # provisioning profile»; the archive is signed for DISTRIBUTION from the start (an App Store profile needs no device)
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$K" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
           rc=0
           xcodebuild -project "$PROJECT" -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            "${AUTH[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C" archive > "$RUNNER_TEMP/signed.log" 2>&1 || rc=$?
+            "${AUTH[@]}" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Distribution" \
+            MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C" archive > "$RUNNER_TEMP/signed.log" 2>&1 || rc=$?
           if [ "$rc" = 0 ]; then
             cp ios/ExportOptions.plist "$RUNNER_TEMP/eo.plist"
             plutil -replace teamID -string "$APPLE_TEAM_ID" "$RUNNER_TEMP/eo.plist"

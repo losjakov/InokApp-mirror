@@ -1,0 +1,15 @@
+name: ios-setup
+description: THE preparation of every iOS job (cloud_36) - node, npm ci, the web build, cap sync ios, the version pair from package.json
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with: { node-version: 22, cache: npm }
+    - name: Install, build the web (the release bundle never listens to the push topic `test`), copy it into the iOS project
+      shell: bash
+      run: npm ci && npm run build && npx cap sync ios
+    - name: Xcode and the version (package.json -> MARKETING_VERSION / CURRENT_PROJECT_VERSION, THE rule of scripts/app_version.py)
+      shell: bash
+      run: |
+        read -r V C < <(python3 -I scripts/app_version.py package.json); echo "V=$V" >> "$GITHUB_ENV"; echo "C=$C" >> "$GITHUB_ENV"
+        echo "$(xcodebuild -version | tr '\n' ' '); iOS $V, build $C; Firebase on iOS: OFF in 1.0.11 (ref/REF_ios_state.md)" | tee -a "$GITHUB_STEP_SUMMARY"
