@@ -41,6 +41,9 @@
   "ref/REF_gotchas_4.md": {
     "max_bytes": 12000
   },
+  "ref/REF_gotchas_5.md": {
+    "max_bytes": 12000
+  },
   "ref/REF_app_release.md": {
     "max_bytes": 8000,
     "note": "A-62 versions and releases (cloud_21)"
