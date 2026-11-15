@@ -1,0 +1,3 @@
+/* cloud_36 (B1): the words iOS shows for the app; uk = the original (Info.plist), ru / en follow */
+"CFBundleDisplayName" = "inok.info";
+"NSLocationWhenInUseUsageDescription" = "Щоб показати найближчі обителі й відстань до них. Місцезнаходження не залишає телефон.";

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- cloud_36 (B4): the App Store export of .github/workflows/ios.yml - cloud-managed signing through the App Store Connect API key
+	     (no certificate or profile in git or in secrets); `destination` is set per run: export (a signed IPA, proves signing) or upload
+	     (TestFlight, the release snapshot only). The team is passed by the workflow (secret APPLE_TEAM_ID), never written here. -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>destination</key>
+	<string>export</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

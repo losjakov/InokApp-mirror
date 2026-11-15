@@ -78,13 +78,17 @@ export function radiusBounds(at: { lat: number; lon: number }, radiusKm: number)
 export const UKRAINE_BOUNDS: [[number, number], [number, number]] = [[22.1, 44.3], [40.3, 52.4]];
 export const RADII_KM = [10, 25, 50, 100] as const;
 
+/** A-117 (1): the font name of the cluster count - its glyphs are BUNDLED (`src/assets/glyphs/count-0-255.pbf`, scripts/make_count_glyphs.py) */
+export const COUNT_FONT = 'Inok Count';
+export const GLYPHS_URL = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
 /**
- * The style used when `config.map_style_url` is unknown or its download fails (offline): a flat background and the
- * OpenFreeMap glyphs (needed by the cluster-count labels; harmless when unreachable). Markers from the DB still render.
+ * A-117 (1), cloud_36: THE local style - every map STARTS on it (the houses from the DB drawn at once, no network asked) and stays on it
+ * while the network style cannot be fetched (offline, a weak signal, the provider down). A flat background; the only text our layers
+ * print is the cluster count, whose glyphs never leave the app (inokMap `transformRequest`).
  */
-export const FALLBACK_STYLE: StyleSpecification = {
+export const LOCAL_STYLE: StyleSpecification = {
   version: 8,
-  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+  glyphs: GLYPHS_URL,
   sources: {},
   layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#e9e5dc' } }],
 };

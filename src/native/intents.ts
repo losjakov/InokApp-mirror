@@ -1,6 +1,6 @@
 import { Browser } from '@capacitor/browser';
 import { Share } from '@capacitor/share';
-import { isNative } from './platform';
+import { isIos, isNative } from './platform';
 import type { Lang } from '@/i18n';
 import { SITE_HOSTS } from '@/data/api/client';
 
@@ -56,6 +56,8 @@ export function directions(lat: number, lon: number, label: string, app: Directi
   const q = `${lat},${lon}`;
   if (app === 'google') return openExternal(`https://www.google.com/maps/dir/?api=1&destination=${q}`);
   if (app === 'waze') return openExternal(`https://waze.com/ul?ll=${q}&navigate=yes`);
+  // cloud_36 (B2): iOS knows no `geo:` - the system Maps app by its own scheme (Capacitor hands a non-web scheme to the system)
+  if (isIos()) return go(`maps://?daddr=${q}&q=${encodeURIComponent(label)}`);
   return go(`geo:${q}?q=${q}(${encodeURIComponent(label)})`);
 }
 

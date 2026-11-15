@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ESLint } from 'eslint';
 import pkg from '../../package.json';
-import { ENGINE_FLOOR, chromeFloor, chromeMajor } from '@/app/engineFloor';
+import { ENGINE_FLOOR, IOS_FLOOR, chromeFloor, chromeMajor } from '@/app/engineFloor';
 import { uuidV4 } from '@/data/repo/cast';
 
 describe('A-46: uuidV4 without crypto.randomUUID (Chrome 92)', () => {
@@ -14,7 +14,9 @@ describe('A-46: uuidV4 without crypto.randomUUID (Chrome 92)', () => {
 
 describe('A-46 / A-47: the ONE engine floor', () => {
   it('is written once in package.json browserslist and is not above Chrome 98 (the reference phone)', () => {
-    expect(pkg.browserslist).toEqual([`chrome >= ${ENGINE_FLOOR}`]);
+    // cloud_36: + the iOS floor (Safari = the system's WKWebView; Capacitor 8's minimum iOS 15) - each engine written once
+    expect(pkg.browserslist).toEqual([`chrome >= ${ENGINE_FLOOR}`, `ios_saf >= ${IOS_FLOOR}`]);
+    expect(IOS_FLOOR).toBe(15);
     expect(ENGINE_FLOOR).toBeLessThanOrEqual(98);
     expect(ENGINE_FLOOR).toBeGreaterThanOrEqual(89); // Ionic 9: Chromium 89+ (its BREAKING.md) - lower is not supported by the stack
     expect(() => chromeFloor(['defaults'])).toThrow();

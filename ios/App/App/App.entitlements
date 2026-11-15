@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- cloud_36 (B1): APNs (the App ID has Push Notifications) and Universal Links of inok.info (the site's
+	     /.well-known/apple-app-site-association, REQUEST R-50; the same paths as Android's App Links) -->
+	<key>aps-environment</key>
+	<string>production</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:inok.info</string>
+	</array>
+</dict>
+</plist>

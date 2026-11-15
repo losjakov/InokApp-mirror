@@ -18,7 +18,8 @@ const SCREENS: S[] = [
   { name: 'eparchies', path: '/more/eparchies', url: 'https://inok.info/dioceses/', ready: 'eparchy-list' },
   { name: 'eparchy', path: '/more/eparchies/1', url: 'https://inok.info/dioceses/1/', ready: 'eparchy-houses' },
   { name: 'streams', path: '/streams', url: 'https://inok.info/live/', ready: 'channels' },
-  { name: 'articles', path: '/articles', url: 'https://inok.info/articles/', ready: 'articles' },
+  { name: 'articles', path: '/articles', url: 'https://inok.info/articles/publications/', ready: 'articles' }, // A-117 (2): opens on «Статті»
+  { name: 'articles-all', path: '/articles', url: 'https://inok.info/articles/', ready: 'articles', before: (p) => p.getByTestId('kind-tab-all').locator('visible=true').click() },
   { name: 'articles-video', path: '/articles', url: 'https://inok.info/articles/video/', ready: 'articles', before: (p) => p.getByTestId('kind-tab-video').locator('visible=true').click() },
   { name: 'article', path: '/articles?id=2869', url: 'https://inok.info/articles/publications/2869/', ready: 'article' },
   { name: 'commission', path: '/more/commission', url: 'https://inok.info/about/', ready: 'share-footer' },

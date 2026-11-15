@@ -1,6 +1,6 @@
 import { PushNotifications, type ActionPerformed, type PushNotificationSchema } from '@capacitor/push-notifications';
 import { registerPlugin } from '@capacitor/core';
-import { isNative } from './platform';
+import { isAndroid, isIos, isNative } from './platform';
 
 /** Local plugin (android/app/src/main/java/info/inok/app/FcmTopicsPlugin.java): FCM topics on the device (A-7). */
 interface FcmTopicsPlugin {
@@ -87,6 +87,8 @@ export async function requestPushPermission(): Promise<PushPermission> {
 
 /** A-67: the phone's notification settings of this app (a refused permission is changed only there; Android 8+). */
 export async function openNotificationSettings(): Promise<void> {
+  // iOS: the app's own page of the Settings app (UIApplication.openSettingsURLString; Capacitor hands a non-web scheme to the system)
+  if (isIos() && isNative()) { window.location.assign('app-settings:'); return; }
   try { await FcmTopics.openSettings(); } catch (e) { log('open settings failed', String(e)); }
 }
 
@@ -117,7 +119,9 @@ export async function registerPush(handlers: { onTap: (m: PushMessage) => void; 
 
 /** Makes the device's topic set equal to `wanted` (+ `test` in debug builds). Idempotent; logs each change. */
 export async function syncTopics(wanted: string[]): Promise<void> {
-  if (!isNative() || !registered) return;
+  // cloud_36: topics are FCM's (the Android shell's FcmTopics); iOS registers with APNs through the same plugin, but has no FCM SDK in
+  // 1.0.11 - its topics wait for Firebase on iOS (ref/REF_ios_state.md); nothing is subscribed, nothing is claimed
+  if (!isAndroid() || !registered) return;
   const want = new Set(deviceTopics(wanted));
   if (PUSH_TEST) { want.add(TOPIC_TEST); log(PUSH_TEST_MARK); }
   for (const t of want) {
@@ -132,13 +136,13 @@ export async function syncTopics(wanted: string[]): Promise<void> {
 
 /** A-84 (b): the tray forgets what the app has shown - all articles (Home's «Нове на сайті» seen) or the opened ones. Never throws. */
 export async function consumedArticles(ids?: string[]): Promise<void> {
-  if (!isNative()) return;
+  if (!isAndroid()) return;
   try { await FcmTopics.consumedArticles(ids ? { ids } : {}); } catch (e) { log('consume failed', String(e)); }
 }
 
 /** A-84 (c): a FRESH live-status lists the live channels; the tray keeps «ефір» notifications of those only. Never throws. */
 export async function liveChannelsNow(ids: Array<number | string>): Promise<void> {
-  if (!isNative()) return;
+  if (!isAndroid()) return;
   try { await FcmTopics.liveChannels({ ids: ids.map(String) }); } catch (e) { log('live channels failed', String(e)); }
 }
 

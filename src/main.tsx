@@ -16,6 +16,7 @@ import { App } from './app/App';
 import { applyTheme } from './state/theme';
 import { applyTextScale } from './state/textScale';
 import { installBridgeProbe } from './app/bridgeProbe';
+import { isIos } from './native/platform';
 
 // D22 (cloud_06): the debug bridge JSON-stringifies EVERY plugin call and result into the console (the 2.2 MB export as base64,
 // each article's JSON, every SQL row) — right after the first import that flood held the main thread and the first home stayed
@@ -25,7 +26,8 @@ if (cap) cap.isLoggingEnabled = false;
 if (import.meta.env.VITE_BRIDGE_PROBE === '1') installBridgeProbe(); // D22: the emulator build measures the bridge
 
 installCrashGuard(); // A-48: never die white - window errors, rejections, the renderer gone, the crash of the last launch
-setupIonicReact({ mode: 'md' });
+// cloud_36 (B2): iOS has no system Back - the edge swipe walks the page stack as the header arrow does (Ionic's gesture; the md look stays)
+setupIonicReact({ mode: 'md', swipeBackEnabled: isIos() });
 applyTheme('system'); // before the first paint; the stored choice follows once the settings are read (AppContext)
 applyTextScale(); // A-56: hyphenation only at a large system text scale
 

@@ -27,6 +27,8 @@ ios/DerivedData/
 *.jks
 *.p12
 *.mobileprovision
+*.p8
+AuthKey_*
 google-services.json
 GoogleService-Info.plist
 .secrets/

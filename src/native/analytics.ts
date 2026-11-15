@@ -1,5 +1,5 @@
 import { registerPlugin } from '@capacitor/core';
-import { isNative } from './platform';
+import { isAndroid } from './platform';
 
 /**
  * A-36 (owner 02.11.2026, answer «Б»): Firebase Analytics — the screens opened and the app instance id, NOTHING else: no advertising
@@ -32,11 +32,11 @@ const webLog = (): string[] => ((window as unknown as { __inokAnalytics?: string
 
 export async function setAnalytics(on: boolean): Promise<void> {
   enabled = on;
-  if (isNative()) await Native.setEnabled({ enabled: on }).catch(() => undefined);
+  if (isAndroid()) await Native.setEnabled({ enabled: on }).catch(() => undefined);
 }
 /** One screen opened (an article = «article»): sent only while the switch is on. */
 export function logScreen(name: string | null): void {
   if (!enabled || !name) return;
-  if (isNative()) void Native.screen({ name }).catch(() => undefined);
+  if (isAndroid()) void Native.screen({ name }).catch(() => undefined);
   else webLog().push(name);
 }

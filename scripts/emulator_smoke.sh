@@ -58,8 +58,21 @@ adb root > /dev/null 2>&1 || true; sleep 2; adb wait-for-device
 # cloud_28 (emulator 43077824891, API 35): `adb exec-out screencap` can deliver a TRUNCATED PNG (png_ink: «incomplete or truncated
 # stream»), which stopped the smoke before its verdict - a shot is taken again (3 tries) until the file is a whole PNG
 shot() { local _; for _ in 1 2 3; do adb exec-out screencap -p > "$1"; python3 -I "$ROOT/scripts/png_ink.py" "$1" > /dev/null 2>&1 && return 0; sleep 1; done; return 0; }
-appcat() { adb exec-out cat "/data/data/$PKG/$1" 2>/dev/null; }
 appls() { adb shell ls "/data/data/$PKG/$1" 2>/dev/null; }
+# cloud_36 (REVIEW cloud_34 NOTE 1, cloud_33 / 34 / 35): API 35 printed «adb: device offline» WHILE copying the database - the copy itself
+# is retried (adb reconnects the transport, waits for the device), up to 3 tries; an empty / failed copy is never taken for the file
+appcopy() {
+  local i
+  for i in 1 2 3; do
+    if timeout 90 adb exec-out cat "/data/data/$PKG/$1" > "$2" 2> "$2.err" && [ -s "$2" ] && ! grep -qi 'offline\|not found' "$2.err"; then rm -f "$2.err"; return 0; fi
+    echo "appcopy $1 try $i: $(head -c 160 "$2.err" 2>/dev/null)" >> "$OUT/adb_retries.txt"
+    adb reconnect offline >/dev/null 2>&1 || true; timeout 60 adb wait-for-device || true; sleep 2
+  done
+  rm -f "$2.err"; return 1
+}
+# cloud_36 (REVIEW cloud_35 NOTE 2 / E2): `ev` answers «eval: <value>» - the v110 verdict reads the VALUE (1.0.10 compared the whole line with
+# «wifi» and printed «not-proved» over correct numbers)
+v110_verdict() { case "${1#eval: }" in wifi|saver|manual) echo proved;; *) echo "not-proved(reason=${1#eval: }: the full file was allowed on this network)";; esac; }
 adb shell dumpsys webviewupdate | tee "$OUT/webview.txt" | head -n 5
 # line looks like: Current WebView package (name, version): (com.google.android.webview, 58.0.3029.125)
 WV=$(grep 'Current WebView package' "$OUT/webview.txt" | grep -oE ', [0-9]+\.' | head -1 | grep -oE '[0-9]+' || true)
@@ -171,7 +184,7 @@ if [ "$WV" -ge "$FLOOR" ]; then
   for _ in $(seq 1 36); do
     sleep 5
     if appls $DB >/dev/null 2>&1; then
-      appcat $DB > "$OUT/inok.db"
+      appcopy $DB "$OUT/inok.db" || true
       if [ "$(head -c 15 "$OUT/inok.db")" = "SQLite format 3" ] &&
          python3 -I "$ROOT/scripts/db_read.py" "$OUT/inok.db" "select value from meta where key='export_version'" 2>/dev/null | grep -q .; then break; fi
     fi
@@ -244,7 +257,7 @@ if [ "$WV" -ge "$FLOOR" ]; then
   if grep -q 'registered\|subscribed' "$OUT/push.txt"; then PUSH="registered,$(grep -o 'subscribed [a-z_0-9]*' "$OUT/push.txt" | sed 's/subscribed //' | tr '\n' '+' | sed 's/+$//')";
   else PUSH="not-registered"; echo "::warning::API $API: push not registered (no Play services on this image, or no google-services.json)"; fi
   # cloud_04: the live export's new fields on the device (R-10 card 37, R-11 98/110, R-13 sort_lang, R-16 avatars) — from the DB the app built
-  appcat $DB > "$OUT/inok.db"
+  appcopy $DB "$OUT/inok.db" || true
   python3 -I "$ROOT/scripts/db_read.py" "$OUT/inok.db" "select 'r10_37', founded_uk, head_role_uk, substr(head_document_uk,1,40), revival_uk is not null, links_json from monastery where code=37;
     select 'r11_110', parent_code, parent_division_uk from monastery where code=110; select 'r11_98', units_uk from monastery where code=98;
     select 'r13', count(*), count(sort_uk), count(eparchy_id) from channel; select 'r16', count(avatar_url), count(distinct avatar_url), count(avatar_sha256) from channel;
@@ -278,7 +291,7 @@ if [ "$WV" -ge "$FLOOR" ]; then
   shot "$OUT/articles.png"
   adb shell input tap 160 185; sleep 5    # the first row (under the kind chips) → the article
   shot "$OUT/article.png"
-  appcat $DB > "$OUT/inok.db"
+  appcopy $DB "$OUT/inok.db" || true
   ARTICLES=$(python3 -I "$ROOT/scripts/db_read.py" "$OUT/inok.db" "select count(*) from article" 2>/dev/null || echo 0)
   echo "articles cached: $ARTICLES $(python3 -I "$ROOT/scripts/db_read.py" "$OUT/inok.db" "select kind, count(*) from article group by kind" | tr '\n' ' ')" | tee -a "$OUT/live_fields.txt"
   [ "$ARTICLES" -gt 0 ] || echo "::warning::API $API: no articles cached (feed fetch failed - see logcat_filtered.txt)"
@@ -375,7 +388,7 @@ if [ "$WV" -ge "$FLOOR" ]; then
   adb shell input keyevent 4; sleep 3
   P3=$(ev "document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed'")
   echo "v108 in_app=$P0 viewer=$P1 back=$P3" | tee "$OUT/v108.txt"
-  case "$W0" in wifi|saver|manual) V110=proved;; *) V110="not-proved(reason=$W0: the full file was allowed on this network)";; esac
+  V110=$(v110_verdict "$W0")
   echo "v110 $V110 photos: before=$N0 open=$N1 (full=$P2 why=$W0) next=$N2 (why=$W1) -> tap full=$P4 photos=$N3 -> next full=$P5 photos=$N4" | tee "$OUT/v110.txt"
   [ "$V110" = proved ] && { [ "$N1" = "$N0" ] && [ "$N2" = "$N0" ] || echo "::warning::API $API: A-112 the viewer saved a file before the tap ($OUT/v110.txt)"; }
   # cloud_34 (1.0.9, A-111), NOT gating (the browser ring gates): the REAL files. After v108's gallery photo, files/photos/ holds it (+ the

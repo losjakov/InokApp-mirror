@@ -118,3 +118,46 @@ for (const [device, cfg] of Object.entries(RING)) test.describe(`store ring ${de
     await expect.poll(() => check('theme')).toBe('dark');
   });
 });
+
+/**
+ * cloud_36 (B5, A-115): the App Store screenshots - the same app in fixtures mode, the sizes Apple asks for: iPhone 6.9" 1320 x 2868
+ * (440 x 956 @3) and iPad 13" 2064 x 2752 (1032 x 1376 @2), uk / ru / en, six frames, the section «Публікації» opening on «Статті»
+ * (A-117 (2)). JPEG (Apple: PNG or JPEG, no transparency). Only on demand (APPSTORE=1 npx playwright test … store.spec): the drafts go to
+ * store/ios/screenshots/<lang>/ by hand, as the Play drafts did; the screens job never spends time on them.
+ */
+const APPSTORE = new URL('./out/appstore/', import.meta.url).pathname;
+const IOS_DEVICES = { iphone: { viewport: { width: 440, height: 956 }, deviceScaleFactor: 3, size: [1320, 2868] }, ipad: { viewport: { width: 1032, height: 1376 }, deviceScaleFactor: 2, size: [2064, 2752] } } as const;
+const IOS_LOCALES = { uk: 'uk-UA', ru: 'ru-RU', en: 'en-US' } as const;
+const IOS_SHOTS: typeof SHOTS = [
+  // «Головна» with the newest publications (a first start has none cached: «Оновити дані» as a person would) - never an empty block
+  { name: 'home', path: '/home', ready: async (p) => {
+      await SHOTS[0].ready(p);
+      const fresh = p.locator('[data-testid="home-new"] ~ * [data-testid^="arow-"], ion-list [data-testid^="arow-"]').locator('visible=true');
+      if (!(await fresh.count())) await p.getByTestId('home-fresh').locator('visible=true').click();
+      await expect(fresh.first()).toBeVisible({ timeout: 20_000 });
+      await expect(p.locator('ion-toast').locator('visible=true')).toHaveCount(0, { timeout: 15_000 }); // «Дані оновлено» gone
+      await expect(p.locator('ion-header [data-testid="refresh"] ion-spinner, ion-header ion-spinner').locator('visible=true')).toHaveCount(0, { timeout: 15_000 });
+      await p.evaluate(async () => { for (const c of Array.from(document.querySelectorAll('ion-content'))) await (c as HTMLIonContentElement).scrollToTop(0); }); // the click scrolled it
+    } },
+  { name: 'publications', path: '/articles', ready: async (p) => { await expect(p.locator('[data-testid^="arow-"]').locator('visible=true').first()).toBeVisible(); } },
+  SHOTS[1], SHOTS[2], SHOTS[3], SHOTS[4],
+];
+for (const [lang, locale] of Object.entries(IOS_LOCALES)) for (const [device, cfg] of Object.entries(IOS_DEVICES)) test.describe(`appstore ${lang} ${device}`, () => {
+  test.skip(!process.env.APPSTORE, 'App Store drafts: APPSTORE=1 only');
+  test.use({ userAgent: ANDROID_UA, viewport: cfg.viewport, deviceScaleFactor: cfg.deviceScaleFactor, colorScheme: 'light', locale, geolocation: KYIV, permissions: ['geolocation'] });
+  for (const [i, s] of IOS_SHOTS.entries()) test(s.name, async ({ page }) => {
+    mkdirSync(`${APPSTORE}${lang}`, { recursive: true });
+    await localPictures(page);
+    await watchTransitions(page);
+    await page.goto(s.path);
+    await s.ready(page);
+    await settled(page);
+    await picturesSettled(page);
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe(lang);
+    if (s.name === 'publications') await expect(page.locator('[data-testid="kind-tab-publication"]').locator('visible=true')).toHaveClass(/segment-button-checked/);
+    const shot = await page.screenshot({ path: `${APPSTORE}${lang}/${i + 1}-${s.name}__${device}.jpg`, type: 'jpeg', quality: 88 });
+    expect([shot.readUInt16BE(shot.indexOf(Buffer.from([0xff, 0xc0])) + 7), shot.readUInt16BE(shot.indexOf(Buffer.from([0xff, 0xc0])) + 5)], 'Apple\'s exact size').toEqual([...cfg.size]);
+  });
+});

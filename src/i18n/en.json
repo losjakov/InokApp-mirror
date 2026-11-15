@@ -315,5 +315,7 @@
   "photos.clear": "Clear saved photos",
   "photos.clear_hint": "Photos will load again when you open them",
   "photos.cleared": "Saved photos deleted",
-  "photos.mb": "MB"
+  "photos.mb": "MB",
+  "common.clear": "Clear",
+  "about.not_app_store": "Not installed from the App Store — the update check is unavailable"
 }

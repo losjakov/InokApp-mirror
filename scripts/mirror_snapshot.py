@@ -33,7 +33,7 @@ BOT = ['-c', 'user.name=inok-mirror', '-c', 'user.email=41898282+github-actions[
 # NEVER (REF_public_mirror §1): refused whatever the list says
 NEVER_TOP = {'reports', 'ref', '.claude', '.git'}
 NEVER_NAMES = {'NEXT.md', 'CLAUDE.md', 'google-services.json', 'GoogleService-Info.plist'}
-NEVER_SUFFIX = ('.keystore', '.jks', '.p12', '.mobileprovision')
+NEVER_SUFFIX = ('.keystore', '.jks', '.p12', '.mobileprovision', '.p8')  # .p8 = an App Store Connect API key (cloud_36, A-118)
 # secrets by content (bytes; the patterns cannot match their own source text)
 SECRETS = [
     ('a private key block', re.compile(rb'-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----')),
@@ -262,6 +262,7 @@ def self_test():
             'ref/x.md': b'x', 'reports/cloud_99/REPORT.md': b'x', 'store/listing_uk.md': b'x', 'DECISIONS_9.md': b'x', 'NEXT.md': b'x',
             'CLAUDE.md': b'x', '.claude/settings.json': b'{}', 'README.md': b'# the private readme\n',
             'android/app/upload.keystore': b'\x00', 'android/release.jks': b'\x00', 'android/app/google-services.json': b'{}',
+            'ios/App/AuthKey_ABC123.p8': b'x', 'ios/App/App/GoogleService-Info.plist': b'<plist/>', 'ios/App/dist.mobileprovision': b'\x00',
             '.env.local': b'A=1', 'src/data/leak.ts': b'const k = `' + key + b'`;', 'src/a.ts': b"k='AIza" + b'B' * 35 + b"'",
             'scripts/t.sh': b'T=gh' + b'p_' + b'a' * 36, 'tests/x.ts': b'github_pat_' + b'A' * 30, '.git/config': b'[core]',
         }

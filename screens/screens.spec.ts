@@ -39,6 +39,14 @@ const actionsRule = async (p: Page, n: number, fits?: boolean) => {
   if (fits !== undefined) expect(m.scrolls, `${n} actions ${fits ? 'fit' : 'scroll'} (gaps ${m.gaps})`).toBe(!fits);
 };
 /** PLAN 5: a mini-map drawn (its MapLibre part loaded lazily, the style and our layers in), scrolled into view, `n` houses set */
+/** A-117 (1): the CLUSTERED houses drawn (a cluster or a pin of the clustered source), not only the three lavras (own source) */
+const housesDrawn = (p: Page) => expect.poll(() => p.evaluate(() => (window as any).__inokMap.queryRenderedFeatures({ layers: ['points', 'clusters'] }).length),
+  { timeout: 15_000, message: 'clustered houses drawn' }).toBeGreaterThan(0);
+/** A-117 (2): the kind tab that is active (the segment's value + TalkBack's «selected») */
+const entryKind = async (p: Page, kind: string) => {
+  await expect(onShown(p, `kind-tab-${kind}`)).toHaveClass(/segment-button-checked/);
+};
+const toAll = async (p: Page) => { await onShown(p, 'kind-tab-all').click(); await entryKind(p, 'all'); };
 const miniReady = async (p: Page, testId: string, n: string) => {
   const box = onShown(p, testId);
   await box.scrollIntoViewIfNeeded();
@@ -773,6 +781,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('list')).toBeVisible(); await expect(p.getByTestId('count')).toContainText('18');
       // REVIEW cloud_34 Q4 (b): the search field is NAMED by its words (SearchField: aria-label = placeholder), every list's search
       await expect(p.locator(SHOWN).getByTestId('search').locator('input')).toHaveAccessibleName((await words(p, ['monasteries.search']))[0]);
+      // REVIEW cloud_35 Q2: its clear «×» is named in the interface language, not Ionic's «reset»
+      await expect(p.locator(SHOWN).getByTestId('search').locator('.searchbar-clear-button')).toHaveAttribute('aria-label', (await words(p, ['common.clear']))[0]);
       // A-44 (R-31): the three lavras first - Kyiv, Pochaiv, Sviatohirsk - then the names as before
       expect(await p.getByTestId('list').locator('[data-testid^="mrow-"]').evaluateAll((rs) => rs.slice(0, 3).map((r) => r.getAttribute('data-testid')))).toEqual(['mrow-242', 'mrow-111', 'mrow-98']);
       // A-28 (withdraws D39): the filter button in the toolbar right of the search, the ONE way to the sheet (no «Фільтри» chip under it);
@@ -1431,7 +1441,24 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.waitForTimeout(800);
     } },
   { name: 'map-offline', path: '/map', before: async (p) => { await p.route('https://tiles.openfreemap.org/**', (r) => r.abort()); },
-    ready: async (p) => { await mapReady(p); await expect(p.getByTestId('map-offline')).toBeVisible(); } },
+    ready: async (p) => { await mapReady(p); await expect(p.getByTestId('map-offline')).toBeVisible(); await housesDrawn(p); } },
+  // A-117 (1), the owner's phone (weak signal): the config already known (the map opened from the tab bar after «Головна»), the style
+  // request NEVER answers, every other request fails. 1.0.10: a white map under the note, no house (JOURNAL «A1»); now the local style
+  // with the clustered houses AND the lavras, the note after BASEMAP_WAIT_MS, the gestures alive (a zoom-in re-clusters)
+  { name: 'map-offline-weak', path: '/home', before: async (p) => {
+      await p.route('https://tiles.openfreemap.org/**', (r) => (/\/styles\//.test(r.request().url()) ? undefined : r.abort())); },
+    ready: async (p) => {
+      await expect(p.getByTestId('home-fresh').locator('visible=true')).toBeVisible();
+      await p.locator('ion-tab-button[tab="map"]').click();
+      await mapReady(p);
+      await housesDrawn(p);
+      await expect(p.getByTestId('map-offline')).toBeVisible({ timeout: 15_000 });
+      expect(await p.evaluate(() => (window as any).__inokMap.getStyle().layers.length), 'the local style (background + our layers)').toBeLessThan(20);
+      const z = await p.evaluate(() => (window as any).__inokMap.getZoom());
+      await p.locator('.maplibregl-ctrl-zoom-in').locator('visible=true').click();
+      await expect.poll(() => p.evaluate(() => (window as any).__inokMap.getZoom()), { message: 'the zoom button works offline' }).toBeGreaterThan(z + 0.5);
+      await mapReady(p);
+    } },
   // A-37 (owner 02.11.2026): a channel live NOW opens the broadcast itself (live[].video_id) on every screen; not live = the channel page
   { name: 'streams-open-live', only: UK, path: '/streams', before: recordOpens, ready: async (p) => {
       await expect(p.getByTestId('channels')).toBeVisible();
@@ -1471,7 +1498,32 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect((await sent()).every((x: string) => /^[a-z]+$/.test(x))).toBe(true);
       await p.getByTestId('more-incognito').locator('visible=true').scrollIntoViewIfNeeded();
     } },
-  { name: 'articles', path: '/articles', ready: async (p) => { await expect(p.getByTestId('articles')).toBeVisible(); await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(10); await picturesLoaded(p, '.arow__cover img', 3); } },
+  // A-117 (2): the section opens on «Статті»; the whole feed = one tap on «Все» (the screens below that test the feed take it first)
+  { name: 'articles-entry', path: '/home', ready: async (p) => {
+      await expect(p.getByTestId('home-checked').locator('visible=true')).toBeVisible();
+      await p.locator('ion-tab-button[tab="articles"]').click();
+      await entryKind(p, 'publication');
+      await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]').first()).toHaveAttribute('data-kind', 'publication');
+      // an article and Back: the same kind; the tab button from another tab: the same top screen, the same kind
+      await onShown(p, 'articles').locator('[data-testid^="arow-"]').first().click();
+      await expect(p).toHaveURL(/\/articles\?id=\d+$/);
+      await settled(p); await onShown(p, 'back').click();
+      await entryKind(p, 'publication');
+      await p.locator('ion-tab-button[tab="map"]').click();
+      await expect(p).toHaveURL(/\/map$/);
+      await p.locator('ion-tab-button[tab="articles"]').click();
+      await entryKind(p, 'publication');
+      // a kind chosen by the person is kept as before (A-27: the top screen stays mounted)
+      await onShown(p, 'kind-tab-all').click();
+      await p.locator('ion-tab-button[tab="streams"]').click();
+      await expect(p).toHaveURL(/\/streams$/);
+      await p.locator('ion-tab-button[tab="articles"]').click();
+      await entryKind(p, 'all');
+      await onShown(p, 'kind-tab-publication').click();
+      await entryKind(p, 'publication');
+      await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]').first()).toHaveAttribute('data-kind', 'publication');
+    } },
+  { name: 'articles', path: '/articles', ready: async (p) => { await entryKind(p, 'publication'); await toAll(p); await expect(p.getByTestId('articles')).toBeVisible(); await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(10); await picturesLoaded(p, '.arow__cover img', 3); } },
   { name: 'articles-news', path: '/articles', ready: async (p) => {
       await expect(p.getByTestId('articles')).toBeVisible();
       await p.getByTestId('kind-tab-news').click();
@@ -1481,6 +1533,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
     } },
   // A-87 (2) + A-96 W-8: the kind tabs stay under the toolbar while only the list scrolls; every tab looks the same (inactive grey, active blue)
   { name: 'articles-tabs-top', path: '/articles', ready: async (p) => {
+      await toAll(p);
       await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(10);
       const inks = await kindInks(p);
       expect(Object.fromEntries(Object.entries(inks).map(([k, v]) => [k, v.tone])), JSON.stringify(inks)).toEqual({ all: 'blue', publication: 'grey', video: 'grey', news: 'grey' });
@@ -1516,6 +1569,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // A-97: the search - the header becomes the field (the monasteries' searchbar) with «×»; ONE request ~400 ms after typing stops (never per
   // letter); the matches marked yellow in the titles (THE highlight); a kind tab keeps the query; nothing found = the line; «×» = the list back
   { name: 'articles-search', only: [...UK, 'phone-ru'], path: '/articles', ready: async (p) => {
+      await toAll(p);
       await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]')).toHaveCount(10);
       const asked: string[] = [];
       p.on('request', (r) => { if (/articles\.json\?q=/.test(r.url())) asked.push(decodeURIComponent(new URL(r.url()).searchParams.get('q') ?? '')); });
@@ -1540,6 +1594,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(onShown(p, 'articles').locator('mark.hl').first()).toBeVisible({ timeout: 5000 });
     } },
   { name: 'articles-search-close', only: ['phone-light'], path: '/articles', ready: async (p) => {
+      await toAll(p);
       await onShown(p, 'search-open').click();
       const field = p.locator(SHOWN).getByTestId('articles-search').locator('input');
       await field.fill('лавр');
@@ -1553,6 +1608,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // checked), one choice for ALL tabs, the icon marked while not the default; «Показати більше» pages THAT list (the fixtures answer pages
   // of 4) without a repeated item; the orders = THE comparator (`articleOrder`): views_week most first, rating by the contract's table
   { name: 'articles-sort', only: [...UK, 'phone-ru'], path: '/articles', ready: async (p) => {
+      await toAll(p);
       await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]')).toHaveCount(10);
       const asked: string[] = [];
       p.on('request', (r) => { const m = /articles\.json\?q=[^&]*&sort=(\w+)/.exec(decodeURIComponent(r.url())); if (m) asked.push(m[1]); });
@@ -1592,6 +1648,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
     } },
   // R-48 (P2): a server WITHOUT `articles_sort_v2` - the sheet offers the two dates only; no request with the new orders is ever made
   { name: 'articles-sort-v2-off', only: UK, path: '/articles', before: async (p) => { await p.addInitScript(() => { (window as any).__inokConfig = { features: { comments_write: false, embedded_player: false, articles_query: true } }; }); }, ready: async (p) => {
+      await toAll(p);
       await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]')).toHaveCount(10);
       const asked: string[] = [];
       p.on('request', (r) => { if (/sort=(views_week|rating)/.test(r.url())) asked.push(r.url()); });
@@ -1605,6 +1662,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
     } },
   // A-97: an old server (no `articles_query`) - no search, no sort, nothing asked; the list as in 1.0.5
   { name: 'articles-query-off', only: ['phone-light'], path: '/articles', before: async (p) => { await p.addInitScript(() => { (window as any).__inokConfig = { features: { comments_write: false, embedded_player: false } }; }); }, ready: async (p) => {
+      await toAll(p);
       await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]')).toHaveCount(10);
       await expect(p.locator(SHOWN).getByTestId('search-open')).toHaveCount(0);
       await expect(p.locator(SHOWN).getByTestId('sort-open')).toHaveCount(0);
@@ -1612,6 +1670,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
     } },
   // A-97 offline: the request fails -> the SAVED publications filtered here, with the note
   { name: 'articles-search-offline', only: ['phone-light'], path: '/articles', before: async (p) => { await p.route(/articles\.json\?q=/, (r) => r.abort('internetdisconnected')); }, ready: async (p) => {
+      await toAll(p);
       await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]')).toHaveCount(10);
       await onShown(p, 'search-open').click();
       const word = (await onShown(p, 'articles').locator('[data-testid^="arow-"] .mrow__title').first().innerText()).split(/\s+/).find((w) => w.length >= 5)!.slice(0, 4);
@@ -1620,6 +1679,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(onShown(p, 'articles').locator('mark.hl').first()).toBeVisible();
     } },
   { name: 'articles-tabs-scrolled', path: '/articles', ready: async (p) => {
+      await toAll(p);
       await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(10);
       const before = await kindsAt(p);
       await wheelList(p, 400, 3);
@@ -2701,6 +2761,28 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       const a = (await asked(p)).filter((x) => x !== 'info'); // the start-up check asks Play too (A-80 ADDENDUM 1)
       expect(a[0]).toMatch(/^share .*"text":"(Монастирський|Монастырский|Monastic).*inok\.info.*","url":"https:\/\/play\.google\.com\/store\/apps\/details\?id=info\.inok\.app"/);
       expect(a.slice(1)).toEqual(['store {"androidPackageName":"info.inok.app","androidStorePackageName":"com.android.vending"}']);
+    } },
+  // cloud_36 (B2): the iPhone (the web plays it: `inok.platform` = ios) - the Play listing is never offered (share / rate hidden even with the
+  // site's switch on), the update check asks the App Store's lookup: not there yet = «не з App Store»; a newer version = its store page
+  { name: 'about-ios', only: ['phone-light', 'phone-dark', 'tablet'], path: '/more/about', before: async (p) => {
+      await withPlay(null, STORE_ON)(p);
+      await p.addInitScript(() => { localStorage.setItem('inok.platform', 'ios'); });
+      await p.route('https://itunes.apple.com/lookup?**', (r) => r.fulfill({ json: { resultCount: 0, results: [] } })); },
+    ready: async (p) => {
+      await expect(onShown(p, 'app-version')).toBeVisible();
+      await expect.poll(() => p.evaluate(() => !!(window as any).__inokConfig)).toBe(true);
+      await expect(p.getByTestId('about-share')).toHaveCount(0);
+      await expect(p.getByTestId('about-rate')).toHaveCount(0);
+      await onShown(p, 'about-update').click();
+      await expect(onShown(p, 'about-update-note')).toHaveText(/Встановлено не з App Store|Установлено не из App Store|Not installed from the App Store/);
+    } },
+  { name: 'about-ios-update', only: ['phone-light'], path: '/more/about', before: async (p) => {
+      await recordOpens(p);
+      await p.addInitScript(() => { localStorage.setItem('inok.platform', 'ios'); });
+      await p.route('https://itunes.apple.com/lookup?**', (r) => r.fulfill({ json: { resultCount: 1, results: [{ version: '9.9.9', trackId: 6700000001 }] } })); },
+    ready: async (p) => {
+      await onShown(p, 'about-update').click();
+      await expect.poll(() => p.evaluate(() => (window as any).__opened)).toEqual(['https://apps.apple.com/app/id6700000001']);
     } },
   { name: 'about-update-available', only: ['phone-light'], path: '/more/about', before: withPlay({ updateAvailability: 2, immediateUpdateAllowed: true }), ready: async (p) => {
       await onShown(p, 'about-update').click();

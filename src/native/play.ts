@@ -1,6 +1,7 @@
 import { AppUpdate } from '@capawesome/capacitor-app-update';
 import type { AppConfig } from '@/data/api/types';
-import { isNative } from './platform';
+import { isIos, isNative } from './platform';
+import { APP_VERSION, versionBelow } from '@/app/version';
 import { shareUrl } from './intents';
 
 /**
@@ -26,13 +27,15 @@ export interface PlayUpdateInfo {
   clientVersionStalenessDays?: number;
   installStatus?: number;
   currentVersionName?: string;
+  /** iOS: the App Store's numeric id of the app (iTunes lookup `trackId`) - the store page the update opens */
+  appStoreId?: number;
 }
 export const AVAILABLE = 2;
 export const IN_PROGRESS = 3;
 export const DOWNLOADED = 11;
 interface PlayApi {
   getAppUpdateInfo(): Promise<PlayUpdateInfo>;
-  openAppStore(o: { androidPackageName?: string; androidStorePackageName?: string }): Promise<void>;
+  openAppStore(o: { androidPackageName?: string; androidStorePackageName?: string; appId?: string }): Promise<void>;
   performImmediateUpdate(): Promise<{ code: number }>;
   startFlexibleUpdate(): Promise<{ code: number }>;
   completeFlexibleUpdate(): Promise<void>;
@@ -47,7 +50,30 @@ export type UpdateCheck = { state: 'available'; info: PlayUpdateInfo } | { state
 export const notFromPlay = (e: unknown): boolean =>
   /(^|\D)-(10|9|6)(\D|$)|not owned|PLAY_SERVICES|API_NOT_AVAILABLE|not supported/i.test(String((e as Error)?.message ?? e));
 
+/**
+ * cloud_36 (B2): iOS has no Play and no in-app update - the App Store's own lookup (`itunes.apple.com/lookup?bundleId=`; Ukraine's
+ * storefront first, then the default) says whether a newer version is there and gives the store page; an update = that page
+ * (`openAppStore`, the same plugin). Not in the store (TestFlight, before the release) = «not from the store». Never an install path.
+ */
+export const APP_STORE_LOOKUP = ['ua', null].map((c) => `https://itunes.apple.com/lookup?bundleId=${APP_ID}${c ? `&country=${c}` : ''}`);
+export async function appStoreCheck(installed = APP_VERSION): Promise<UpdateCheck> {
+  try {
+    for (const url of APP_STORE_LOOKUP) {
+      const j = (await (await fetch(url)).json()) as { results?: { version?: string; trackId?: number }[] };
+      const r = j.results?.[0];
+      if (!r?.version || !r.trackId) continue;
+      const info: PlayUpdateInfo = { updateAvailability: versionBelow(installed, r.version) ? AVAILABLE : 1, immediateUpdateAllowed: false,
+        flexibleUpdateAllowed: false, currentVersionName: installed, appStoreId: r.trackId };
+      return info.updateAvailability === AVAILABLE ? { state: 'available', info } : { state: 'none', info };
+    }
+    return { state: 'not_play' };
+  } catch {
+    return { state: 'error' };
+  }
+}
+
 export async function checkUpdate(): Promise<UpdateCheck> {
+  if (isIos()) return appStoreCheck();
   const p = api();
   if (!p) return { state: 'not_play' };
   try {
@@ -66,11 +92,19 @@ export async function openListing(c?: AppConfig | null): Promise<void> {
   window.open(playListingUrl(c), '_blank', 'noopener');
 }
 
+/** iOS: the app's App Store page (the App Store app; the browser ring: a tab) */
+export async function openAppStorePage(id?: number): Promise<void> {
+  if (!id) return;
+  if (isNative()) { await AppUpdate.openAppStore({ appId: String(id) }); return; }
+  window.open(`https://apps.apple.com/app/id${id}`, '_blank', 'noopener');
+}
+
 /** «Поділитися застосунком»: the system share sheet with one line and the listing's address (`@capacitor/share`, A-43's call). */
 export const shareApp = (title: string, line: string, c?: AppConfig | null): Promise<void> => shareUrl(title, playListingUrl(c), line);
 
 /** Google's own full-screen update (an update the row found, or a version below the site's minimum); not allowed -> the listing. */
 export async function immediateUpdate(info: PlayUpdateInfo, c?: AppConfig | null): Promise<void> {
+  if (isIos()) { await openAppStorePage(info.appStoreId); return; }
   const p = api();
   if (p && info.immediateUpdateAllowed !== false) { await p.performImmediateUpdate(); return; }
   await openListing(c);

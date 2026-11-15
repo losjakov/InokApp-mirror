@@ -16,6 +16,20 @@ export function chromeFloor(list: readonly string[]): number {
 
 export const ENGINE_FLOOR = chromeFloor(pkg.browserslist);
 
+/**
+ * cloud_36 (A-117 (4), A-46's iOS twin): the iOS floor = `ios_saf >= N` of the same list. On iOS the engine IS the system's (WKWebView =
+ * Safari of that iOS), so the floor is the app's deployment target: an older iPhone cannot install the app at all - no old engine ever
+ * runs it (no white screen possible). Read by vite.config.ts (the build target) and checked against the Xcode project by a unit test.
+ */
+export function iosFloor(list: readonly string[]): number {
+  for (const q of list) {
+    const m = /^\s*ios_saf\s*>=\s*(\d+)\s*$/i.exec(q);
+    if (m) return Number(m[1]);
+  }
+  throw new Error('package.json browserslist: no "ios_saf >= N" entry');
+}
+export const IOS_FLOOR = iosFloor(pkg.browserslist);
+
 /** The Chrome / WebView major of a user agent («Chrome/98.0.4758.87»), null when it is not Chromium. */
 export function chromeMajor(ua: string): number | null {
   const m = /Chrome\/(\d+)\./.exec(ua);

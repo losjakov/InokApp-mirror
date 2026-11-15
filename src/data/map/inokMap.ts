@@ -1,4 +1,4 @@
-import { Map as MLMap, NavigationControl, setWorkerUrl, type ErrorEvent, type GeoJSONSource, type LngLatBoundsLike, type MapOptions } from 'maplibre-gl';
+import { Map as MLMap, NavigationControl, setWorkerUrl, type ErrorEvent, type GeoJSONSource, type LngLatBoundsLike, type MapOptions, type RequestTransformFunction, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 // MapLibre 6 resolves its worker as `./maplibre-gl-worker.mjs` next to its own module URL; after Vite bundling that
 // file is not next to the chunk → «Worker failed to load» → no rendering. Point it at OUR worker bundle (REF_gotchas):
@@ -6,9 +6,26 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import mapWorkerUrl from './mapWorker.ts?worker&url';
 import { MARKER_ICONS } from './markerIcon';
 import { basemapTransform } from './basemap';
-import { FALLBACK_STYLE, UKRAINE_BOUNDS, splitLavras } from './geojson';
+import { COUNT_FONT, LOCAL_STYLE, UKRAINE_BOUNDS, splitLavras } from './geojson';
+import countGlyphs from '@/assets/glyphs/count-0-255.pbf?url';
 import type { Lang } from '@/i18n';
+import { onNetChange, online } from '@/native/network';
 setWorkerUrl(mapWorkerUrl);
+
+/** A-117 (1): how long the network style may take before the map says «without the base map» (a weak signal never answers) */
+export const BASEMAP_WAIT_MS = 8000;
+/** the cluster count's glyphs from the app itself, on every style (the worker fetches them: an absolute URL) */
+export const countGlyphsRequest: RequestTransformFunction = (url, type) =>
+  type === 'Glyphs' && decodeURIComponent(url).includes(`/${COUNT_FONT}/`) ? { url: new URL(countGlyphs, location.href).href } : undefined;
+
+/** THE fetch of the network style: its JSON, or null when it fails or does not answer in BASEMAP_WAIT_MS (never waits longer) */
+export async function fetchBasemap(url: string, wait = BASEMAP_WAIT_MS): Promise<StyleSpecification | null> {
+  if (!(await online())) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((ok) => { timer = setTimeout(() => ok(null), wait); });
+  const got = fetch(url).then((r) => (r.ok ? (r.json() as Promise<StyleSpecification>) : null)).then((j) => (j && j.version === 8 && Array.isArray(j.layers) ? j : null), () => null);
+  try { return await Promise.race([got, late]); } finally { clearTimeout(timer); }
+}
 
 /**
  * PLAN 5 (cloud_11): ONE set-up of every map the app draws — the main map and the mini-maps (an eparchy's page, «Контакти»).
@@ -101,8 +118,12 @@ export interface InokMapOptions {
   bounds?: LngLatBoundsLike;
   center?: [number, number];
   zoom?: number;
-  /** the style could not load (offline, provider down): the flat fallback is drawn (main) — a mini-map shows its stub */
+  /** the network style could not be fetched (offline, a weak signal, provider down): the map stays on LOCAL_STYLE (main) — a mini-map shows its stub */
   onFallback?: () => void;
+  /** A-117 (1): the base map's tiles stopped coming after its style loaded (the main map's note) */
+  onTilesLost?: () => void;
+  /** the network style is drawn (again): the note leaves */
+  onBasemap?: () => void;
   /** our sources and layers exist (again: a style switch drops them) — the screen adds its own layers here */
   onLayers?: (map: MLMap) => void;
 }
@@ -113,7 +134,16 @@ export class InokMap {
   private appliedStyle: string | null;
   private appliedLang: Lang;
   private fellBack = false;
+  private tilesLost = false;
+  /** base map tiles that FAILED since the base map's style.load (0 = they were only slow: the note leaves once they come) */
+  private tileErrors = 0;
+  private tileTimer: ReturnType<typeof setTimeout> | undefined;
   private waitingUrl: boolean;
+  /** the network style's JSON once fetched (a language change re-applies it without the network) */
+  private basemap: StyleSpecification | null = null;
+  private asked = 0;
+  private removed = false;
+  private stopNet: () => void;
   private lang: Lang;
   private houses: Houses | null = null;
   private place: GeoJSON.FeatureCollection = EMPTY;
@@ -121,7 +151,7 @@ export class InokMap {
   constructor(private o: InokMapOptions) {
     const interactive = o.interactive !== false;
     const opts: MapOptions = {
-      container: o.container, interactive, attributionControl: interactive ? { compact: true } : false,
+      container: o.container, interactive, attributionControl: interactive ? { compact: true } : false, transformRequest: countGlyphsRequest,
       dragRotate: false, pitchWithRotate: false, cooperativeGestures: false,
       ...(o.center ? { center: o.center, zoom: o.zoom ?? PLACE_ZOOM } : { bounds: o.bounds ?? UKRAINE_BOUNDS, fitBoundsOptions: { padding: 16 } }),
     };
@@ -131,7 +161,15 @@ export class InokMap {
     this.appliedLang = o.lang;
     this.lang = o.lang;
     this.waitingUrl = !!o.styleUrl;
-    map.setStyle(o.styleUrl ?? FALLBACK_STYLE, { transformStyle: basemapTransform(o.lang) }); // A-24: the one style transform
+    // A-117 (1), cloud_36 (JOURNAL «A1»): EVERY map starts on the local style - the houses are drawn from the DB at once; the network
+    // style is fetched beside it and replaces it only once it is HERE (a URL given to MapLibre that never answers left a white map)
+    map.setStyle(LOCAL_STYLE, { transformStyle: basemapTransform(o.lang) }); // A-24: the one style transform
+    if (o.styleUrl) void this.loadBasemap(o.styleUrl);
+    // the network came back: a style that failed is asked again, lost tiles are asked again
+    this.stopNet = onNetChange(() => {
+      if (this.fellBack && this.appliedStyle) void this.loadBasemap(this.appliedStyle);
+      else if (this.tilesLost && this.basemap) { this.tilesLost = false; this.map.setStyle(this.basemap, { diff: false, transformStyle: basemapTransform(this.lang) }); }
+    });
     if (interactive) {
       map.touchZoomRotate.disableRotation();
       map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
@@ -144,16 +182,21 @@ export class InokMap {
       map.on('data', collapse);
     }
     map.on('error', (e: ErrorEvent & { sourceId?: string }) => {
-      // a failed style download (offline, provider down) — not a missing tile — switches to the fallback style
-      // (the URL style may come after the fallback was drawn — the config loads after the first screen, D22)
-      if (!this.fellBack && (this.waitingUrl || !map.isStyleLoaded()) && !e.sourceId) {
-        this.waitingUrl = false;
-        this.fellBack = true;
-        o.onFallback?.();
-        map.setStyle(FALLBACK_STYLE, { transformStyle: basemapTransform(this.lang) });
-      }
+      // a base map tile that failed (offline after the style came): the note; our own sources are GeoJSON, never fetched
+      if (e.sourceId && map.getSource(e.sourceId)?.type !== 'geojson') { this.tileErrors++; this.loseTiles(); }
     });
-    map.on('style.load', () => { this.waitingUrl = false; void this.addLayers(); });
+    map.on('style.load', () => {
+      clearTimeout(this.tileTimer);
+      if (this.basemap) {
+        this.tileErrors = 0;
+        if (!this.tilesLost) o.onBasemap?.();
+        // tiles that never answer (a weak signal) send no error: not all here in BASEMAP_WAIT_MS = the note too
+        this.tileTimer = setTimeout(() => { if (!this.removed && !map.areTilesLoaded()) this.loseTiles(); }, BASEMAP_WAIT_MS);
+      }
+      void this.addLayers();
+    });
+    // the slow tiles came after all (none failed): the note leaves
+    map.on('idle', () => { if (this.tilesLost && this.basemap && this.tileErrors === 0) { this.tilesLost = false; o.onBasemap?.(); } });
     // D61: `data-drawn` = the map's own «drawn» signal for shots and tests (never a timer): '1' on MapLibre's `idle` (no camera movement,
     // every tile of the view loaded, no fade) once our layers are on the URL style; '0' as soon as it moves or loads data again
     // cloud_16 (CI: `idle` before the houses reached the worker = «drawn» with no pin): '1' only once the houses set are IN the sources
@@ -204,7 +247,7 @@ export class InokMap {
     // D35: a cluster's NUMBER is never hidden — its circle stays under the lavras (A-21), the count is drawn above every pin,
     // haloed in the cluster colour so it reads over a pin too
     map.addLayer({ id: 'cluster-count', type: 'symbol', source: SRC, filter: ['has', 'point_count'],
-      layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-allow-overlap': true, 'text-ignore-placement': false, 'text-padding': 14 },
+      layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': [COUNT_FONT], 'text-size': 13, 'text-allow-overlap': true, 'text-ignore-placement': false, 'text-padding': 14 },
       paint: { 'text-color': '#fff', 'text-halo-color': '#0c6486', 'text-halo-width': 2 } });
     // a place that is not a house (the editorial office of «Контакти»): the brand colour, ringed white
     map.addLayer({ id: 'place', type: 'symbol', source: 'place',
@@ -249,20 +292,41 @@ export class InokMap {
     this.apply();
   }
 
-  /** the style URL arrives after the config loads (first start): switch once; A-24: the interface language changes the labels —
-   *  the same style again through the transform (a full reload: our layers come back on style.load) */
+  private loseTiles() { if (!this.tilesLost) { this.tilesLost = true; this.o.onTilesLost?.(); } }
+
+  /** the network style: fetched (BASEMAP_WAIT_MS at most), then drawn; failed = stay on the local style + `onFallback` (the latest ask wins) */
+  private async loadBasemap(url: string) {
+    const ask = ++this.asked;
+    this.waitingUrl = true;
+    this.setDrawn('0');
+    const style = await fetchBasemap(url);
+    if (ask !== this.asked || this.removed) return;
+    this.waitingUrl = false;
+    if (!style) {
+      if (!this.fellBack) { this.fellBack = true; this.o.onFallback?.(); }
+      this.map.triggerRepaint(); // `idle` again: the map on the local style is «drawn» now
+      return;
+    }
+    this.fellBack = false;
+    this.tilesLost = false;
+    this.basemap = style;
+    this.appliedLang = this.lang;
+    this.map.setStyle(style, { diff: false, transformStyle: basemapTransform(this.lang) });
+  }
+
+  /** the style URL arrives after the config loads (first start); A-24: the interface language changes the labels — the same style again
+   *  through the transform (a full reload: our layers come back on style.load) */
   restyle(styleUrl: string | null, lang: Lang) {
     this.lang = lang;
-    if (styleUrl && !this.fellBack && this.appliedStyle !== styleUrl) {
+    if (styleUrl && this.appliedStyle !== styleUrl) {
       this.appliedStyle = styleUrl;
-      this.appliedLang = lang;
-      this.waitingUrl = true;
-      this.map.setStyle(styleUrl, { transformStyle: basemapTransform(lang) });
+      this.basemap = null;
+      void this.loadBasemap(styleUrl);
     } else if (this.appliedLang !== lang) {
       this.appliedLang = lang;
-      this.map.setStyle(this.fellBack || !this.appliedStyle ? FALLBACK_STYLE : this.appliedStyle, { diff: false, transformStyle: basemapTransform(lang) });
+      this.map.setStyle(this.basemap ?? LOCAL_STYLE, { diff: false, transformStyle: basemapTransform(lang) });
     }
   }
 
-  remove() { this.map.remove(); }
+  remove() { this.removed = true; clearTimeout(this.tileTimer); this.stopNet(); this.map.remove(); }
 }

@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './toast';
 import { openNotificationSettings } from '@/native/push';
+import { isIos } from '@/native/platform';
 import { ASK_DELAY_MS, afterAnswer, shouldAsk } from '@/state/softAsk';
 import type { AskKind } from '@/state/settings';
 import { useApp } from '@/state/AppContext';
@@ -18,7 +19,8 @@ export function SoftAsk({ kind, active = true }: { kind: AskKind; active?: boole
   const [ask] = useIonAlert();
   const navigate = useNavigate();
   const toast = useToast();
-  const due = active && shouldAsk(kind, settings, push);
+  // cloud_36 (B2): iOS 1.0.11 delivers no notification (no FCM on iOS, REF_ios_state) - nothing invites the person to switch them on there
+  const due = active && !isIos() && shouldAsk(kind, settings, push);
   useEffect(() => {
     if (!due) return;
     const timer = window.setTimeout(() => {

@@ -1,5 +1,5 @@
 import { registerPlugin } from '@capacitor/core';
-import { isNative } from './platform';
+import { isAndroid } from './platform';
 
 /** A-66: the Google Cloud project `info-inok-app` linked in Play Console (08.11.2026) - the ONE place its number is written. */
 export const CLOUD_PROJECT_NUMBER = '939184267521';
@@ -10,7 +10,7 @@ const PlayIntegrity = registerPlugin<{ token(o: { requestHash: string; cloudProj
 
 /** The token bound to `requestHash`, or null where there is none (the web; a phone without Play; Google busy; slower than 15 s). */
 export async function playIntegrityToken(requestHash: string): Promise<string | null> {
-  if (!isNative()) return null;
+  if (!isAndroid()) return null; // Play Integrity is Google's: no token on iOS (the site's switch, R-8, stays off for it)
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const late = new Promise<null>((r) => { timer = setTimeout(() => r(null), WAIT_MS); });

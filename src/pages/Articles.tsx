@@ -32,13 +32,17 @@ export const QUERY_DEBOUNCE_MS = 400;
  * a kind tab pages the server's section list (R-19: `articles?kind=`; the cached items of that kind show first and offline); «Показати більше» pages further while online, not cached.
  * `?id=` opens an article (push tap, contract §4; the home «Нове на сайті»); on ≥600 dp list and article side by side.
  */
+/** A-117 (2): the section opens on «Статті» (the kind of greatest weight), not «Все»; the tabs' order and «Все» stay. The top screen stays
+ *  mounted (A-27), so a kind chosen later is kept as before. InokSite ruling 355 is the site's twin. */
+export const ENTRY_KIND: ArticleKind = 'publication';
+
 export function ArticlesPage() {
   const { db, t, lang, articlesVersion, refreshArticles, config } = useApp();
   const wide = useWide();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const id = params.get('id') ? Number(params.get('id')) : null;
-  const [kind, setKind] = useState<string>('all');
+  const [kind, setKind] = useState<string>(ENTRY_KIND);
   const [items, setItems] = useState<Article[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);

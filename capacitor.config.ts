@@ -14,6 +14,7 @@ const config: CapacitorConfig = {
     CapacitorHttp: { enabled: true },
     CapacitorSQLite: {
       androidIsEncryption: false,
+      iosIsEncryption: false, // cloud_36: the iOS twin (the directory is public data)
     },
   },
 };

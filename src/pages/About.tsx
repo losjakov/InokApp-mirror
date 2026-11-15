@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { APP_VERSION } from '@/app/version';
 import { openLink } from '@/native/intents';
 import { SITE_URL } from '@/data/api/client';
+import { isIos } from '@/native/platform';
 import { checkUpdate, immediateUpdate, openListing, shareApp, storeLinksShown, type UpdateCheck } from '@/native/play';
 import { useApp } from '@/state/AppContext';
 
@@ -32,7 +33,7 @@ export function AboutPage() {
     if (c.state === 'available') await immediateUpdate(c.info, config);
   };
   const checkNote = check === 'busy' ? t('about.checking') : check?.state === 'none' ? t('about.latest', { v: APP_VERSION })
-    : check?.state === 'not_play' ? t('about.not_play') : check?.state === 'error' ? t('about.check_error') : null;
+    : check?.state === 'not_play' ? t(isIos() ? 'about.not_app_store' : 'about.not_play') : check?.state === 'error' ? t('about.check_error') : null;
   return (
     <IonPage>
       <PageHeader title={t('about.title')} />
@@ -43,7 +44,8 @@ export function AboutPage() {
             <IonNote slot="end" data-testid="app-version">{APP_VERSION}</IonNote>
             {settings.ownDevice && <IonIcon slot="end" icon={eyeOffOutline} className="own-device" aria-label={t('views.own_device')} data-testid="own-device" />}
           </IonItem>
-          {storeLinksShown(config) && <>
+          {/* iOS 1.0.11: the App Store listing is not public yet - share / rate follow it (REF_ios_state); the Play link is never offered on an iPhone */}
+          {storeLinksShown(config) && !isIos() && <>
             <IonItem button detail={false} onClick={() => void shareApp(t('app.name'), t('about.share_text'), config)} data-testid="about-share">
               <IonIcon slot="start" icon={shareSocialOutline} aria-hidden="true" /><IonLabel>{t('about.share')}</IonLabel>
             </IonItem>

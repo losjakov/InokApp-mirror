@@ -3,7 +3,7 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { renderErrorPage } from './src/i18n/errorPage';
-import { ENGINE_FLOOR } from './src/app/engineFloor';
+import { ENGINE_FLOOR, IOS_FLOOR } from './src/app/engineFloor';
 
 // Serves /fixtures/* from the repository's fixtures folder in dev and preview (web = fixtures mode;
 // the native app talks to the live API). Nothing from fixtures/ is copied into the production bundle.
@@ -41,8 +41,8 @@ export default defineConfig({
   plugins: [react(), fixturesServer(), errorPage()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
-  // A-46: the build target = THE engine floor (package.json browserslist); the map worker is built the same way (ES module worker)
-  build: { target: `chrome${ENGINE_FLOOR}`, sourcemap: false },
+  // A-46: the build target = THE engine floors (package.json browserslist: Android's Chrome, iOS's Safari - cloud_36); the map worker the same way
+  build: { target: [`chrome${ENGINE_FLOOR}`, `safari${IOS_FLOOR}`], sourcemap: false },
   worker: { format: 'es' },
   server: { port: 5173, strictPort: true, host: '127.0.0.1' },
   test: {

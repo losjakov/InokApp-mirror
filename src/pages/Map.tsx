@@ -17,7 +17,6 @@ import { eparchyTitle, getEparchy } from '@/data/repo/eparchies';
 import { field, type MapPoint, type MonasteryListRow as Row, type MonasteryRow as CardRow } from '@/data/repo/types';
 import { distanceKm, formatKm } from '@/data/search/geo';
 import { currentPosition, type Position } from '@/native/geolocation';
-import { online } from '@/native/network';
 import { useApp } from '@/state/AppContext';
 import { tCount } from '@/i18n';
 import { sideRow } from '@/components/sideRow';
@@ -30,7 +29,8 @@ const NO_SCOPE_CHROME = { ...SCOPE_CHROME, top: 0 };
 /**
  * Stage 2 (spec §4): MapLibre with the style URL from config (OpenFreeMap), markers from SQLite as one clustered GeoJSON
  * source, tap → marker card, «near me» with a radius ring + a list sorted by distance, directions intents.
- * Offline: the style download fails → FALLBACK_STYLE + a banner; the markers (from the DB) stay. No WebGL → message + list.
+ * Offline (A-117 (1)): the map starts on the local style with the houses from the DB; the network style replaces it once fetched; failed or
+ * its tiles lost → a note that says so (the houses stay). No WebGL → message + list.
  */
 export function MapPage() {
   const { db, t, lang, config, dict } = useApp();
@@ -73,7 +73,7 @@ export function MapPage() {
   // the map is created once per mount (the ONE set-up: inokMap.ts); style failures fall back to the flat style (markers still render)
   useEffect(() => {
     if (!box.current || mapRef.current) return;
-    const c = new InokMap({ container: box.current, styleUrl, lang, center: at ?? undefined, zoom: at ? PLACE_ZOOM : undefined, onFallback: () => setOffline(true),
+    const c = new InokMap({ container: box.current, styleUrl, lang, center: at ?? undefined, zoom: at ? PLACE_ZOOM : undefined, onFallback: () => setOffline(true), onTilesLost: () => setOffline(true), onBasemap: () => setOffline(false),
       onLayers: (m) => { // the screen's own layers: the «near me» ring under the houses, the person's dot above them
         m.addSource('me', { type: 'geojson', data: EMPTY });
         m.addSource('radius', { type: 'geojson', data: EMPTY });
@@ -86,7 +86,6 @@ export function MapPage() {
     const map = c.map;
     ctl.current = c;
     mapRef.current = map;
-    online().then((on) => !on && setOffline(true));
     // browser tests click markers by projected coordinates; the emulator's store frame 03 fits the three lavras (A-78 4, scripts/store_checks.mjs)
     (window as unknown as { __inokMap?: MLMap }).__inokMap = map;
     map.on('click', 'clusters', (e: MapLayerMouseEvent) => {
@@ -179,7 +178,6 @@ export function MapPage() {
       const p = await currentPosition();
       setPos(p);
       setNearOn(true);
-      if (!(await online())) setOffline(true);
     } catch {
       setPosError(true);
     } finally {

@@ -4,6 +4,7 @@
 # whatever this list says. The public README.md is added by the tool from scripts/mirror_README.md.
 src/
 android/
+ios/
 tests/
 screens/
 fixtures/
