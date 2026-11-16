@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArticleRow } from './ArticleRow';
 import { loadRelated, moreRelated, type RelatedBlock } from '@/data/repo/articles';
 import { useApp } from '@/state/AppContext';
+import { NetNotice } from './NetNotice';
+import { netFailure, type NetFailure } from '@/data/netFailure';
 
 /** A-18 / R-17: under the history — «Публікації», «Відео», «Новини» of THIS card in the interface language, as the card page:
  *  5 rows each, «Показати більше» while the site has more; a block with no rows is not drawn. Tap → the article in the app. */
@@ -13,6 +15,7 @@ export function RelatedBlocks({ code }: { code: number }) {
   const navigate = useNavigate();
   const [blocks, setBlocks] = useState<RelatedBlock[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [fail, setFail] = useState<{ kind: string; f: NetFailure } | null>(null); // A-125: why a block's «Показати більше» did nothing
   useEffect(() => {
     let on = true;
     loadRelated(db, code, lang).then((b) => on && setBlocks(b));
@@ -21,10 +24,11 @@ export function RelatedBlocks({ code }: { code: number }) {
   const more = async (b: RelatedBlock) => {
     if (!b.next) return;
     setBusy(b.kind);
+    setFail(null);
     try {
       const p = await moreRelated(code, b.kind, lang, b.next);
       setBlocks((all) => all.map((x) => (x.kind === b.kind ? { ...x, items: [...x.items, ...p.items], next: p.next } : x)));
-    } catch { /* offline: the button stays */ }
+    } catch (e) { setFail({ kind: b.kind, f: await netFailure(e) }); } // the button stays; the cause under it
     setBusy(null);
   };
   return (
@@ -36,6 +40,7 @@ export function RelatedBlocks({ code }: { code: number }) {
           {b.next && (
             <MoreButton label={t('articles.more')} busy={busy === b.kind} onClick={() => void more(b)} testId={`related-more-${b.kind}`} />
           )}
+          {b.next && <NetNotice failure={fail?.kind === b.kind ? fail.f : null} onRetry={() => void more(b)} testId={`related-more-${b.kind}-net`} />}
         </section>
       ))}
     </>

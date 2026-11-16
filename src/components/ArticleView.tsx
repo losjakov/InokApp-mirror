@@ -13,7 +13,9 @@ import { longDate } from '@/i18n/date';
 import type { Article, Comments } from '@/data/api/types';
 import { articleHeader, articleLead, fetchArticle, getArticle, myRating, rateArticle, readOnSite, videoLink } from '@/data/repo/articles';
 import { loadComments, withCounts, type CommentsRead } from '@/data/repo/comments';
-import { castFailure, castMessage } from '@/data/repo/cast';
+import { castFailureNow, castMessage } from '@/data/repo/cast';
+import { NetNotice } from './NetNotice';
+import { netFailure, type NetFailure } from '@/data/netFailure';
 import { CommentsBlock } from './CommentsBlock';
 import { openOnSite, siteUrl } from '@/native/intents';
 import { VideoButton } from './VideoButton';
@@ -35,6 +37,8 @@ export function ArticleView({ id }: { id: number }) {
   const [a, setA] = useState<Article | null | undefined>(undefined);
   const [mine, setMine] = useState<number | null>(null);
   const [comments, setComments] = useState<Comments | null>(null);
+  const [fail, setFail] = useState<NetFailure | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const toast = useToast();
   const root = useRef<HTMLElement>(null);
   const eye = useViewsEye({ kind: 'article', id }, root); // A-65: beside the date, as on the site; one view by the site's rules
@@ -53,18 +57,26 @@ export function ArticleView({ id }: { id: number }) {
       if (x) { show(x); comments(x); }
       // A-51 (R-35): online, the server's own copy replaces the cached one (an admin's edit shows without a restart); D69: an id the
       // cache lacks (a push tap on a warm app) is asked, then shown. Offline / busy: the cache, as before; 404 with no copy = not found.
-      const srv = await fetchArticle(db, id, lang).catch(() => undefined);
+      let err: unknown = null;
+      const srv = await fetchArticle(db, id, lang).catch((e: unknown) => { err = e; return undefined; });
       if (!on) return;
-      if (srv) { show(srv); if (!x) comments(srv); }
-      else if (!x) setA(srv === undefined && articlesVersion === 0 ? undefined : null); // cold start offline: wait for the first refresh
+      if (srv) { show(srv); if (!x) comments(srv); setFail(null); }
+      // A-125 (cloud_38): no copy and no answer = WHY in place with «Повторити» (1.0.11: an endless spinner on a cold start offline, else a
+      // false «not found»); a real 404 (null) stays «not found»
+      else if (!x && err) { const f = await netFailure(err); if (on) { setFail(f); setA(null); } }
+      else if (!x) setA(null);
     })();
     return () => { on = false; };
-  }, [db, id, lang, articlesVersion]);
+  }, [db, id, lang, articlesVersion, attempt]);
   if (a === undefined) return <div className="empty"><Busy /></div>;
+  if (!a && fail) return <div className="empty"><NetNotice failure={fail} onRetry={() => { setFail(null); setA(undefined); setAttempt((n) => n + 1); }} testId="article-net" /></div>;
   if (!a) return <div className="empty" data-testid="article-missing">{t('articles.not_found')}</div>;
   const rate = async (v: number) => {
     try { const ans = await rateArticle(db, a, v, lang); setMine(ans.mine); setA({ ...a, rating: ans.rating ?? a.rating }); }
-    catch (e) { toast(t(castMessage(castFailure(e), 'rating')), { cssClass: 'rating-toast' }); }
+    catch (e) { // A-125: no network / no answer = the shared words AND «Повторити»; a refusal = its own line
+      const f = await castFailureNow(e);
+      toast(t(castMessage(f, 'rating')), { cssClass: 'rating-toast', testId: 'rating-toast', ...(f === 'offline' || f === 'unreachable' ? { duration: 6000, action: { text: t('net.retry'), handler: () => void rate(v) } } : {}) });
+    }
   };
   const site = () => void openOnSite(a.site_url, lang);
   const lead = articleLead(a);

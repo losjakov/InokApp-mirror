@@ -1,4 +1,5 @@
 import { UpdateOffer } from '@/components/UpdateOffer';
+import { NetHost } from '@/components/NetNotice';
 import { IonApp, IonIcon, IonLabel, IonRouterOutlet, IonTabBar, IonTabs } from '@ionic/react';
 import { Busy } from '@/components/Busy';
 import { IonReactRouter } from '@ionic/react-router';
@@ -58,6 +59,7 @@ function Tabs() {
   return (
     <>
     <UpdateOffer />
+    <NetHost />
     <IonTabs>
       <IonRouterOutlet>
         <Route path="/home" element={<HomePage />} />

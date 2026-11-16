@@ -21,13 +21,15 @@ export const FLASH_MS = 2000;
  * «Додано…»): Ionic's `present` ignores a second toast of the hook while the first is up (gotcha cloud_25), so the shown one is dismissed
  * first. Ionic's toast is `role="status"` + `aria-live="polite"`: TalkBack reads it without moving the focus.
  */
-export function useToast(): (message: string, o?: { duration?: number; cssClass?: string; testId?: string }) => void {
+export function useToast(): (message: string, o?: { duration?: number; cssClass?: string; testId?: string; action?: { text: string; handler: () => void } }) => void {
   const [present, dismiss] = useIonToast();
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   return useCallback((message, o) => {
     chain.current = chain.current.then(() => dismiss()).catch(() => {}).then(() => present({
       message, duration: o?.duration ?? TOAST_MS, cssClass: ['app-toast', o?.cssClass].filter(Boolean).join(' '), position: 'bottom', positionAnchor: toastAnchor(),
       htmlAttributes: o?.testId ? { 'data-testid': o.testId } : undefined,
+      // A-125: «Повторити» on a failed network tap - the action button of the same snackbar (one look)
+      buttons: o?.action ? [{ text: o.action.text, handler: o.action.handler, htmlAttributes: { 'data-testid': `${o.testId ?? 'toast'}-retry` } }] : undefined,
     }));
   }, [present, dismiss]);
 }

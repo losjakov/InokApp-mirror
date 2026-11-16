@@ -56,7 +56,7 @@ describe('A-34: comment votes (R-27)', () => {
       [new ApiError(429, 'rate_limited'), 'rate_limited'],
       [new ApiError(403, 'integrity_failed'), 'refused'],
       [new ApiError(503, 'integrity_unavailable'), 'error'],
-      [new TypeError('Failed to fetch'), 'offline'],
+      [new TypeError('Failed to fetch'), 'unreachable'], // A-125: the test's device is online - a fetch that failed is «no answer», never «no network»
       [new ApiError(503, 'vote_closed'), 'closed'],
     ];
     for (const [e, why] of table) {
@@ -152,7 +152,7 @@ describe('A-49 (R-32): report ONE comment, hide on this phone', () => {
     expect(await reportComment(db, 2869, 109)).toEqual({ ok: true });
     expect(rep).toHaveBeenCalledWith(2869, 109, { install_id: await installId(db) });
     for (const [e, f] of [[new ApiError(503, 'report_closed'), 'closed'], [new ApiError(429, 'rate_limited'), 'rate_limited'],
-      [new ApiError(503, 'unavailable'), 'error'], [new ApiError(404, 'not_found'), 'error'], [new TypeError('Failed to fetch'), 'offline']] as const) {
+      [new ApiError(503, 'unavailable'), 'error'], [new ApiError(404, 'not_found'), 'error'], [new TypeError('Failed to fetch'), 'unreachable']] as const) {
       rep.mockRejectedValueOnce(e);
       expect(await reportComment(db, 2869, 109)).toEqual({ ok: false, failure: f });
     }

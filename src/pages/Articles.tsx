@@ -17,6 +17,8 @@ import { articleSorts, type ArticleSort } from '@/data/repo/articleOrder';
 import { ARTICLE_KINDS } from '@/native/push';
 import { useApp } from '@/state/AppContext';
 import { ShareFooter } from '@/components/ShareFooter';
+import { NetNotice } from '@/components/NetNotice';
+import { netFailure, type NetFailure } from '@/data/netFailure';
 import { SplitContent } from '@/components/SplitContent';
 import { StatusNote } from '@/components/StatusNote';
 import { sitePageUrl } from '@/data/links/sitePages';
@@ -47,6 +49,9 @@ export function ArticlesPage() {
   const [next, setNext] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [more, setMore] = useState(false);
+  const [moreFail, setMoreFail] = useState<NetFailure | null>(null);
+  const [failKey, setFailKey] = useState('');
+  const moreFailNow = failKey === `${kind}|${lang}` ? moreFail : null; // another list: its own paging (no stale «why»)
   const [older, setOlder] = useState<{ items: Article[]; next: string | null } | null>(null);
   // R-19: a kind tab pages the server's section list; the cache of that kind shows first (and offline)
   const [server, setServer] = useState<{ kind: string; items: Article[]; next: string | null } | null>(null);
@@ -103,6 +108,7 @@ export function ArticlesPage() {
   const tab = server && server.kind === kind ? server : null;
   const loadMore = async () => {
     setMore(true);
+    setMoreFail(null);
     try {
       if (fv) {
         if (fv.next) { const p = await fetchQuery(db, lang, kind === 'all' ? null : (kind as ArticleKind), q, sort, fv.next); setFound((cur) => (cur?.key === fv.key ? { ...cur, items: mergePage(cur.items, p.items), next: p.next } : cur)); }
@@ -114,7 +120,7 @@ export function ArticlesPage() {
       }
       const cursor = older ? older.next : next;
       if (cursor) { const p = await fetchOlder(lang, cursor); setOlder({ items: [...(older?.items ?? []), ...p.items], next: p.next }); }
-    } catch { setOffline(true); } finally { setMore(false); }
+    } catch (e) { setMoreFail(await netFailure(e)); setFailKey(`${kind}|${lang}`); } finally { setMore(false); } // A-125: the cause under the button, «Повторити»
   };
   const open = (a: number) => navigate(`/articles?id=${a}`);
   const shown = active ? (fv ? fv.items : null) : tab ? tab.items : items && [...items, ...(older?.items ?? []).filter((a) => (kind === 'all' || a.kind === kind) && !items.some((b) => b.id === a.id))];
@@ -134,6 +140,7 @@ export function ArticlesPage() {
       {shown && shown.length > 0 && hasMore && (
         <MoreButton label={t('articles.more')} busy={more} onClick={loadMore} testId="articles-more" />
       )}
+      <NetNotice failure={moreFailNow} onRetry={() => void loadMore()} testId="articles-more-net" />
       {shown && <ShareFooter title={t('articles.title')} url={sitePageUrl('/articles', lang, kind as ArticleKind | 'all')} />}
     </>
   );

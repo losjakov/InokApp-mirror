@@ -8,6 +8,7 @@ import { APP_VERSION } from '@/app/version';
 import { openLink } from '@/native/intents';
 import { SITE_URL } from '@/data/api/client';
 import { isIos } from '@/native/platform';
+import { netFailure, type NetFailure } from '@/data/netFailure';
 import { checkUpdate, immediateUpdate, openListing, shareApp, storeLinksShown, type UpdateCheck } from '@/native/play';
 import { useApp } from '@/state/AppContext';
 
@@ -27,14 +28,16 @@ export function AboutPage() {
   const privacy = config?.privacy_url; // A-8: only from config, never hard-coded
   // A-80: «Перевірити оновлення» - Play's answer under the row; an update -> Google's own flow; not from Play -> said, nothing opens
   const [check, setCheck] = useState<UpdateCheck | 'busy' | null>(null);
+  const [checkWhy, setCheckWhy] = useState<NetFailure | null>(null);
   const runCheck = async () => {
     setCheck('busy');
     const c = await checkUpdate();
+    setCheckWhy(c.state === 'error' ? await netFailure(c) : null); // A-125: no network = said so (not «try later»)
     setCheck(c);
     if (c.state === 'available') await immediateUpdate(c.info, config);
   };
   const checkNote = check === 'busy' ? t('about.checking') : check?.state === 'none' ? t('about.latest', { v: APP_VERSION })
-    : check?.state === 'not_play' ? t(isIos() ? 'about.not_app_store' : 'about.not_play') : check?.state === 'error' ? t('about.check_error') : null;
+    : check?.state === 'not_play' ? t(isIos() ? 'about.not_app_store' : 'about.not_play') : check?.state === 'error' ? (checkWhy === 'offline' ? t('net.offline') : t('about.check_error')) : null;
   return (
     <IonPage>
       <PageHeader title={t('about.title')} />

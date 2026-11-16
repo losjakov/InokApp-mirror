@@ -2,6 +2,9 @@ import type { Db } from '@/data/db/types';
 import { getMeta, setMeta } from '@/data/db/schema';
 import { ApiError } from '@/data/api/client';
 import { playIntegrityToken } from '@/native/integrity';
+import { netMessageKey } from '@/data/netFailure';
+import { online } from '@/native/network';
+import { isIos } from '@/native/platform';
 
 /**
  * ONE code for everything the install casts on the site (A-34, A-49 + contract §3): the article's stars, the comments' likes /
@@ -58,18 +61,26 @@ export async function castBody<T extends object>(db: Db, line: (install: string)
   return { ...body, install_id, ...(token ? { integrity_token: token } : {}) };
 }
 
-/** What a refusal means to the person (every cast: stars, votes, reports): closed before the Play release, too many, refused, no network, anything else. */
-export type CastFailure = 'closed' | 'rate_limited' | 'refused' | 'offline' | 'error';
+/** What a refusal means to the person (every cast: stars, votes, reports): closed before the Play release, too many, refused, no network
+ *  (the device has none), no answer (the device online, the site silent - A-125: never called «no network»), anything else. */
+export type CastFailure = 'closed' | 'rate_limited' | 'refused' | 'offline' | 'unreachable' | 'ios' | 'error';
 const CLOSED = new Set(['vote_closed', 'rating_closed', 'report_closed']);
-export function castFailure(e: unknown): CastFailure {
+export function castFailure(e: unknown, deviceOnline = false): CastFailure {
   // cloud_38 (A1): the server's own answer of the last refused cast, readable by the simulator ring (scripts/ios_sim_tour.sh) - never shown
   (globalThis as { __inokLastCast?: string }).__inokLastCast = e instanceof ApiError ? `${e.status} ${e.code}` : `no answer: ${String(e).slice(0, 80)}`;
-  if (!(e instanceof ApiError)) return 'offline'; // fetch itself failed: no answer from the server
+  if (!(e instanceof ApiError)) return deviceOnline ? 'unreachable' : 'offline'; // no answer: the device's own network decides which (A-125)
   if (e.status === 503 && CLOSED.has(e.code)) return 'closed';
   if (e.status === 429) return 'rate_limited';
+  // cloud_38 (A1, A-124): the site asks a Play Integrity token (Google's, Android only) once its switch is on - an iPhone can never pass it.
+  // Said as it is («not yet on iPhone»), never «try again»; the server side is REQUEST R-53 (InokSite window C), not worked around here
+  if (e.status === 403 && e.code === 'integrity_required' && isIos()) return 'ios';
   if (e.status === 403) return 'refused';
   return 'error';
 }
 
 /** The i18n key of a failure's short line; `closed` names what is closed (the stars or the comment votes). */
-export const castMessage = (f: CastFailure, what: 'rating' | 'vote' | 'report'): string => (f === 'closed' ? `cast.closed_${what}` : `cast.${f}`);
+export const castMessage = (f: CastFailure, what: 'rating' | 'vote' | 'report'): string =>
+  f === 'closed' ? `cast.closed_${what}` : f === 'offline' || f === 'unreachable' ? netMessageKey(f) : `cast.${f}`; // A-125: the shared net words
+
+/** The same, the device's network read now (the casts' callers are async). */
+export const castFailureNow = async (e: unknown): Promise<CastFailure> => castFailure(e, e instanceof ApiError ? true : await online());

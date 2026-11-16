@@ -9,7 +9,9 @@ nav() { node "$NAVJS" "$@" >> "$S/nav.txt" 2>&1 || echo "nav $* failed" >> "$S/n
 check() { node "$NAVJS" check "$1" 2>/dev/null; }
 # a read-back polled until it says $2 (pictures arrive, a toast fades) - prints the last value; 1 = never
 waitcheck() { local v="" _; for _ in $(seq 1 "${3:-20}"); do v=$(check "$1"); [ "$v" = "$2" ] && { echo "$v"; return 0; }; sleep 1.5; done; echo "$v"; return 1; }
-frames() { grep "^$1|" "$ROOT/scripts/store_frames.txt" | cut -d'|' -f2- | sed "s/\\\$ART/$ART/g"; }
+# cloud_38 (the iOS simulator: after a WebGL map its picture stays white): STORE_SKIP / STORE_ONLY = a regex of frame names left out / kept
+frames() { grep "^$1|" "$ROOT/scripts/store_frames.txt" | cut -d'|' -f2- | sed "s/\\\$ART/$ART/g" \
+  | { if [ -n "${STORE_SKIP:-}" ]; then grep -vE "^[^|]*(${STORE_SKIP})"; else cat; fi; } | { if [ -n "${STORE_ONLY:-}" ]; then grep -E "^[^|]*(${STORE_ONLY})"; else cat; fi; }; }
 
 set_lang() {
   nav go /more/language; sleep 2; nav click "[data-testid=\"lang-$1\"]"; sleep 3

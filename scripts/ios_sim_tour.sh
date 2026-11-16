@@ -81,6 +81,17 @@ launch() { # (re)start the app with its console captured; wait for «home painte
   echo "the remote hand never asked the relay ($TAG)" | tee -a "$OUT/nav.txt"; return 1
 }
 
+# ios run 1 (D12): a WebGL map leaves the simulator's picture white / frozen (the DOM goes on) even across app restarts - the device itself
+# is restarted after every screen with a map; the app's data stays on it
+reboot_sim() {
+  xcrun simctl shutdown "$U" > /dev/null 2>&1 || true
+  xcrun simctl boot "$U"; xcrun simctl bootstatus "$U" -b > /dev/null
+  xcrun simctl ui "$U" appearance light
+  xcrun simctl status_bar "$U" override --time 10:00 --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100 2>>"$OUT/nav.txt" || true
+  xcrun simctl location "$U" set 50.4344,30.5571 2>>"$OUT/nav.txt" || true
+  launch
+}
+
 # a crash screen left by the step before (A-48's «Щось пішло не так») is written down with its code and the app restarted - one fault, one line
 guard_crash() {
   local c; c=$(ev "(() => { const e = document.querySelector('[data-testid=crash]'); return e ? ((e.innerText.match(/R-[A-Za-z]+-[0-9a-f]+/) || ['crash'])[0] + ' ' + (e.innerText.split('\\n').pop() || '').slice(0, 120)) : 'ok'; })()")
@@ -116,6 +127,7 @@ a3_walk() {
   if { [ "$wide" = wide ] || { [ "${c1#/monasteries/}" != "$c1" ] && [ "$u1" = /monasteries ]; }; } && [ "${m1#/map}" != "$m1" ] && [ "$u2" = /more/eparchies/1 ]; then
     a3 "back (header arrow)" PASS "list->$c1->back=$u1; eparchy->$m1->back=$u2 ($wide)"; else a3 "back (header arrow)" FAIL "list->$c1->back=$u1; eparchy->$m1->back=$u2 ($wide)"; fi
   a3 "back (edge swipe)" NOT-PROVABLE "a system gesture: no DOM tap reaches it - the owner's iPhone (PHONE_TEST_BACKLOG cloud_37)"
+  reboot_sim   # the eparchy's mini-map (WebGL) of spot 2: the next frames from a fresh simulator (ios run 1, D12)
   guard_crash spot3
   # 3 the map online: drawn, clustered houses + the three lavras whole
   nav go /map; sleep 3; node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
@@ -127,6 +139,7 @@ a3_walk() {
       return (g ? 'webgl ' + (g.getParameter(g.VERSION) || '?') : 'NO webgl') + ', maps drawn=' + (m.join('/') || 'none') + (mp ? ', style loaded ' + mp.isStyleLoaded() + ', loaded ' + mp.loaded()
         + ', houses source ' + (mp.getSource('monasteries') ? mp.isSourceLoaded('monasteries') : 'none') : '') + ', worker fetched ' + (w.join(' ').slice(-80) || 'no') + ', worker ' + JSON.stringify(window.__inokMapWorker || null) + ', map errors [' + (window.__inokMapErrors || []).join(' | ') + ']'; })()")"
   [ "$lv" = ok ] && [ "${v%% *}" -gt 0 ] 2>/dev/null && a3 "map online" PASS "$v; lavras $lv" || a3 "map online" FAIL "$v; lavras $lv"; shot "$OUT/a3-map__$TAG.png"
+  reboot_sim   # D12: after a WebGL map the simulator's picture stays frozen / white - every later frame from a fresh simulator
   a3 "map offline" NOT-PROVABLE "the simulator shares the Mac's network (no airplane mode) - the browser ring proves the logic (map-offline, map-offline-weak x4 profiles); the owner's iPhone in airplane mode"
   guard_crash spot4
   # 4 the gallery in the app's viewer: card 242 -> «Фотогалерея» -> «1 / N» -> next -> «2 / N» -> close
@@ -212,7 +225,9 @@ a3_walk() {
   launch
   guard_crash spot14
   # 14 A1 (A-124: «оцінки й лайки не ставляться» on iOS): a star and a like on article 1833 (it has comments) - the server's own answer read back
-  nav go "/articles?id=1833"; node "$NAVJS" wait '[data-testid="article"] [data-testid="rating"]' >> "$OUT/nav.txt" 2>&1; sleep 3
+  nav go "/articles?id=1833"; node "$NAVJS" wait '[data-testid="article"] [data-testid="rating"]' >> "$OUT/nav.txt" 2>&1; sleep 4
+  # ios run 1: the A2 offer («Повідомляти про нові публікації?») comes over the first opened article (as on Android) - «Ні, дякую» first
+  ev "(() => { const b = Array.from(document.querySelectorAll('ion-alert.soft-ask:not(.overlay-hidden) .alert-button')).pop(); b && b.click(); return 'ok'; })()" > /dev/null; sleep 2
   local r0 r1 rt v0 v1 vs
   r0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]')||{}).disabled ? 'cast before' : 'open'")
   ev "window.__inokLastCast = null, 'ok'" > /dev/null
@@ -220,7 +235,7 @@ a3_walk() {
   r1=$(ev "(() => { const s = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]'); return (s && s.dataset.lit === '1' ? 'lit' : 'not lit') + '; server ' + (window.__inokLastCast || 'ok'); })()")
   rt=$(ev "(Array.from(document.querySelectorAll('ion-toast')).map((t) => t.message).filter(Boolean).pop()) || 'no toast'")
   shot "$OUT/a3-rating__$TAG.png"
-  case "$r1" in lit*'server ok') a3 "rating cast (A1)" PASS "$r0 -> $r1";; *) a3 "rating cast (A1)" FAIL "$r0 -> $r1; toast «$rt»";; esac
+  case "$r1" in lit*'server ok') a3 "rating cast (A1)" PASS "$r0 -> $r1";; *) a3 "rating cast (A1)" FAIL "$r0 -> $r1; toast «${rt}»";; esac
   nav scroll '[data-testid^="vote-up-"]'; sleep 2
   ev "window.__inokLastCast = null, 'ok'" > /dev/null
   v0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none'")
@@ -229,7 +244,7 @@ a3_walk() {
   vs=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=vote-status]')||{}).textContent || ''")
   shot "$OUT/a3-like__$TAG.png"
   case "$v0|$v1" in "n|y; server ok") a3 "comment like (A1)" PASS "mine $v0 -> $v1"; nav click '[data-testid^="vote-up-"]'; sleep 4;;  # withdrawn: the desired state «none»
-    *) a3 "comment like (A1)" FAIL "mine $v0 -> $v1; «$vs»";; esac
+    *) a3 "comment like (A1)" FAIL "mine $v0 -> $v1; «${vs}»";; esac
   guard_crash spot15
   # 15 A2: the soft offer of «Публікації» after the first opened article (as on Android) - our dialog, never the system's prompt first
   ev "(async () => { const P = Capacitor.Plugins.Preferences; const v = (await P.get({ key: 'settings' })).value; const s = Object.assign(v ? JSON.parse(v) : {}, { asked: [] });
@@ -242,7 +257,7 @@ a3_walk() {
   nav go /more/notifications; sleep 3
   v=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=push-status]')||{}).textContent || 'none'")
   shotof "$OUT/a3-notifications__$TAG.png" '[data-testid=push-list]' > /dev/null
-  [ "$v" != none ] && a3 "«Сповіщення» screen (A2)" PASS "«$v»" || a3 "«Сповіщення» screen (A2)" FAIL "no status line"
+  [ "$v" != none ] && a3 "«Сповіщення» screen (A2)" PASS "«${v}»" || a3 "«Сповіщення» screen (A2)" FAIL "no status line"
   a3 "system permission prompt + delivery (A2)" NOT-PROVABLE "a simulator shows no APNs prompt result / no FCM delivery - the owner's iPhone (PHONE_TEST_BACKLOG cloud_38)"
   # 16 A8 (A-124 «все, що забаговано»): EVERY screen of the app - the frame, its pixels (never blank), no crash, the page's title on top
   local sc path name
@@ -256,6 +271,7 @@ a3_walk() {
       return (document.querySelector('[data-testid=crash]') ? 'CRASH' : 'ok') + ' title «' + ((t && t.textContent) || '').trim().slice(0, 40) + '» ' + (ov ? 'SIDEWAYS' : 'fits') + ' ' + location.pathname + location.search; })()")
     shot "$OUT/a8-${name}__$TAG.png"; local p; p=$("${PY:-python3}" -I "$ROOT/scripts/store_png.py" --paint "$OUT/a8-${name}__$TAG.png" 2>/dev/null || echo '?')
     case "$v|$p" in "ok title «"*"» fits "*"|ok") a3 "screen $name (A8)" PASS "$v; pixels $p";; *) a3 "screen $name (A8)" FAIL "$v; pixels $p";; esac
+    case "$name" in map|eparchy|contacts) reboot_sim;; esac   # a WebGL map on screen: the next frame from a fresh simulator (D12)
   done
   a3 "VoiceOver" NOT-PROVABLE "the simulator has no VoiceOver - names / roles / order are the a11y tree of the same DOM (axe 0); the owner's iPhone"
   a3 "share sheet / call / directions (Apple Maps)" NOT-PROVABLE "system sheets and other apps - the owner's iPhone"
@@ -270,7 +286,13 @@ appstore() { # set(phone|tablet) dir-name
   launch
   for lang in uk ru en; do
     set_lang "$lang"; units_ok "$lang" || return 1
-    shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
+    # ios run 1 (D12): after a WebGL map the simulator's picture stays white, even across app restarts - every other frame first, the map
+    # frame LAST in its language, then the simulator is rebooted (the app's settings, the language included, stay on the device)
+    STORE_SKIP='eparchy|map' shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
+    STORE_ONLY=eparchy shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1   # its mini-map is WebGL too
+    reboot_sim
+    STORE_ONLY=map shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
+    reboot_sim
   done
 }
 

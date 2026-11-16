@@ -12,6 +12,7 @@ import type { AppConfig, LiveStatus } from '@/data/api/types';
 import { DEFAULTS, LEGACY_TOPICS, effectiveLang, loadSettings, saveSettings, settingsStored, type Settings } from './settings';
 import { applyTheme } from './theme';
 import { makeT, type Lang, type Translate } from '@/i18n';
+import { onNetChange } from '@/native/network';
 import { liveChannelsNow, pushPermission, registerPush, requestPushPermission, syncTopics, type PushMessage, type PushPermission } from '@/native/push';
 
 export type Boot = 'loading' | 'ready' | 'first_run' | 'update_app';
@@ -269,7 +270,10 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
   }, [boot, register]);
   // the wanted topics follow the settings once registered (idempotent)
   useEffect(() => {
-    if (pushRegistered) void syncTopics(settings.topics);
+    if (!pushRegistered) return;
+    void syncTopics(settings.topics);
+    // A-125 (cloud_38): a subscription that failed without a network is asked again when the network comes back
+    return onNetChange(() => void syncTopics(settings.topics));
   }, [pushRegistered, settings.topics]);
   const enablePush = useCallback(async () => {
     const p = await requestPushPermission();

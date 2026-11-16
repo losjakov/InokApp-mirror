@@ -3,7 +3,7 @@ import type { Article, Comment, Comments, L10n, VoteValue, Votes } from '@/data/
 import { keepCounts, type Counts } from './articles';
 import { dataSource } from '@/data/source';
 import { cacheGet, cacheSet } from './cache';
-import { castBody, castFailure, installId, type CastFailure } from './cast';
+import { castBody, castFailureNow, installId, type CastFailure } from './cast';
 
 /**
  * Comments of a publication or a video (contract §3): read-only text (A-33: written in the site's own form), and under every comment
@@ -93,7 +93,7 @@ export async function voteComment(db: Db, articleId: number, cid: number, value:
     await keepVotes(db, articleId, cid, ans);
     return { ok: true, votes: ans };
   } catch (e) {
-    const failure = castFailure(e);
+    const failure = await castFailureNow(e);
     if (failure === 'closed') closed = true;
     return { ok: false, votes: before, failure };
   }
@@ -117,7 +117,7 @@ export async function reportComment(db: Db, articleId: number, cid: number): Pro
     await dataSource().report(articleId, cid, await castBody(db, (i) => ['report', articleId, cid, i], {}));
     return { ok: true };
   } catch (e) {
-    return { ok: false, failure: castFailure(e) };
+    return { ok: false, failure: await castFailureNow(e) };
   }
 }
 

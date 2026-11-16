@@ -530,3 +530,8 @@ ion-toast.app-banner { --button-color: var(--inok-banner-action); }
 .sr-only { position: absolute; top: 0; left: 0; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 /* A-88 (WCAG 2.5.8): Ionic's searchbar «clear» is 22 px wide - at least 24 x 24 to tap */
 ion-searchbar .searchbar-clear-button { min-width: 24px; }
+/* A-125 (cloud_38): THE in-place «why» of a failed network action - under its button, the secondary type, «Повторити» beside it */
+.net-notice:empty { display: none; }
+.net-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 0 16px 8px; }
+.net-notice__text { margin: 0; flex: 1 1 200px; font-size: var(--inok-type-secondary); line-height: var(--inok-line); color: var(--ion-text-color); }
+.net-notice ion-button { min-height: 48px; margin: 0; }

@@ -2337,6 +2337,86 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.getByTestId('related-publication').scrollIntoViewIfNeeded();
       await picturesLoaded(p, '[data-testid="related-publication"] img', 3);
     } },
+  // A-125 (cloud_38, the owner's Android 1.0.11: «Показати більше» without a network - a tap, nothing, no word): every network action
+  // says WHY - in place under its button (a polite live region that is in the page BEFORE the tap) or in the app's snackbar, with
+  // «Повторити»; «no internet» only when the device has none (online + no answer = «inok.info не відповідає»; never a false «no network»)
+  { name: 'net-articles-more-offline', path: '/articles', only: ['phone-light', 'phone-dark', 'tablet'], ready: async (p) => {
+      await toAll(p); // the fixture's paged list = the server's sort «за переглядами» (4 rows, «Показати більше» -> 8)
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-views_week"]').click();
+      await expect(onShown(p, 'kinds')).toHaveAttribute('data-query', /\|all\|\|views_week$/, { timeout: 5000 });
+      await expect(onShown(p, 'articles-more')).toBeVisible();
+      const live = onShown(p, 'articles-more-net');
+      await expect(live, 'the live region is in the page before the tap').toHaveAttribute('role', 'status');
+      await expect(live).toHaveText('');
+      const n = await onShown(p, 'articles').locator('[data-testid^="arow-"]').count();
+      await p.context().setOffline(true);
+      await onShown(p, 'articles-more').click();
+      const [off, retry] = await words(p, ['net.offline', 'net.retry']);
+      await expect(live).toContainText(off);
+      await expect(live.getByRole('button', { name: retry })).toBeVisible();
+      await p.context().setOffline(false);
+      await live.getByRole('button', { name: retry }).click();
+      await expect.poll(() => onShown(p, 'articles').locator('[data-testid^="arow-"]').count(), { message: '«Повторити» pages on' }).toBeGreaterThan(n);
+      await expect(live).toHaveText('');
+    } },
+  { name: 'net-articles-more-unreachable', path: '/articles', only: ['phone-light'], ready: async (p) => {
+      await toAll(p); // the fixture's paged list = the server's sort «за переглядами» (4 rows, «Показати більше» -> 8)
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-views_week"]').click();
+      await expect(onShown(p, 'kinds')).toHaveAttribute('data-query', /\|all\|\|views_week$/, { timeout: 5000 });
+      await expect(onShown(p, 'articles-more')).toBeVisible();
+      await p.route('**/fixtures/**', (r) => r.abort()); // the device online, the site silent
+      await onShown(p, 'articles-more').click();
+      const [silent, off] = await words(p, ['net.unreachable', 'net.offline']);
+      await expect(onShown(p, 'articles-more-net')).toContainText(silent);
+      await expect(onShown(p, 'articles-more-net')).not.toContainText(off); // P2: never «no internet» while the device has one
+    } },
+  { name: 'net-related-more-offline', path: '/monasteries/242', tall: 2400, only: ['phone-light'], ready: async (p) => {
+      await expect(p.getByTestId('related-more-publication')).toBeVisible();
+      await p.context().setOffline(true);
+      await p.getByTestId('related-more-publication').click();
+      await expect(p.getByTestId('related-more-publication-net')).toContainText((await words(p, ['net.offline']))[0]);
+    } },
+  { name: 'net-article-open-offline', path: '/articles', only: ['phone-light'], ready: async (p) => {
+      await expect(onShown(p, 'articles')).toBeVisible();
+      await p.context().setOffline(true);
+      await p.evaluate(() => { history.pushState({}, '', '/articles?id=999001'); dispatchEvent(new PopStateEvent('popstate')); }); // an id the cache lacks (a push tap)
+      const note = onShown(p, 'article-net');
+      await expect(note, 'never an endless spinner, never a false «not found»').toContainText((await words(p, ['net.offline']))[0], { timeout: 10_000 });
+      await expect(onShown(p, 'article-missing')).toHaveCount(0);
+      await expect(note.getByRole('button', { name: (await words(p, ['net.retry']))[0] })).toBeVisible();
+    } },
+  { name: 'net-outer-link-offline', path: '/more/commission', only: ['phone-light'], before: recordOpens, ready: async (p) => {
+      await expect(onShown(p, 'social')).toBeAttached();
+      await p.context().setOffline(true);
+      await onShown(p, 'social-telegram').click();
+      const t = p.locator('ion-toast[data-testid="net-toast"]');
+      await expect(t).toHaveText(new RegExp((await words(p, ['net.offline']))[0].replace(/[.()]/g, '\\$&')));
+      expect(await p.evaluate(() => (window as any).__opened), 'nothing opened into an error page').toEqual([]);
+      await p.context().setOffline(false);
+      await t.locator('[data-testid="net-toast-retry"]').click();
+      await expect.poll(() => p.evaluate(() => (window as any).__opened.length), { message: '«Повторити» opens it' }).toBe(1);
+    } },
+  { name: 'net-refresh-offline', path: '/articles', only: ['phone-light'], ready: async (p) => {
+      await expect(onShown(p, 'articles')).toBeVisible();
+      await p.context().setOffline(true);
+      await onShown(p, 'refresh').click();
+      await expect(p.locator('ion-toast[data-testid="net-toast"]')).toContainText((await words(p, ['net.offline']))[0]);
+      await expect(onShown(p, 'refresh')).toHaveAttribute('data-busy', '0'); // never an endless spinner
+    } },
+  { name: 'net-rating-offline', path: '/articles?id=2869', only: ['phone-light'], ready: async (p) => {
+      await expect(onShown(p, 'rating')).toBeVisible();
+      await p.context().setOffline(true);
+      await onShown(p, 'star-5').click();
+      const t = p.locator('ion-toast[data-testid="rating-toast"]');
+      await expect(t).toContainText((await words(p, ['net.offline']))[0]);
+      await expect(t.locator('[data-testid="rating-toast-retry"]')).toBeAttached();
+    } },
+  { name: 'net-push-later', path: '/more/notifications', only: ['phone-light'], before: pushPerm('granted'), ready: async (p) => {
+      await expect(p.getByTestId('topic-articles')).toBeVisible();
+      await p.context().setOffline(true);
+      await p.getByTestId('kind-news').click();
+      await expect(p.locator('ion-toast[data-testid="push-later"]')).toContainText((await words(p, ['net.later']))[0]);
+    } },
   { name: 'monastery-related-more', path: '/monasteries/242', tall: 2400, ready: async (p) => {
       // the lists differ by language: uk has 10 publications (the second page ends it); the fixture keeps only the first ru page
       const uk = (await p.evaluate(() => document.documentElement.lang)) === 'uk';

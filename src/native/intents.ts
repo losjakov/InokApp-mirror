@@ -3,6 +3,7 @@ import { Share } from '@capacitor/share';
 import { isIos, isNative } from './platform';
 import type { Lang } from '@/i18n';
 import { SITE_HOSTS } from '@/data/api/client';
+import { online } from './network';
 
 /** tel: / mailto: / geo: — Capacitor's WebView hands these schemes to the system (intent). On the web: same via the browser. */
 const go = (url: string) => {
@@ -13,8 +14,20 @@ export const openSystemUrl = go;
 export const callPhone = (phone: string) => go(`tel:${phone.replace(/[^+\d]/g, '')}`);
 export const mailTo = (email: string) => go(`mailto:${email}`);
 
+/** A-125 (cloud_38): an outer page / a video / a broadcast opened WITHOUT a network showed a browser's own error page (or nothing) - the app
+ *  says why instead, with «Повторити». The device's own word decides (src/native/network.ts); the words and the snackbar are the app's
+ *  (src/components/NetNotice.tsx `useNetToast`, wired once by the tabs). Unwired (a unit test, the first-run screen) = opened as before. */
+let whenOffline: ((retry: () => void) => void) | null = null;
+export const onOfflineOpen = (h: typeof whenOffline): void => { whenOffline = h; };
+const offlineSaid = async (retry: () => void): Promise<boolean> => {
+  if (!whenOffline || (await online())) return false;
+  whenOffline(retry);
+  return true;
+};
+
 /** https links: the in-app browser tab (`@capacitor/browser` = Custom Tabs / SFSafariViewController, A-33), a new tab on the web. */
 export async function openExternal(url: string): Promise<void> {
+  if (await offlineSaid(() => void openExternal(url))) return;
   if (isNative()) await Browser.open({ url });
   else window.open(url, '_blank', 'noopener');
 }
@@ -39,6 +52,7 @@ export const openLink = (url: string, lang: Lang): Promise<void> => openExternal
 /** Opens a page of the site in the in-app tab and resolves when the person closes it (A-33: then the app re-reads what may have changed). */
 export async function openOnSite(url: string, lang: Lang, hash?: string): Promise<void> {
   const to = siteUrl(url, lang, hash);
+  if (await offlineSaid(() => void openOnSite(url, lang, hash))) return;
   if (!isNative()) { window.open(to, '_blank', 'noopener'); return; }
   let closed!: () => void;
   const done = new Promise<void>((r) => { closed = r; });

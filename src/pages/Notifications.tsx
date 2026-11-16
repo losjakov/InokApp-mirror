@@ -14,6 +14,8 @@ import { normalize } from '@/data/search/normalize';
 
 const SEARCH_FROM = 12;
 import { useApp } from '@/state/AppContext';
+import { useToast } from '@/components/toast';
+import { online } from '@/native/network';
 
 /** Spec §5 / A-7: one switch for articles, one per channel; topics live on the device, the server keeps nothing. */
 export function NotificationsPage() {
@@ -28,11 +30,16 @@ export function NotificationsPage() {
     if (want && !(await allowed())) return;
     const topics = want ? Array.from(new Set([...settings.topics, topic])) : settings.topics.filter((x) => x !== topic);
     await setSettings({ topics });
+    await saidLater();
   };
+  // A-125 (cloud_38): a switch changed without a network is kept and applied when the network comes back (AppContext re-syncs then) - said
+  const toast = useToast();
+  const saidLater = async () => { if (!(await online())) toast(t('net.later'), { testId: 'push-later', duration: 4000 }); };
   const kinds = shownOn(true, push) ? articleKinds(settings.topics) : [];
   const setKinds = async (k: readonly ArticleKind[]) => {
     if (k.length && !(await allowed())) return;
     await setSettings({ topics: withArticleKinds(settings.topics, k) });
+    await saidLater();
   };
   // A-67: «Обрати канали» opens this screen at the channel list
   const { hash } = useLocation();

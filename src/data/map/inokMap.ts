@@ -247,17 +247,10 @@ export class InokMap {
       }
       void this.addLayers();
     });
-    // cloud_38 D16 (the Play map frames drawn in a corner / half white while `data-drawn` stayed 1): a WebView loses the GL context when
-    // the screen's size or density changes (the emulator's `wm size`); MapLibre's own restore brings the canvas back stale and without our
-    // pictures. So: lost = not drawn; restored = the canvas sized to the box again and the style re-applied whole (our layers, the
-    // pictures and the data come back on its style.load) - one path for every map of the app
+    // cloud_38: a lost GL context = not drawn (the shots never trust a stale `data-drawn`); MapLibre restores the map itself. (A re-applied
+    // style on restore - tried for D16 - looped «lost / restored» on the iOS 16.4 simulator, ios run 1: removed, JOURNAL D11)
     map.on('webglcontextlost', () => { console.info('InokMap: GL context lost'); this.setDrawn('0'); });
-    map.on('webglcontextrestored', () => {
-      console.info('InokMap: GL context restored - style re-applied');
-      if (this.removed) return;
-      map.resize();
-      map.setStyle(this.basemap ?? LOCAL_STYLE, { diff: false, transformStyle: basemapTransform(this.lang) });
-    });
+    map.on('webglcontextrestored', () => { console.info('InokMap: GL context restored'); if (!this.removed) map.triggerRepaint(); });
     // the slow tiles came after all (none failed): the note leaves
     map.on('idle', () => { if (this.tilesLost && this.basemap && this.tileErrors === 0) { this.tilesLost = false; o.onBasemap?.(); } });
     // D61: `data-drawn` = the map's own «drawn» signal for shots and tests (never a timer): '1' on MapLibre's `idle` (no camera movement,

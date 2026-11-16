@@ -251,7 +251,6 @@
   "cast.closed_rating": "Rating is temporarily unavailable",
   "cast.rate_limited": "Too many attempts. Please try later.",
   "cast.refused": "The check failed. Please try again.",
-  "cast.offline": "No network. Try again when you are online.",
   "cast.error": "Could not send. Please try later.",
   "contacts.office": "Editorial office of the Monastic Herald of Ukraine",
   "more.incognito": "Incognito mode",
@@ -318,5 +317,11 @@
   "photos.mb": "MB",
   "common.clear": "Clear",
   "about.not_app_store": "Not installed from the App Store — the update check is unavailable",
-  "social.title": "On social media"
+  "social.title": "On social media",
+  "net.offline": "No internet connection. Check the network and try again.",
+  "net.unreachable": "inok.info is not answering — the connection may be weak. Try again.",
+  "net.server": "The inok.info server answered with an error. Try again later.",
+  "net.retry": "Retry",
+  "net.later": "No internet connection. The change is saved and will apply once the network is back.",
+  "cast.ios": "Ratings and votes from iPhone and iPad are not accepted yet: the site does not verify them for iOS. We are working on it."
 }
