@@ -106,7 +106,9 @@ a3_walk() {
   v=$(ev "(() => { const m = window.__inokMap; if (!m) return 'none'; return m.queryRenderedFeatures({ layers: ['points', 'clusters', 'lavras'] }).length + ' marks drawn'; })()")
   local lv; lv=$(check lavras)
   # why a map may stay empty on a CI simulator (a VM without a GPU): the address, WebGL, the map's own «drawn»
-  v="$v; at $(node "$NAVJS" url); $(ev "(() => { const c = document.createElement('canvas'); const g = c.getContext('webgl2') || c.getContext('webgl'); const m = Array.from(document.querySelectorAll('.maplibregl-map')).map((e) => e.dataset.drawn); return (g ? 'webgl ' + (g.getParameter(g.VERSION) || '?') : 'NO webgl') + ', maps drawn=' + (m.join('/') || 'none'); })()")"
+  v="$v; at $(node "$NAVJS" url); $(ev "(() => { const c = document.createElement('canvas'); const g = c.getContext('webgl2') || c.getContext('webgl'); const m = Array.from(document.querySelectorAll('.maplibregl-map')).map((e) => e.dataset.drawn); const mp = window.__inokMap; const w = performance.getEntriesByType('resource').map((x) => x.name).filter((n) => /mapWorker|worker/i.test(n));
+      return (g ? 'webgl ' + (g.getParameter(g.VERSION) || '?') : 'NO webgl') + ', maps drawn=' + (m.join('/') || 'none') + (mp ? ', style loaded ' + mp.isStyleLoaded() + ', loaded ' + mp.loaded()
+        + ', houses source ' + (mp.getSource('monasteries') ? mp.isSourceLoaded('monasteries') : 'none') : '') + ', worker fetched ' + (w.join(' ').slice(-80) || 'no') + ', map errors [' + (window.__inokMapErrors || []).join(' | ') + ']'; })()")"
   [ "$lv" = ok ] && [ "${v%% *}" -gt 0 ] 2>/dev/null && a3 "map online" PASS "$v; lavras $lv" || a3 "map online" FAIL "$v; lavras $lv"; shot "$OUT/a3-map__$TAG.png"
   a3 "map offline" NOT-PROVABLE "the simulator shares the Mac's network (no airplane mode) - the browser ring proves the logic (map-offline, map-offline-weak x4 profiles); the owner's iPhone in airplane mode"
   guard_crash spot4

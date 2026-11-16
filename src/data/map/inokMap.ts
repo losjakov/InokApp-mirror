@@ -136,6 +136,17 @@ export function tilesLoaded(map: Pick<MLMap, 'areTilesLoaded'> & { style?: unkno
   try { return map.areTilesLoaded(); } catch { return true; }
 }
 
+/** cloud_37 (the iOS simulator: a map that never drew, nothing in the console - this handler swallowed MapLibre's errors): the last ten
+ *  are kept on `window.__inokMapErrors` and said once each in the console («InokMap:», read from the device log / the CI console). */
+function noteMapError(e: { error?: { message?: string }; sourceId?: string }): void {
+  const msg = `${e.sourceId ? `${e.sourceId}: ` : ''}${e.error?.message ?? 'error'}`.slice(0, 200);
+  const w = window as unknown as { __inokMapErrors?: string[] };
+  const kept = (w.__inokMapErrors ??= []);
+  if (kept.includes(msg)) return;
+  kept.push(msg); if (kept.length > 10) kept.shift();
+  console.warn(`InokMap: ${msg}`);
+}
+
 /** One map of the app: created once per mount, removed with `remove()`. */
 export class InokMap {
   readonly map: MLMap;
@@ -190,6 +201,7 @@ export class InokMap {
       map.on('data', collapse);
     }
     map.on('error', (e: ErrorEvent & { sourceId?: string }) => {
+      noteMapError(e);
       // a base map tile that failed (offline after the style came): the note; our own sources are GeoJSON, never fetched
       if (e.sourceId && map.getSource(e.sourceId)?.type !== 'geojson') { this.tileErrors++; this.loseTiles(); }
     });
