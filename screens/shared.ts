@@ -45,3 +45,7 @@ export const toastAboveTabs = (p: Page, sel: string) => expect.poll(() => p.eval
   const a = w.getBoundingClientRect(), b = bar.getBoundingClientRect();
   return a.height > 0 && a.bottom <= b.top + 0.5 ? 'above' : `toast bottom ${Math.round(a.bottom)} > tab bar top ${Math.round(b.top)}`;
 }, sel), { timeout: 2500 }).toBe('above');
+
+/** cloud_37 (A-121, the screens on WebKit): THE app's own rule (src/app/crash.tsx) - a ResizeObserver loop notice carries no Error and is
+ *  not a crash. WebKit hands it to Playwright as a page error (Chromium does not), so every `pageerror` collector skips exactly it. */
+export const benignPageError = (e: Error): boolean => /^ResizeObserver loop (completed with undelivered notifications|limit exceeded)/.test(e.message);

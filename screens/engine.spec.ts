@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { ANDROID_UA, KYIV, localPictures, mapReady, toastAboveTabs } from './shared';
+import { ANDROID_UA, KYIV, localPictures, mapReady, toastAboveTabs, benignPageError } from './shared';
 
 /**
  * A-46 / A-47 (old phones). Three proofs in the browser (the API 26 emulator ships WebView 69, below every floor):
@@ -104,7 +104,7 @@ test.describe('A-46 the Chrome 89 API surface', () => {
   test.use({ userAgent: ANDROID_UA, viewport: profiles['phone-light'].viewport, deviceScaleFactor: 1, locale: 'uk-UA', geolocation: KYIV, permissions: ['geolocation'] });
   test('first run imports, the list opens with the lavras, a card opens, the map draws - no page error', async ({ page }) => {
     const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('pageerror', (e) => { if (!benignPageError(e)) errors.push(String(e)); });
     page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`.slice(0, 300)); });
     page.on('worker', (w) => w.evaluate(() => 0).catch(() => {}));
     await page.addInitScript(NEWER_THAN_FLOOR);
@@ -124,7 +124,7 @@ test.describe('A-46 the Chrome 89 API surface', () => {
   });
   test('A-48: Home stays alive 10 s with the live status and the feed (the reference phone went white here), then every tab', async ({ page }) => {
     const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('pageerror', (e) => { if (!benignPageError(e)) errors.push(String(e)); });
     await page.addInitScript(NEWER_THAN_FLOOR);
     await localPictures(page);
     await page.goto('/home');

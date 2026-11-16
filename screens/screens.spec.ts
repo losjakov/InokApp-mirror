@@ -1,7 +1,7 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { onShown, settled, SHOWN, watchTransitions } from './settle';
 import { A11Y_PROFILES, axeScreen } from './a11y';
-import { ANDROID_UA, KYIV, jumpDrawn, localPictures, mapReady, picturesSettled, toastAboveTabs } from './shared';
+import { ANDROID_UA, KYIV, jumpDrawn, localPictures, mapReady, picturesSettled, toastAboveTabs, benignPageError } from './shared';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
@@ -1454,6 +1454,26 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
         await p.waitForTimeout(400);
       }
       await expect(p.getByTestId('map-card')).toContainText('Церковщина');
+    } },
+  // cloud_37 (A-121, found on the iOS simulator: R-TypeError «t.setData»): «near me» asked while the map is between two styles (the local
+  // style swapped for the network one drops every source until our layers return) - no crash; the dot comes back with the layers
+  { name: 'map-near-style-swap', path: '/map', only: ['phone-light'], ready: async (p) => {
+      await mapReady(p);
+      // the window made as long as on a slow phone: the marker pictures of the next style are held undecoded until released, so our sources
+      // (dropped by the style swap) are not back yet when «near me» answers
+      await p.evaluate(() => { const w = window as any; const orig = HTMLImageElement.prototype.decode; w.__held = []; w.__decode = orig;
+        HTMLImageElement.prototype.decode = function () { return new Promise<void>((ok, ko) => w.__held.push(() => orig.call(this).then(ok, ko))); }; });
+      await p.evaluate(() => { const m = (window as any).__inokMap; const st = m.getStyle(); const ours = new Set(['monasteries', 'lavras', 'place', 'me', 'radius']);
+        // the next style as the network sends it: the base map only - none of our sources / layers (getStyle() would carry them over)
+        m.setStyle({ ...st, sources: Object.fromEntries(Object.entries(st.sources).filter(([k]) => !ours.has(k))), layers: st.layers.filter((l: any) => !ours.has(l.source)) }, { diff: false }); });
+      await p.waitForTimeout(400);
+      expect(await p.evaluate(() => !!(window as any).__inokMap.getSource('me')), 'our sources are gone during the swap').toBe(false);
+      await onShown(p, 'near-me').evaluate((b) => (b as HTMLElement).click());
+      await expect(onShown(p, 'near-list')).toBeVisible({ timeout: 15_000 });
+      await p.waitForTimeout(500);
+      await expect(p.getByTestId('crash'), 'no crash screen (R-TypeError «t.setData» on the iOS simulator)').toHaveCount(0);
+      await p.evaluate(() => { const w = window as any; HTMLImageElement.prototype.decode = w.__decode; for (const f of w.__held.splice(0)) f(); }); // the pictures come
+      await expect.poll(() => p.evaluate(() => (window as any).__inokMap.getSource('me')?.serialize().data?.features?.length ?? -1), { timeout: 15_000 }).toBe(1);
     } },
   { name: 'map-near', path: '/map', ready: async (p) => {
       await mapReady(p);
@@ -3017,7 +3037,7 @@ for (const [profile, cfg] of Object.entries(profiles)) {
         if (process.env.THROTTLE) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.THROTTLE) });
         const errors: string[] = [];
         // D33: the error WITH its first stack frames — a flaky error must name where it comes from
-        page.on('pageerror', (e) => errors.push(`${String(e)} @ ${(e.stack ?? '').split('\n').slice(1, 12).map((l) => l.trim()).join(' < ')}`));
+        page.on('pageerror', (e) => benignPageError(e) || errors.push(`${String(e)} @ ${(e.stack ?? '').split('\n').slice(1, 12).map((l) => l.trim()).join(' < ')}`));
         if (s.tall || s.width) await page.setViewportSize({ width: s.width ?? cfg.viewport.width, height: s.tall ?? cfg.viewport.height });
         // the system font scale: the WebView's text zoom = the root size (every size of the app is in rem)
         if (s.font) await page.addInitScript((f) => document.addEventListener('DOMContentLoaded', () => {

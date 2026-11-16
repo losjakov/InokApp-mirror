@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { onShown, settled, watchTransitions } from './settle';
-import { ANDROID_UA, KYIV } from './shared';
+import { ANDROID_UA, KYIV, benignPageError } from './shared';
 
 /**
  * A-27 / D44 (owner, his phone, 01.11.2026 20:58): a bottom tab button ALWAYS opens its own top screen; a screen opened FROM another
@@ -55,7 +55,7 @@ for (const [profile, viewport] of [['phone', { width: 360, height: 780 }], ['tab
   test.use({ userAgent: ANDROID_UA, viewport, locale: 'uk-UA', geolocation: KYIV, permissions: ['geolocation'] });
   // a page error during a transition broke every later tab tap on the emulator (run 41342920913): none is allowed anywhere here
   let errors: string[] = [];
-  test.beforeEach(async ({ page }) => { errors = []; page.on('pageerror', (e) => errors.push(String(e))); await watchTransitions(page); });
+  test.beforeEach(async ({ page }) => { errors = []; page.on('pageerror', (e) => { if (!benignPageError(e)) errors.push(String(e)); }); await watchTransitions(page); });
   test.afterEach(() => { expect(errors, 'page errors').toEqual([]); });
 
   test('a map with a selected house left alive in its tab, then eparchy → its map → Back: tabs still work, no error', async ({ page: p }) => {

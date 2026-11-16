@@ -15,7 +15,7 @@ RC=0
 for spec in 'iphone|iPhone [0-9]+ Pro Max' 'ipad|iPad Pro 13'; do
   tag="${spec%%|*}"; rx="${spec#*|}"
   U="$(pick "$rx")"
-  if [ -z "$U" ]; then echo "::error::no available simulator matches «$rx»"; xcrun simctl list devices available | head -40; RC=1; continue; fi
+  if [ -z "$U" ]; then echo "::error::no available simulator matches «${rx}»"; xcrun simctl list devices available | head -40; RC=1; continue; fi
   NAME="$(xcrun simctl list devices | grep "$U" | sed 's/ (.*//; s/^ *//')"
   xcrun simctl boot "$U" 2>/dev/null || true
   xcrun simctl bootstatus "$U" -b > /dev/null

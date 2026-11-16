@@ -91,7 +91,8 @@ export function MapPage() {
     map.on('click', 'clusters', (e: MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f) return;
-      const src = map.getSource(SRC) as GeoJSONSource;
+      const src = map.getSource(SRC) as GeoJSONSource | undefined;
+      if (!src) return; // a tap during a style swap (see «near me» below)
       src.getClusterExpansionZoom(f.properties.cluster_id as number).then((z) => {
         map.easeTo({ center: (f.geometry as GeoJSON.Point).coordinates as [number, number], zoom: z + 0.5 });
       });
@@ -196,8 +197,11 @@ export function MapPage() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    const me = map.getSource('me') as GeoJSONSource;
-    const ring = map.getSource('radius') as GeoJSONSource;
+    const me = map.getSource('me') as GeoJSONSource | undefined;
+    const ring = map.getSource('radius') as GeoJSONSource | undefined;
+    // cloud_37 (the iOS simulator: R-TypeError «t.setData»): between a style swap (the local style -> the network one, A-117) and our layers'
+    // return the screen's sources do not exist; nothing to draw now - `onLayers` bumps layersGen and this runs again on the new style
+    if (!me || !ring) return;
     if (pos && nearOn) {
       me.setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [pos.lon, pos.lat] } }] });
       ring.setData(radiusPolygon(pos, radius));

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { ANDROID_UA, KYIV, localPictures, picturesSettled } from './shared';
+import { ANDROID_UA, KYIV, localPictures, picturesSettled, benignPageError } from './shared';
 import { settled, watchTransitions } from './settle';
 
 /**
@@ -33,7 +33,7 @@ for (const profile of REVIEW) {
     for (const s of SCREENS) {
       test(s.name, async ({ page }) => {
         const errors: string[] = [];
-        page.on('pageerror', (e) => errors.push(String(e)));
+        page.on('pageerror', (e) => { if (!benignPageError(e)) errors.push(String(e)); });
         await localPictures(page);
         await watchTransitions(page);
         await page.goto(s.path);
