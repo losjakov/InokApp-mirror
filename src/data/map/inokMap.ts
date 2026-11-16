@@ -128,6 +128,14 @@ export interface InokMapOptions {
   onLayers?: (map: MLMap) => void;
 }
 
+/** cloud_37 (the iOS 16.4 simulator: «Object.values requires that input parameter not be null or undefined» inside MapLibre's
+ *  `areTilesLoaded`, from our 8-s tile timer - the whole app fell to its crash screen): the question asked safely. No style (the map is
+ *  between styles / going away) or MapLibre failing to answer = «loaded» - the note is a hint, never worth the app. */
+export function tilesLoaded(map: Pick<MLMap, 'areTilesLoaded'> & { style?: unknown }): boolean {
+  if (!map.style) return true;
+  try { return map.areTilesLoaded(); } catch { return true; }
+}
+
 /** One map of the app: created once per mount, removed with `remove()`. */
 export class InokMap {
   readonly map: MLMap;
@@ -191,7 +199,7 @@ export class InokMap {
         this.tileErrors = 0;
         if (!this.tilesLost) o.onBasemap?.();
         // tiles that never answer (a weak signal) send no error: not all here in BASEMAP_WAIT_MS = the note too
-        this.tileTimer = setTimeout(() => { if (!this.removed && !map.areTilesLoaded()) this.loseTiles(); }, BASEMAP_WAIT_MS);
+        this.tileTimer = setTimeout(() => { if (!this.removed && !tilesLoaded(map)) this.loseTiles(); }, BASEMAP_WAIT_MS);
       }
       void this.addLayers();
     });

@@ -68,7 +68,10 @@ launch() { # (re)start the app with its console captured; wait for «home painte
 guard_crash() {
   local c; c=$(ev "(() => { const e = document.querySelector('[data-testid=crash]'); return e ? ((e.innerText.match(/R-[A-Za-z]+-[0-9a-f]+/) || ['crash'])[0] + ' ' + (e.innerText.split('\\n').pop() || '').slice(0, 120)) : 'ok'; })()")
   [ "$c" = ok ] && return 0
-  shot "$OUT/a3-crash-before-$1__$TAG.png"; a3 "no crash before «$1»" FAIL "$c"; launch
+  shot "$OUT/a3-crash-before-$1__$TAG.png"; a3 "no crash before «${1}»" FAIL "$c"
+  # «Спробувати ще раз» clears the kept crash and reloads (a plain restart shows the last launch's crash again - ios run 2)
+  ev "(document.querySelector('#inok-crash button') || {}).click?.(), 'ok'" > /dev/null; sleep 12
+  [ "$(ev "document.querySelector('[data-testid=crash]') ? 'crash' : 'ok'")" = ok ] || launch
 }
 
 # ---- the trouble spots Android paid for (ref/REF_gotchas*, reports/PHONE_TEST_BACKLOG.md), walked with taps (A-121)
@@ -102,6 +105,8 @@ a3_walk() {
   node "$NAVJS" "do" fitLavras >> "$OUT/nav.txt" 2>&1; sleep 2; node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
   v=$(ev "(() => { const m = window.__inokMap; if (!m) return 'none'; return m.queryRenderedFeatures({ layers: ['points', 'clusters', 'lavras'] }).length + ' marks drawn'; })()")
   local lv; lv=$(check lavras)
+  # why a map may stay empty on a CI simulator (a VM without a GPU): the address, WebGL, the map's own «drawn»
+  v="$v; at $(node "$NAVJS" url); $(ev "(() => { const c = document.createElement('canvas'); const g = c.getContext('webgl2') || c.getContext('webgl'); const m = Array.from(document.querySelectorAll('.maplibregl-map')).map((e) => e.dataset.drawn); return (g ? 'webgl ' + (g.getParameter(g.VERSION) || '?') : 'NO webgl') + ', maps drawn=' + (m.join('/') || 'none'); })()")"
   [ "$lv" = ok ] && [ "${v%% *}" -gt 0 ] 2>/dev/null && a3 "map online" PASS "$v; lavras $lv" || a3 "map online" FAIL "$v; lavras $lv"; shot "$OUT/a3-map__$TAG.png"
   a3 "map offline" NOT-PROVABLE "the simulator shares the Mac's network (no airplane mode) - the browser ring proves the logic (map-offline, map-offline-weak x4 profiles); the owner's iPhone in airplane mode"
   guard_crash spot4
@@ -135,7 +140,9 @@ a3_walk() {
   before=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=photos-used]')||{}).textContent||'none'")
   nav click '[data-testid="photos-clear"]'; sleep 2
   ev "(document.querySelector('ion-alert [data-testid=photos-confirm-do]')||{}).click?.(), 'ok'" > /dev/null; sleep 1
-  v=$(ev "Array.from(document.querySelectorAll('ion-toast')).some((t) => !t.classList.contains('overlay-hidden')) ? 'toast' : 'none'"); shot "$OUT/a3-photos-clear__$TAG.png"; sleep 3
+  for _ in 1 2 3 4 5 6 7 8; do # the files are deleted first, then the toast (~2 s): polled, not read once (ios run 2: «15,9 МБ -> 0 МБ», toast missed)
+    v=$(ev "Array.from(document.querySelectorAll('ion-toast')).some((t) => !t.classList.contains('overlay-hidden')) ? 'toast' : 'none'"); [ "$v" = toast ] && break; sleep 1
+  done; shot "$OUT/a3-photos-clear__$TAG.png"; sleep 3
   after=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=photos-used]')||{}).textContent||'none'")
   [ "$v" = toast ] && a3 "clear saved photos" PASS "$before -> $after, the toast shown" || a3 "clear saved photos" FAIL "$before -> $after, toast: $v"
   guard_crash spot7

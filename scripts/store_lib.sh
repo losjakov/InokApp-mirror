@@ -54,7 +54,8 @@ shot_frame() { # file name path ready steps
 shoot_frames() { # set dir lang
   local set=$1 d=$2 lang=$3 line name path ready steps
   mkdir -p "$d"
-  mapfile -t FR < <(frames "$set")   # read first: adb / simctl inside the loop must not eat the list from stdin
+  # read first (adb / simctl inside the loop must not eat the list from stdin); a read loop, not mapfile - macOS bash 3.2 has none (ios run 2)
+  FR=(); while IFS= read -r line; do FR+=("$line"); done < <(frames "$set")
   for line in "${FR[@]}"; do
     IFS='|' read -r name path ready steps <<< "$line"
     case "$name" in *-dark) set_theme dark;; esac

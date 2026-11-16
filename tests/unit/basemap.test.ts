@@ -53,3 +53,14 @@ describe('A-24 base map: one style transform', () => {
     expect((layer(s, 'boundary_2') as { layout?: { visibility?: string } }).layout?.visibility).not.toBe('none');
   });
 });
+
+/** cloud_37 (the iOS 16.4 simulator crash): the 8-s tile question never throws - no style or MapLibre's TypeError = «loaded» (no note, no crash) */
+describe('tilesLoaded (iOS 16.4: Object.values inside areTilesLoaded)', () => {
+  it('answers MapLibre when it can, «loaded» when it cannot', async () => {
+    const { tilesLoaded } = await import('@/data/map/inokMap');
+    expect(tilesLoaded({ style: {}, areTilesLoaded: () => false })).toBe(false);
+    expect(tilesLoaded({ style: {}, areTilesLoaded: () => true })).toBe(true);
+    expect(tilesLoaded({ style: undefined, areTilesLoaded: () => { throw new Error('never asked'); } })).toBe(true);
+    expect(tilesLoaded({ style: {}, areTilesLoaded: () => { throw new TypeError('Object.values requires that input parameter not be null or undefined'); } })).toBe(true);
+  });
+});

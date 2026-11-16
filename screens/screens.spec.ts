@@ -1504,6 +1504,17 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // A-117 (1), the owner's phone (weak signal): the config already known (the map opened from the tab bar after «Головна»), the style
   // request NEVER answers, every other request fails. 1.0.10: a white map under the note, no house (JOURNAL «A1»); now the local style
   // with the clustered houses AND the lavras, the note after BASEMAP_WAIT_MS, the gestures alive (a zoom-in re-clusters)
+  // cloud_37 (the iOS 16.4 simulator: «Object.values requires…» thrown inside MapLibre's areTilesLoaded by our 8-s tile timer = the crash
+  // screen): tiles that never come + MapLibre failing that question -> no crash, the map stays
+  { name: 'map-tiles-question-throws', path: '/map', only: ['phone-light'], before: async (p) => {
+      await p.route('https://tiles.openfreemap.org/**', (r) => (/\/styles\//.test(r.request().url()) ? r.continue() : undefined)); },
+    ready: async (p) => {
+      await expect.poll(() => p.evaluate(() => !!(window as any).__inokMap), { timeout: 20_000 }).toBe(true);
+      await p.evaluate(() => { (window as any).__inokMap.areTilesLoaded = () => { throw new TypeError('Object.values requires that input parameter not be null or undefined'); }; });
+      await p.waitForTimeout(10_000); // past BASEMAP_WAIT_MS (8 s) after the network style's load
+      await expect(p.getByTestId('crash'), 'no crash screen').toHaveCount(0);
+      await expect(p.getByTestId('map').locator('visible=true')).toBeVisible();
+    } },
   { name: 'map-offline-weak', path: '/home', before: async (p) => {
       await p.route('https://tiles.openfreemap.org/**', (r) => (/\/styles\//.test(r.request().url()) ? undefined : r.abort())); },
     ready: async (p) => {
