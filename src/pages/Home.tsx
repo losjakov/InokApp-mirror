@@ -152,6 +152,7 @@ function ArticleBlock({ sort, title, testId }: { sort: ArticleSort; title: strin
   const [busy, setBusy] = useState(false);
   const [fail, setFail] = useState<NetFailure | null>(null);
   const [tries, setTries] = useState(0);
+  const [fetched, setFetched] = useState(false); // the server answered (or failed) once this run - the store frames wait for it (cloud_39)
   useEffect(() => {
     let on = true;
     void (async () => {
@@ -159,10 +160,10 @@ function ArticleBlock({ sort, title, testId }: { sort: ArticleSort; title: strin
       if (!on) return;
       setRows(kept);
       if (articlesVersion === 0 && tries === 0) return; // the feed's own try first (A-25 #3: no second burst at start)
-      setBusy(true);
+      setBusy(true); setFetched(false); // a new language / a retry: «answered» again only by THIS request
       try { const r = await fetchBlock(db, lang, sort); if (on) { setRows(r); setFail(null); } }
       catch (e) { const f = await netFailure(e); if (on) setFail(f); }
-      finally { if (on) setBusy(false); }
+      finally { if (on) { setBusy(false); setFetched(true); } }
     })();
     return () => { on = false; };
   }, [db, lang, sort, articlesVersion, tries]);
@@ -174,7 +175,9 @@ function ArticleBlock({ sort, title, testId }: { sort: ArticleSort; title: strin
       {!empty ? rows.map((a) => <ArticleRow key={a.id} a={a} onSelect={(id) => navigate(`/articles?id=${id}`)} />)
         : busy ? <ListBox><div className="empty empty--row"><Busy /></div></ListBox>
           : !fail && rows ? <IonItem lines="none"><IonLabel className="home__quiet">{t('articles.empty')}</IonLabel></IonItem> : null}
-      <ListBox><NetNotice failure={empty && !busy ? fail : null} onRetry={() => setTries((n) => n + 1)} testId={`${testId}-net`} /></ListBox>
+      <div role="listitem" data-testid={`${testId}-block`} data-fetched={fetched ? '1' : '0'} data-rows={rows?.length ?? 0}>
+        <NetNotice failure={empty && !busy ? fail : null} onRetry={() => setTries((n) => n + 1)} testId={`${testId}-net`} />
+      </div>
     </>
   );
 }

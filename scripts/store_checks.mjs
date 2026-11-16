@@ -163,15 +163,25 @@ export const ACTIONS = {
   })()`,
   /** cloud_38 NOTE 9: the smallest scroll (0 ... 200 px - cloud_39: the A-128 home's article rows are taller than 64 px) at which no row, heading or tile of the page is cut by the tab bar or the header */
   wholeRows: `(async () => {
-    const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden')).pop();
+    const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    // cloud_39: during a page transition TWO pages are shown - the leaving one measured and scrolled is the wrong page; wait for one (<= 4 s)
+    const shown = () => Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden'));
+    for (let i = 0; i < 20 && shown().length > 1; i++) await wait(200);
+    if (shown().length !== 1) return 'none';
+    const pg = shown()[0];
     const ct = pg?.querySelector('ion-content'); if (!ct) return 'none';
+    // the atoms of a frame: list rows, headings, the calendar, each tile's icon and caption (a tile's own top padding may go under the header)
+    const atomsNow = () => Array.from(pg.querySelectorAll('ion-item, .home__h, ion-list-header, .cal, .tile > ion-icon, .tile > span:not(.tile__dot)')).filter((e) => e.getClientRects().length > 0)
+      .map((e) => { const b = e.getBoundingClientRect(); return [b.top, b.bottom]; }); // exact: rowsWhole reads the same unrounded boxes
+    const key = (a) => JSON.stringify(a.map(([t, b]) => [Math.round(t), Math.round(b)]));
+    // cloud_39 (screens run 2): rows that arrive late (the live list, the A-128 blocks) moved the page AFTER the scroll - the layout must stand
+    // still for 400 ms first (at most 6 s), and the result is read back after the scroll ('none' = the caller asks again)
+    let atoms = atomsNow();
+    for (let i = 0; i < 15; i++) { await wait(400); const a = atomsNow(); if (key(a) === key(atoms)) break; atoms = a; }
     const tb = document.querySelector('ion-tab-bar')?.getBoundingClientRect(); const cr = ct.getBoundingClientRect();
     const top = cr.top, bottom = Math.min(cr.bottom, tb && tb.height > 0 ? tb.top : innerHeight);
-    // the atoms of a frame: list rows, headings, the calendar, each tile's icon and caption (a tile's own top padding may go under the header)
-    const atoms = Array.from(pg.querySelectorAll('ion-item, .home__h, ion-list-header, .cal, .tile > ion-icon, .tile > span:not(.tile__dot)')).filter((e) => e.getClientRects().length > 0)
-      .map((e) => { const b = e.getBoundingClientRect(); return [b.top, b.bottom]; });
-    const cut = (sc) => atoms.some(([t, b]) => (t - sc < top - 1 && b - sc > top + 1) || (t - sc < bottom - 1 && b - sc > bottom + 1));
-    for (let sc = 0; sc <= 200; sc++) if (!cut(sc)) { if (sc) await ct.scrollByPoint(0, sc, 0); await new Promise((ok) => setTimeout(ok, 300)); return 'ok'; }
+    const cut = (at, sc) => at.some(([t, b]) => (t - sc < top - 1 && b - sc > top + 1) || (t - sc < bottom - 1 && b - sc > bottom + 1));
+    for (let sc = 0; sc <= 200; sc++) if (!cut(atoms, sc)) { if (sc) await ct.scrollByPoint(0, sc, 0); await wait(300); return cut(atomsNow(), 0) ? 'none' : 'ok'; }
     return 'none';
   })()`,
   /** tablet frame 06: the selected article's row of the list in view (its centre), «Показати більше» until it is there (at most 15 pages) */

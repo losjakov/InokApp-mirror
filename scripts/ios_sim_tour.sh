@@ -302,8 +302,11 @@ a3_walk() {
     # ios run 1 (cloud_39): «Мова» on an iPad is a white page with 3 rows - 99 % one colour is a sparse page, not a blank one; only 100 % is
     case "$p" in "BLANK (100%"*) ;; BLANK*) p="ok (sparse: ${p#BLANK })";; esac
     local ok8=no; case "$v|$p" in "ok title «"*"» fits "*"|ok"*) ok8=yes;; esac
-    if [ "$name" = map ] && [ "$ok8" = no ]; then   # A-127: the WebGL map screen as a whole is outside the lock
-      a3 "screen $name (A8)" OUT "${v:-no answer from the page}; pixels $p - the WebGL map screen itself (A-127: outside the lock)"; else
+    # A-127: a screen WITH a WebGL map (the map; the eparchy's and «Контакти»'s mini-maps) whose page stopped answering or painting is outside
+    # the lock (ios run 2 of cloud_39: «Контакти» on the iPad 26.5 - no answer, white); its DOM checks count whenever the page answers
+    local gl8=no; case "$name" in map) gl8=yes;; eparchy|contacts) [ -z "$v" ] && gl8=yes;; esac
+    if [ "$gl8" = yes ] && [ "$ok8" = no ]; then
+      a3 "screen $name (A8)" OUT "${v:-no answer from the page}; pixels $p - a WebGL map on this screen (A-127: outside the lock)"; else
     case "$v|$p|$AFTER_GL" in "ok title «"*"» fits "*"|ok"*) a3 "screen $name (A8)" PASS "$v; pixels $p";;
       "ok title «"*"» fits "*"|1") a3 "screen $name (A8)" OUT "$v; pixels $p - the picture after a WebGL map (A-127: outside the lock; the DOM checks passed)";;
       *) a3 "screen $name (A8)" FAIL "$v; pixels $p";; esac

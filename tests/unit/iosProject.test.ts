@@ -133,6 +133,7 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     expect(tourB1).toMatch(/case "\$p" in "BLANK \(100%"\*\) ;; BLANK\*\) p="ok \(sparse/);
     // the WebGL map screen and the eparchy's way back over its map: OUT, never FAIL; the list's way back stays in the lock; toasts recorded in the page
     expect(tourB1).toMatch(/a3 "screen \$name \(A8\)" OUT "\$\{v:-no answer from the page\}/);
+    expect(tourB1).toMatch(/case "\$name" in map\) gl8=yes;; eparchy\|contacts\) \[ -z "\$v" \] && gl8=yes;; esac/);
     expect(tourB1).toMatch(/a3 "back over the map \(header arrow\)" OUT/);
     expect(tourB1).toMatch(/a3 "back \(header arrow\)" FAIL/);
     expect(tourB1).toMatch(/toast_watch\n\s+nav click '\[data-testid="article"\] \[data-testid="star-5"\]'/);
