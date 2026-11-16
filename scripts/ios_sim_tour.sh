@@ -18,7 +18,8 @@ NAVJS="$ROOT/scripts/emu_nav.mjs"
 S="$OUT"; ART=${STORE_ARTICLE:-1832}
 # shellcheck source=scripts/store_lib.sh
 . "$ROOT/scripts/store_lib.sh"
-demo_all() { :; } # the status bar is overridden once per device (simctl status_bar), nothing to re-apply
+# cloud_38 (E5, ios run 2: the App Store frames of iOS 26.5 showed the real clock): the status bar override is re-applied before EVERY frame
+demo_all() { xcrun simctl status_bar "$U" override --time 10:00 --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100 2>>"$OUT/nav.txt" || true; sleep 1; }
 ev() { local o; o=$(node "$NAVJS" eval "$1" 2>>"$OUT/nav.txt") || true; o="${o%%$'\n'*}"; printf '%s\n' "${o#eval: }"; }
 
 # ---- the runtime: newest / oldest iOS the runner has; for «oldest» first try to download iOS 15 (the app's floor), then 16, 17

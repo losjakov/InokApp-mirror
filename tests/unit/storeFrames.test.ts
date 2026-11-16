@@ -14,10 +14,12 @@ const paint = (f: string) => execFileSync('python3', ['-I', PY, '--paint', f], {
 
 describe.skipIf(!hasPil)('store frame paint (scripts/store_png.py)', () => {
   it('refuses the 1.0.11 map frame drawn in part (D16)', () => {
-    expect(paint(FR('d16-map-phone.png'))).toMatch(/^MAP NOT PAINTED \(3\d% of the map box white\)$/);
+    expect(paint(FR('d16-map-phone.png'))).toMatch(/^MAP NOT PAINTED \(2\d% of the box rows/);
   });
   it('passes a whole map and real frames of the set (no false «blank» on a white list or a dark home)', () => {
     expect(paint(FR('good-map-phone.png'))).toBe('ok');
+    // the release emulator's uk phone map of 1.0.12: whole, its land light (>= 250 in every channel) - refused by the first rule (37 % «white»)
+    expect(paint(FR('good-map-light-land-phone.png'))).toBe('ok');
     expect(paint(FR('good-monasteries-phone.png'))).toBe('ok');
     expect(paint(FR('good-home-dark-phone.png'))).toBe('ok');
   });

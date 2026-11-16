@@ -206,6 +206,14 @@ export class InokMap {
     };
     const map = new MLMap(opts);
     this.map = map;
+    // cloud_38 D16 - THE cause of the Play map frames drawn in a ~400 x 300 corner: a map resized while its page is hidden (0 x 0) takes
+    // MapLibre's 400 x 300 fallback, and the emulator's WebView did not resize it back when shown. A hidden map is never resized (MapLibre's
+    // own observer, the screens' observers and the language restyle all come here); shown again, the observers size it to its box.
+    const resize = map.resize.bind(map);
+    map.resize = ((...a: Parameters<MLMap['resize']>) => {
+      const c = map.getContainer();
+      return c.clientWidth > 0 && c.clientHeight > 0 ? resize(...a) : map;
+    }) as MLMap['resize'];
     this.appliedStyle = o.styleUrl;
     this.appliedLang = o.lang;
     this.lang = o.lang;

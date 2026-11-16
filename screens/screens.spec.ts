@@ -1498,6 +1498,24 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
     } },
   // cloud_38 D16: no browser test - Chromium cannot reproduce it (JOURNAL cloud_38 D2); a CDP + GL-loss test raced the slow CI runner twice
   // (E6) and was removed. D16's proof = the Play run's fresh process per size + the pixel refusal (unit storeFrames, the emulator's frames).
+  // cloud_38 D16 - THE mechanism (the release emulator's frames: the base map drawn in a ~400 x 300 corner): a map whose page is HIDDEN
+  // (display none, 0 x 0) must never be resized - MapLibre falls back to 400 x 300 there, and a WebView that does not resize it back
+  // keeps drawing that corner (a language change restyles the hidden map in the Play run). Hidden: the canvas keeps its size; shown: = box.
+  { name: 'map-hidden-no-fallback', path: '/map', only: ['phone-light', 'tablet'], ready: async (p) => {
+      await mapReady(p);
+      const before = await p.evaluate(() => { const c = (window as any).__inokMap.getCanvas(); return [c.width, c.height]; });
+      await p.locator('ion-tab-button[tab=monasteries]').click();
+      await expect.poll(() => p.evaluate(() => (window as any).__inokMap.getContainer().clientWidth)).toBe(0);
+      await p.setViewportSize({ width: p.viewportSize()!.width + 40, height: p.viewportSize()!.height }); // a resize while hidden
+      await p.evaluate(() => (window as any).__inokMap.resize()); // what MapLibre's own observer / the language restyle does
+      await p.waitForTimeout(400);
+      const hidden = await p.evaluate(() => { const c = (window as any).__inokMap.getCanvas(); return [c.width, c.height]; });
+      expect(hidden, `the hidden map kept its canvas (never the 400 x 300 fallback) - before ${before}`).toEqual(before);
+      await p.locator('ion-tab-button[tab=map]').click();
+      await expect.poll(() => p.evaluate(() => { const m = (window as any).__inokMap; const c = m.getCanvas(); const b = m.getContainer();
+        return b.clientWidth > 0 && c.width === Math.round(b.clientWidth * devicePixelRatio) && c.height === Math.round(b.clientHeight * devicePixelRatio); }),
+        { message: 'shown again: the canvas = its box' }).toBe(true);
+    } },
   { name: 'map-near', path: '/map', ready: async (p) => {
       await mapReady(p);
       await p.getByTestId('near-me').click();

@@ -17,7 +17,7 @@ APPSTORE = {'iphone': (1320, 2868, 8), 'ipad': (2064, 2752, 7)}
 LANGS = ('uk', 'ru', 'en')
 MAX_BYTES = 8 * 1024 * 1024
 BLANK_MIN = 0.985  # the share of the body (below the status bar, above the navigation) in ONE colour that makes a frame blank
-MAP_WHITE_MAX = 0.08  # the share of pure white (every channel >= 250) a drawn map may hold (the base map's land is #f8f4f0, never white)
+MAP_WHITE_MAX = 0.08  # the share of the map box's rows or columns that may be ENTIRELY pure white (every channel >= 250)
 
 
 def finish(path, w, h):
@@ -71,11 +71,16 @@ def paint(path):
         with open(side) as fh:
             x, y, bw, bh = [int(float(v)) for v in fh.read().split()[:4]]
         box = im.crop((max(0, x), max(0, y), min(w, x + bw), min(h, y + bh)))
+        # cloud_38 (the release emulator): a light base map (land >= 250 in every channel) is not «white» - D16's mark is a whole BAND of
+        # the box with nothing drawn: full rows (the top) or full columns (the right) of pure white
         box = box.resize((120, max(1, int(120 * box.size[1] / max(1, box.size[0])))))
+        bw, bh = box.size
         q = pixels(box)
-        white = sum(1 for c in q if min(c) >= 250) / len(q)
-        if white > MAP_WHITE_MAX:
-            bad.append('MAP NOT PAINTED (%d%% of the map box white)' % (white * 100))
+        wh = [min(c) >= 250 for c in q]
+        rows = sum(1 for y in range(bh) if sum(wh[y * bw:(y + 1) * bw]) >= 0.98 * bw) / bh
+        cols = sum(1 for x in range(bw) if sum(wh[x::bw]) >= 0.98 * bh) / bw
+        if max(rows, cols) > MAP_WHITE_MAX:
+            bad.append('MAP NOT PAINTED (%d%% of the box rows / %d%% of its columns blank)' % (rows * 100, cols * 100))
     return bad
 
 
