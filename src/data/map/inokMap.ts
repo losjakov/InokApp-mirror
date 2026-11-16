@@ -6,11 +6,26 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import mapWorkerUrl from './mapWorker.ts?worker&url';
 import { MARKER_ICONS } from './markerIcon';
 import { basemapTransform } from './basemap';
+import { mapWorkerSource, noteMapError, tilesLoaded } from './mapRuntime';
+export { tilesLoaded } from './mapRuntime';
 import { COUNT_FONT, LOCAL_STYLE, UKRAINE_BOUNDS, splitLavras } from './geojson';
 import countGlyphs from '@/assets/glyphs/count-0-255.pbf?url';
 import type { Lang } from '@/i18n';
 import { onNetChange, online } from '@/native/network';
 setWorkerUrl(mapWorkerUrl);
+/**
+ * cloud_37 (the iOS simulator, ios run 4: every map stayed empty - the style never loaded, no worker was ever fetched; MapLibre's style waits
+ * for its worker): WKWebView starts no worker from the app's own scheme (`capacitor://`). On a page that is not http(s) the SAME worker code
+ * is read once and started from a `blob:` URL of the page's own origin, BEFORE any map of this module exists (top-level await: the lazy map
+ * chunks wait for it). Android (https://localhost) and the browser keep the file URL. `inok.mapWorker` = 'blob' takes the blob path anywhere
+ * (the screens prove it in Chromium and WebKit). How it went: `window.__inokMapWorker`.
+ */
+if (typeof window !== 'undefined') { // a page (never the unit tests' node, which only imports the pure helpers of this module)
+  const forcedWorker = (() => { try { return localStorage.getItem('inok.mapWorker'); } catch { return null; } })();
+  const worker = await mapWorkerSource(mapWorkerUrl, location.protocol, forcedWorker, (u) => fetch(u).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); }));
+  setWorkerUrl(worker.url);
+  (window as unknown as { __inokMapWorker?: unknown }).__inokMapWorker = { how: worker.how, error: worker.error };
+}
 
 /** A-117 (1): how long the network style may take before the map says «without the base map» (a weak signal never answers) */
 export const BASEMAP_WAIT_MS = 8000;
@@ -126,25 +141,6 @@ export interface InokMapOptions {
   onBasemap?: () => void;
   /** our sources and layers exist (again: a style switch drops them) — the screen adds its own layers here */
   onLayers?: (map: MLMap) => void;
-}
-
-/** cloud_37 (the iOS 16.4 simulator: «Object.values requires that input parameter not be null or undefined» inside MapLibre's
- *  `areTilesLoaded`, from our 8-s tile timer - the whole app fell to its crash screen): the question asked safely. No style (the map is
- *  between styles / going away) or MapLibre failing to answer = «loaded» - the note is a hint, never worth the app. */
-export function tilesLoaded(map: Pick<MLMap, 'areTilesLoaded'> & { style?: unknown }): boolean {
-  if (!map.style) return true;
-  try { return map.areTilesLoaded(); } catch { return true; }
-}
-
-/** cloud_37 (the iOS simulator: a map that never drew, nothing in the console - this handler swallowed MapLibre's errors): the last ten
- *  are kept on `window.__inokMapErrors` and said once each in the console («InokMap:», read from the device log / the CI console). */
-function noteMapError(e: { error?: { message?: string }; sourceId?: string }): void {
-  const msg = `${e.sourceId ? `${e.sourceId}: ` : ''}${e.error?.message ?? 'error'}`.slice(0, 200);
-  const w = window as unknown as { __inokMapErrors?: string[] };
-  const kept = (w.__inokMapErrors ??= []);
-  if (kept.includes(msg)) return;
-  kept.push(msg); if (kept.length > 10) kept.shift();
-  console.warn(`InokMap: ${msg}`);
 }
 
 /** One map of the app: created once per mount, removed with `remove()`. */

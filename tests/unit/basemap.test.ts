@@ -57,10 +57,23 @@ describe('A-24 base map: one style transform', () => {
 /** cloud_37 (the iOS 16.4 simulator crash): the 8-s tile question never throws - no style or MapLibre's TypeError = «loaded» (no note, no crash) */
 describe('tilesLoaded (iOS 16.4: Object.values inside areTilesLoaded)', () => {
   it('answers MapLibre when it can, «loaded» when it cannot', async () => {
-    const { tilesLoaded } = await import('@/data/map/inokMap');
+    const { tilesLoaded } = await import('@/data/map/mapRuntime');
     expect(tilesLoaded({ style: {}, areTilesLoaded: () => false })).toBe(false);
     expect(tilesLoaded({ style: {}, areTilesLoaded: () => true })).toBe(true);
     expect(tilesLoaded({ style: undefined, areTilesLoaded: () => { throw new Error('never asked'); } })).toBe(true);
     expect(tilesLoaded({ style: {}, areTilesLoaded: () => { throw new TypeError('Object.values requires that input parameter not be null or undefined'); } })).toBe(true);
+  });
+});
+
+/** cloud_37 (ios run 4: no map ever drew on iOS - no worker from capacitor://): the worker's source by the page's scheme */
+describe('mapWorkerSource', () => {
+  it('http(s) = the file; capacitor:// (iOS) or forced = a blob of the same code; a failed read = the file, said', async () => {
+    const { mapWorkerSource } = await import('@/data/map/mapRuntime');
+    const load = async (u: string) => `code of ${u}`; const toUrl = (c: string) => `blob:${c}`;
+    expect(await mapWorkerSource('/assets/w.js', 'https:', null, load, toUrl)).toEqual({ how: 'file', url: '/assets/w.js' });
+    expect(await mapWorkerSource('/assets/w.js', 'http:', null, load, toUrl)).toEqual({ how: 'file', url: '/assets/w.js' });
+    expect(await mapWorkerSource('/assets/w.js', 'capacitor:', null, load, toUrl)).toEqual({ how: 'blob', url: 'blob:code of /assets/w.js' });
+    expect(await mapWorkerSource('/assets/w.js', 'https:', 'blob', load, toUrl)).toEqual({ how: 'blob', url: 'blob:code of /assets/w.js' });
+    expect(await mapWorkerSource('/assets/w.js', 'capacitor:', null, async () => { throw new Error('HTTP 404'); }, toUrl)).toEqual({ how: 'file', url: '/assets/w.js', error: 'Error: HTTP 404' });
   });
 });

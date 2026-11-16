@@ -108,7 +108,7 @@ a3_walk() {
   # why a map may stay empty on a CI simulator (a VM without a GPU): the address, WebGL, the map's own «drawn»
   v="$v; at $(node "$NAVJS" url); $(ev "(() => { const c = document.createElement('canvas'); const g = c.getContext('webgl2') || c.getContext('webgl'); const m = Array.from(document.querySelectorAll('.maplibregl-map')).map((e) => e.dataset.drawn); const mp = window.__inokMap; const w = performance.getEntriesByType('resource').map((x) => x.name).filter((n) => /mapWorker|worker/i.test(n));
       return (g ? 'webgl ' + (g.getParameter(g.VERSION) || '?') : 'NO webgl') + ', maps drawn=' + (m.join('/') || 'none') + (mp ? ', style loaded ' + mp.isStyleLoaded() + ', loaded ' + mp.loaded()
-        + ', houses source ' + (mp.getSource('monasteries') ? mp.isSourceLoaded('monasteries') : 'none') : '') + ', worker fetched ' + (w.join(' ').slice(-80) || 'no') + ', map errors [' + (window.__inokMapErrors || []).join(' | ') + ']'; })()")"
+        + ', houses source ' + (mp.getSource('monasteries') ? mp.isSourceLoaded('monasteries') : 'none') : '') + ', worker fetched ' + (w.join(' ').slice(-80) || 'no') + ', worker ' + JSON.stringify(window.__inokMapWorker || null) + ', map errors [' + (window.__inokMapErrors || []).join(' | ') + ']'; })()")"
   [ "$lv" = ok ] && [ "${v%% *}" -gt 0 ] 2>/dev/null && a3 "map online" PASS "$v; lavras $lv" || a3 "map online" FAIL "$v; lavras $lv"; shot "$OUT/a3-map__$TAG.png"
   a3 "map offline" NOT-PROVABLE "the simulator shares the Mac's network (no airplane mode) - the browser ring proves the logic (map-offline, map-offline-weak x4 profiles); the owner's iPhone in airplane mode"
   guard_crash spot4
@@ -142,8 +142,8 @@ a3_walk() {
   before=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=photos-used]')||{}).textContent||'none'")
   nav click '[data-testid="photos-clear"]'; sleep 2
   ev "(document.querySelector('ion-alert [data-testid=photos-confirm-do]')||{}).click?.(), 'ok'" > /dev/null; sleep 1
-  for _ in 1 2 3 4 5 6 7 8; do # the files are deleted first, then the toast (~2 s): polled, not read once (ios run 2: «15,9 МБ -> 0 МБ», toast missed)
-    v=$(ev "Array.from(document.querySelectorAll('ion-toast')).some((t) => !t.classList.contains('overlay-hidden')) ? 'toast' : 'none'"); [ "$v" = toast ] && break; sleep 1
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do # the files are deleted first, then the toast (~2 s): polled, not read once (ios run 2: «15,9 МБ -> 0 МБ», toast missed)
+    v=$(ev "document.querySelector('ion-toast[data-testid=photos-cleared]') ? 'toast' : 'none'"); [ "$v" = toast ] && break; sleep 1
   done; shot "$OUT/a3-photos-clear__$TAG.png"; sleep 3
   after=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=photos-used]')||{}).textContent||'none'")
   [ "$v" = toast ] && a3 "clear saved photos" PASS "$before -> $after, the toast shown" || a3 "clear saved photos" FAIL "$before -> $after, toast: $v"

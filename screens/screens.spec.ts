@@ -1506,6 +1506,14 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // with the clustered houses AND the lavras, the note after BASEMAP_WAIT_MS, the gestures alive (a zoom-in re-clusters)
   // cloud_37 (the iOS 16.4 simulator: «Object.values requires…» thrown inside MapLibre's areTilesLoaded by our 8-s tile timer = the crash
   // screen): tiles that never come + MapLibre failing that question -> no crash, the map stays
+  // cloud_37 (ios run 4: on iOS no map ever drew - WKWebView starts no worker from capacitor://; the style waits for its worker): MapLibre's
+  // worker from a blob: URL of the same code (iOS's path, forced here) draws the map with every house
+  { name: 'map-worker-blob', path: '/map', only: ['phone-light', 'tablet'], before: async (p: Page) => { await p.addInitScript(() => { localStorage.setItem('inok.mapWorker', 'blob'); }); },
+    ready: async (p) => {
+      await mapReady(p);
+      await housesDrawn(p);
+      expect(await p.evaluate(() => (window as any).__inokMapWorker)).toEqual({ how: 'blob' });
+    } },
   { name: 'map-tiles-question-throws', path: '/map', only: ['phone-light'], before: async (p) => {
       await p.route('https://tiles.openfreemap.org/**', (r) => (/\/styles\//.test(r.request().url()) ? r.continue() : undefined)); },
     ready: async (p) => {
