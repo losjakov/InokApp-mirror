@@ -1459,10 +1459,10 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // style swapped for the network one drops every source until our layers return) - no crash; the dot comes back with the layers
   { name: 'map-near-style-swap', path: '/map', only: ['phone-light'], ready: async (p) => {
       await mapReady(p);
-      // the window made as long as on a slow phone: the marker pictures of the next style are held undecoded until released, so our sources
+      // the window made as long as on a slow phone: the marker pictures of the next style are held unloaded until released, so our sources
       // (dropped by the style swap) are not back yet when «near me» answers
-      await p.evaluate(() => { const w = window as any; const orig = HTMLImageElement.prototype.decode; w.__held = []; w.__decode = orig;
-        HTMLImageElement.prototype.decode = function () { return new Promise<void>((ok, ko) => w.__held.push(() => orig.call(this).then(ok, ko))); }; });
+      await p.evaluate(() => { const w = window as any; const d = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!; w.__held = []; w.__src = d;
+        Object.defineProperty(HTMLImageElement.prototype, 'src', { configurable: true, get() { return d.get!.call(this); }, set(v) { w.__held.push(() => d.set!.call(this, v)); } }); });
       await p.evaluate(() => { const m = (window as any).__inokMap; const st = m.getStyle(); const ours = new Set(['monasteries', 'lavras', 'place', 'me', 'radius']);
         // the next style as the network sends it: the base map only - none of our sources / layers (getStyle() would carry them over)
         m.setStyle({ ...st, sources: Object.fromEntries(Object.entries(st.sources).filter(([k]) => !ours.has(k))), layers: st.layers.filter((l: any) => !ours.has(l.source)) }, { diff: false }); });
@@ -1472,7 +1472,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(onShown(p, 'near-list')).toBeVisible({ timeout: 15_000 });
       await p.waitForTimeout(500);
       await expect(p.getByTestId('crash'), 'no crash screen (R-TypeError «t.setData» on the iOS simulator)').toHaveCount(0);
-      await p.evaluate(() => { const w = window as any; HTMLImageElement.prototype.decode = w.__decode; for (const f of w.__held.splice(0)) f(); }); // the pictures come
+      await p.evaluate(() => { const w = window as any; Object.defineProperty(HTMLImageElement.prototype, 'src', w.__src); for (const f of w.__held.splice(0)) f(); }); // the pictures come
       await expect.poll(() => p.evaluate(() => (window as any).__inokMap.getSource('me')?.serialize().data?.features?.length ?? -1), { timeout: 15_000 }).toBe(1);
     } },
   { name: 'map-near', path: '/map', ready: async (p) => {
@@ -1508,6 +1508,21 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // screen): tiles that never come + MapLibre failing that question -> no crash, the map stays
   // cloud_37 (ios run 4: on iOS no map ever drew - WKWebView starts no worker from capacitor://; the style waits for its worker): MapLibre's
   // worker from a blob: URL of the same code (iOS's path, forced here) draws the map with every house
+  // cloud_37 (the iOS 16.4 simulator: an icon that never became a picture threw from drawImage = the crash screen): one site icon that does not
+  // draw - the map still draws every other house, no crash screen; the fault is kept with the map's errors
+  { name: 'map-icon-fails', path: '/map', only: ['phone-light'], before: async (p: Page) => { await p.addInitScript(() => {
+      // Safari 16.4's answer to drawing that SVG: the FIRST icon drawn throws InvalidStateError (the rest draw)
+      const orig = CanvasRenderingContext2D.prototype.drawImage; let thrown = false;
+      CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, ...a: unknown[]) {
+        if (!thrown && a[0] instanceof HTMLImageElement) { thrown = true; throw new DOMException('The object is in an invalid state.', 'InvalidStateError'); }
+        return (orig as (...x: unknown[]) => void).apply(this, a);
+      } as typeof orig; }); },
+    ready: async (p) => {
+      await mapReady(p);
+      await expect.poll(() => p.evaluate(() => (window as any).__inokMap.queryRenderedFeatures({ layers: ['points', 'clusters', 'lavras'] }).length), { timeout: 15_000 }).toBeGreaterThan(0);
+      await expect(p.getByTestId('crash')).toHaveCount(0);
+      expect(await p.evaluate(() => ((window as any).__inokMapErrors || []).join(' '))).toMatch(/invalid state/);
+    } },
   { name: 'map-worker-blob', path: '/map', only: ['phone-light', 'tablet'], before: async (p: Page) => { await p.addInitScript(() => { localStorage.setItem('inok.mapWorker', 'blob'); }); },
     ready: async (p) => {
       await mapReady(p);

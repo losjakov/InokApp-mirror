@@ -75,14 +75,21 @@ async function addMarkerImages(map: MLMap): Promise<void> {
     if (map.hasImage(name)) return;
     const url = Object.entries(urls).find(([k]) => k.endsWith(`/${name}.svg`))?.[1];
     if (!url) return;
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    const h = Math.round((ICON_PX * img.naturalHeight) / img.naturalWidth);
-    const c = document.createElement('canvas');
-    c.width = ICON_PX * 2; c.height = h * 2;
-    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
-    if (!map.hasImage(name)) map.addImage(name, c.getContext('2d')!.getImageData(0, 0, c.width, c.height), { pixelRatio: 2 });
+    // cloud_37 (the iOS 16.4 simulator: «The object is in an invalid state» from drawImage = the crash screen): the picture is awaited by its
+    // `load` event (Safari may settle decode() of an SVG before it has a size), a picture without a size is skipped, and one icon that
+    // fails never takes the map (or the app) with it - the house's other marks still draw
+    try {
+      const img = new Image();
+      await new Promise<void>((ok, ko) => { img.onload = () => ok(); img.onerror = () => ko(new Error(`icon ${name} did not load`)); img.src = url; });
+      if (!img.naturalWidth || !img.naturalHeight) throw new Error(`icon ${name} has no size`);
+      const h = Math.round((ICON_PX * img.naturalHeight) / img.naturalWidth);
+      const c = document.createElement('canvas');
+      c.width = ICON_PX * 2; c.height = h * 2;
+      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+      if (!map.hasImage(name)) map.addImage(name, c.getContext('2d')!.getImageData(0, 0, c.width, c.height), { pixelRatio: 2 });
+    } catch (e) {
+      noteMapError({ error: { message: String(e) } });
+    }
   }));
 }
 
@@ -202,6 +209,7 @@ export class InokMap {
       if (e.sourceId && map.getSource(e.sourceId)?.type !== 'geojson') { this.tileErrors++; this.loseTiles(); }
     });
     map.on('style.load', () => {
+      console.info(`InokMap: style.load ${this.basemap ? 'network' : 'local'}`); // cloud_37: the map's life in the device log (iOS)
       clearTimeout(this.tileTimer);
       if (this.basemap) {
         this.tileErrors = 0;
