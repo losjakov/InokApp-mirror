@@ -35,7 +35,8 @@ ion-back-button + .toolbar__logo { margin-inline-start: 0; }
 /* the title wraps (owner 31.10: no ellipses) - Ionic's ion-title truncates inside its shadow DOM, so a plain heading */
 .toolbar__title--fit { white-space: nowrap; overflow: hidden; flex: 1 1 auto; min-width: 0; } /* A-97: one line or nothing */
 .toolbar__title--fit[data-dropped="1"] { color: transparent; } /* dropped: not drawn, still the heading TalkBack reads */
-.toolbar__title { margin: 0; padding: 6px 16px 6px 12px; font-size: min(var(--inok-type-heading), calc(20px * var(--inok-chrome-max))); font-weight: 500; line-height: 1.2; color: inherit; overflow-wrap: break-word; }
+.toolbar__title { margin: 0; padding: 6px 16px 6px 12px; font-size: min(var(--inok-type-heading), calc(20px * var(--inok-chrome-max))); font-weight: 500; line-height: 1.2; color: inherit; overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.toolbar__title[data-long="1"] { overflow-wrap: anywhere; } /* NOTE 4: only a word longer than the room at 14 px breaks (never seen on a page title) */
 /* `.item ion-label > h2` outranks Ionic's own `.sc-ion-label-md-s > h2` */
 .item ion-label > h2, .inok-title { font-size: var(--inok-type-title); font-weight: 500; line-height: 1.3; }
 .item ion-label > p, ion-note, .inok-secondary { font-size: var(--inok-type-secondary); line-height: var(--inok-line); }
@@ -73,11 +74,16 @@ ion-button, ion-chip { text-transform: none; letter-spacing: normal; } /* D10 / 
 /* NOTE 5 (REVIEW cloud_36, the iPad 13"): ONE 960-px column for the whole of «Головна» - tiles, the calendar and the lists end on the same edge */
 @media (min-width: 600px) { .tiles { max-width: 960px; margin: 0 auto; } .home__list.home__list { max-width: 960px; margin: 0 auto; } /* doubled: Ionic's runtime `.list-md { margin: 0 }` came later and won (the list sat at 0-960) */
   .home .streams__cal { max-width: calc(960px - 24px); margin-inline: auto; }
+  .home .social { max-width: 960px; margin-inline: auto; } /* A-128: the social block in the same 960 column */
   /* NOTE 8 (REVIEW cloud_37, tablet10 dark): the 960 column's lists drew the item tone (#1e1e1e) between two bands of the page tone
      (#121212) - not meant: on a wide screen the lists take the page's tone, ONE dark surface (the tiles and the calendar stay cards) */
   .ion-palette-dark .home__list.home__list { --ion-item-background: var(--ion-background-color); background: var(--ion-background-color); } }
 .home__h { --color: var(--ion-color-primary); font-size: var(--inok-type-heading); font-weight: 600; min-height: 40px; padding-top: 8px; align-items: baseline; }
 .home__h ion-label { margin: 0; flex: 1 1 auto; }
+/* A-128: «У соціальних мережах» on «Головна» = a section of the page: its head in the home heads' colour and inset */
+.home .social .inok-heading { color: var(--ion-color-primary); margin-top: 8px; }
+.home .social { background: var(--ion-item-background, var(--ion-background-color)); }
+.empty--row { padding: 12px 24px; }
 .home__all { font-size: var(--inok-type-secondary); font-weight: 500; color: var(--ion-color-primary); text-decoration: none; padding-inline-end: 16px; }
 .home__quiet { color: var(--ion-color-medium); font-size: var(--inok-type-secondary) !important; white-space: normal !important; }
 .home__fresh { --min-height: 40px; }
@@ -496,7 +502,8 @@ ion-alert.soft-ask--plain .alert-button-group.alert-button-group { padding-top: 
 .views { display: inline; white-space: nowrap; color: var(--inok-eye); }
 .views ion-icon { font-size: 1.1em; vertical-align: -0.2em; margin-inline-end: 0.25em; }
 /* F3 (REVIEW cloud_25): the banner's action in THE token (variables.css); «×» keeps Ionic's own cancel colour (11:1) */
-ion-toast.app-banner { --button-color: var(--inok-banner-action); }
+/* NOTE 3 (REVIEW cloud_38): EVERY snackbar's action (the banner's and «Повторити» of A-125) = ONE token, >= 4.5 : 1 on the snackbar in both themes */
+ion-toast.app-toast { --button-color: var(--inok-banner-action); }
 .streams__add { padding: 8px 16px 0; }
 .streams__add ion-button { margin: 0; }
 /* A-85 (2): THE smart «up» / «down» arrows (ScrollArrows) - in the page's `ion-content` fixed layer, bottom-right (tablet: the detail pane's

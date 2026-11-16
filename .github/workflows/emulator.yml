@@ -99,10 +99,14 @@ jobs:
           target: ${{ matrix.target }}
           emulator-boot-timeout: 1200
           disk-size: 2048M
+          # cloud_39 (B2): API 35 ran with the action's default RAM - the emulator raised it itself to 2560 MB (run 43906475640: «Increasing RAM
+          # size to 2560MB», heap 576m, 2 cores) and lost adb («device offline») twice; 4096 MB for 35+ (the runner has 16 GB), the rest unchanged
+          ram-size: ${{ matrix.api-level >= 35 && '4096M' || '' }}
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           # cloud_29 (A-66): a Play Store image (no root) = the Play Integrity token through our plugin on the qa build (scripts/emu_integrity.sh)
-          script: bash scripts/${{ matrix.target == 'google_apis_playstore' && 'emu_integrity.sh' || 'emulator_smoke.sh' }} ${{ matrix.api-level }}-${{ matrix.target }}${{ matrix.tag }}
+          # cloud_39 (B2): a smoke that lost the DEVICE runs once more after an adb restart (scripts/emu_once_more.sh); a CODE failure never
+          script: bash scripts/emu_once_more.sh screens/emu-${{ matrix.api-level }}-${{ matrix.target }}${{ matrix.tag }} bash scripts/${{ matrix.target == 'google_apis_playstore' && 'emu_integrity.sh' || 'emulator_smoke.sh' }} ${{ matrix.api-level }}-${{ matrix.target }}${{ matrix.tag }}
       - name: Verdict (job summary; its FIRST line = OK / INFRA re-run / CODE fix / UNCLASSIFIED, A-87)
         if: always()
         run: |

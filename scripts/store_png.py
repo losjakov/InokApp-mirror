@@ -6,14 +6,14 @@ bottom, emu_store.sh) is cut back to the set's exact size from the top; the alph
 alpha). Then every rule is checked and printed per file: exact 9:16 (phone) or 16:9 (tablets), short side >= 1080, RGB without alpha,
 <= 8 MB; cloud_38 (E11, D16): never a BLANK frame (one colour over the screen's body: a white WebView paint) and, for a map frame with
 its box written beside it (`<file>.png.maprect` = "x y w h" in the PNG's pixels, scripts/store_lib.sh), never a map canvas painted in part
-(white over more than MAP_WHITE_MAX of the box); and the counts 8 / 7 / 7 in each of uk / ru / en (--appstore <dir>: iphone 1320 x 2868 x 8, ipad 2064 x 2752 x 7). The last line says PASS or FAIL. Needs Pillow (apt python3-pil).
+(white over more than MAP_WHITE_MAX of the box); and the counts 8 / 7 / 7 in each of uk / ru / en (--appstore <dir>: iphone 1320 x 2868 x 6, ipad 2064 x 2752 x 5 - A-127, no 04 / 05). The last line says PASS or FAIL. Needs Pillow (apt python3-pil).
 """
 import os
 import sys
 
 # A-122 (1.0.11): phone 8, each tablet 7 (scripts/store_frames.txt); --appstore = the App Store set of the iOS simulator (ios_sim_tour.sh)
 SETS = {'phone': (1080, 1920, 8), 'tablet7': (1920, 1080, 7), 'tablet10': (1920, 1080, 7)}
-APPSTORE = {'iphone': (1320, 2868, 8), 'ipad': (2064, 2752, 7)}
+APPSTORE = {'iphone': (1320, 2868, 6), 'ipad': (2064, 2752, 5)}  # A-127: without 04-eparchy / 05-map (a WebGL map: no GPU on the runner)
 LANGS = ('uk', 'ru', 'en')
 MAX_BYTES = 8 * 1024 * 1024
 BLANK_MIN = 0.985  # the share of the body (below the status bar, above the navigation) in ONE colour that makes a frame blank

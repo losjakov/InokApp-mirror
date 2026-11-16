@@ -83,15 +83,17 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     expect(wf).toMatch(/rm -f "\$K"/);
     const setup = read('.github/actions/ios-setup/action.yml'); // THE preparation of every iOS job
     expect(setup).toMatch(/scripts\/app_version\.py package\.json/);
-    expect(wf.match(/uses: \.\/\.github\/actions\/ios-setup/g)).toHaveLength(3);
+    expect(wf.match(/uses: \.\/\.github\/actions\/ios-setup/g)).toHaveLength(4); // simulator ring, App Store set, archive, testflight
     expect(wf).toMatch(/MARKETING_VERSION="\$V" CURRENT_PROJECT_VERSION="\$C"/);
   });
   it('cloud_37: the remote hand (VITE_SIM_DRIVER) and localhost networking live in the simulator job ONLY - never in the archive / TestFlight', () => {
     const jobs = wf.slice(wf.indexOf('\njobs:'));
     const job = (n: string) => { const i = jobs.indexOf(`  ${n}:\n`); const j = jobs.slice(i + 3).search(/\n {2}[a-z-]+:\n/); return jobs.slice(i, j < 0 ? undefined : i + 3 + j); };
+    const simRun = read('.github/actions/ios-sim-run/action.yml'); // cloud_39: THE simulator work of the ring and of the App Store set
     for (const k of ['VITE_SIM_DRIVER=1', 'NSAllowsLocalNetworking']) {
-      expect(job('simulator'), k).toContain(k);
-      for (const n of ['archive', 'testflight']) expect(job(n), `${n}: ${k}`).not.toContain(k);
+      expect(simRun, k).toContain(k);
+      for (const n of ['simulator', 'appstore']) expect(job(n), n).toContain('uses: ./.github/actions/ios-sim-run');
+      for (const n of ['archive', 'testflight']) { expect(job(n), `${n}: ${k}`).not.toContain(k); expect(job(n)).not.toContain('ios-sim-run'); }
       expect(read('.github/actions/ios-setup/action.yml'), k).not.toContain(k);
     }
     expect(read('ios/App/App/Info.plist')).not.toContain('NSAllowsLocalNetworking');
@@ -106,12 +108,23 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     expect(upload.startsWith("${{ needs.simulator.result == 'success' && (")).toBe(true); // the ring first, then «release snapshot / manual upload»
     expect(tf).toMatch(/\[ "\$UPLOAD" = true \]/); // the upload command itself is behind the variable
     expect(tf.match(/export_to upload/g)).toHaveLength(1);
-    // the ring: one device and one task per job (each within its limit), walks on the oldest and the newest iOS, the App Store set
+    // the ring (A-127): one device per job, walks on the oldest and the newest iOS - and NOTHING else: the App Store set is its own job,
+    // OUTSIDE the lock (its result goes to the REPORT), never in `needs`
     const sim = job('simulator');
-    for (const row of ['{ runtime: oldest, device: iphone, task: walk }', '{ runtime: oldest, device: ipad, task: walk }', '{ runtime: newest, device: iphone, task: walk }',
-      '{ runtime: newest, device: ipad, task: walk }', '{ runtime: newest, device: iphone, task: appstore }', '{ runtime: newest, device: ipad, task: appstore }']) expect(sim).toContain(row);
-    expect(sim).toMatch(/timeout-minutes: 90/);
-    expect(sim).not.toMatch(/continue-on-error/); // a red spot is never hidden
+    const rows = [...sim.matchAll(/- \{ runtime: (\w+), device: (\w+), task: (\w+) \}/g)].map((m) => m.slice(1).join(' '));
+    expect(rows).toEqual(['oldest iphone walk', 'oldest ipad walk', 'newest iphone walk', 'newest ipad walk']);
+    const store = job('appstore');
+    expect([...store.matchAll(/- \{ runtime: (\w+), device: (\w+), task: (\w+) \}/g)].map((m) => m.slice(1).join(' '))).toEqual(['newest iphone appstore', 'newest ipad appstore']);
+    expect(tf).not.toMatch(/appstore/);
+    for (const j of [sim, store]) { expect(j).toMatch(/timeout-minutes: 90/); expect(j).toMatch(/uses: \.\/\.github\/actions\/ios-sim-run/); expect(j).not.toMatch(/continue-on-error/); } // a red spot is never hidden
+    // A-127: the WebGL map (and a frame's PICTURE after it) is outside the lock - written OUT, never FAIL; the DOM checks of those screens stay in
+    const tourB1 = read('scripts/ios_sim_tour.sh');
+    expect(tourB1).toMatch(/a3 "map online" PASS "[^"]*" \|\| a3 "map online" OUT /);
+    expect(tourB1).not.toMatch(/a3 "map online" FAIL/);
+    expect(tourB1).toMatch(/AFTER_GL=1/);
+    // A-127: no App Attest on a simulator - the ring checks the HONEST line (cast.ios) there; the live cast = the owner's iPhone
+    expect(tourB1).toMatch(/a3 "rating cast \(A1\)" PASS "[^"]*honest line/);
+    expect(tourB1).toMatch(/a3 "App Attest cast \(A1\)" NOT-PROVABLE/);
     // the tour: ANY FAIL spot = exit 1; the App Store task only whole and clean
     const tour = read('scripts/ios_sim_tour.sh');
     expect(tour).toMatch(/if grep -q '\| FAIL \|' "\$A3" 2>\/dev\/null; then [^\n]*RC=1; fi/);

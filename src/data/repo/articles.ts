@@ -1,9 +1,9 @@
 import type { Db } from '@/data/db/types';
 import type { Article, ArticlesPage, Cover, RatingAnswer, VideoLink } from '@/data/api/types';
 import { videoUrl } from '@/data/live/streams';
-import { castBody } from './cast';
+import { sendCast } from './cast';
 import { ApiError } from '@/data/api/client';
-import { ARTICLE_KINDS, dataSource, type ArticleKind } from '@/data/source';
+import { ARTICLE_KINDS, dataSource, type ArticleFilter, type ArticleKind } from '@/data/source';
 import { sortArticles, type ArticleSort } from './articleOrder';
 import { cacheGet, cacheSet } from './cache';
 import { getMeta, setMeta } from '@/data/db/schema';
@@ -66,7 +66,12 @@ export async function listArticles(db: Db, lang: Lang, kind?: string | null, lim
 export async function getArticle(db: Db, id: number, lang: Lang): Promise<Article | null> {
   const r = await db.query<{ json: string }>('SELECT json FROM article WHERE id = ? ORDER BY lang = ? DESC LIMIT 1', [id, lang]);
   if (r[0]) return JSON.parse(r[0].json) as Article;
-  return older.get(id) ?? (await cacheGet<Article[]>(db, newestKey(lang)))?.value.find((a) => a.id === id) ?? null;
+  if (older.has(id)) return older.get(id)!;
+  for (const sort of BLOCK_SORTS) { // A-128: an article of a home block opens offline though the 30-item feed cache may not hold it
+    const a = (await cacheGet<Article[]>(db, blockKey(sort, lang)))?.value.find((x) => x.id === id);
+    if (a) return a;
+  }
+  return null;
 }
 
 /**
@@ -87,28 +92,44 @@ export async function fetchArticle(db: Db, id: number, lang: Lang): Promise<Arti
 }
 
 /**
- * A-25 #3 «Нове на сайті»: the newest publication, the newest video, the newest news — one each, in that order (R-19: the
- * section list of each kind, 1 item). Kept in the cache table (the 30-item feed cache may hold no video at all), so the home and
- * the article open offline; offline / a failed kind = the last answer, then the feed cache of that kind.
+ * A-128 (owner 16.11.2026) - the home's two blocks of the site's materials, the SAME four places each, in a fixed order: the 2 newest
+ * «Статті», the newest «Відео», the newest «Новина» (`BLOCK_SLOTS`), each kind asked as ITS section list in the block's order (R-19 + R-44 /
+ * R-48: `kind` + `sort` + `limit` - the order code is the «Публікації» screen's own, `ArticleSort`). «Нове на сайті» = `created` (by the date of
+ * placing on the site), «Популярне за тиждень» = `views_week`. A kind with nothing = no row. Each block's last answer is kept per language
+ * (so it shows and its articles open offline); a kind that failed keeps its kept rows.
  */
-const newestKey = (lang: Lang) => `newest_by_kind:${lang}`;
-export async function cachedNewestByKind(db: Db, lang: Lang): Promise<Article[]> {
-  const kept = (await cacheGet<Article[]>(db, newestKey(lang)))?.value ?? [];
-  const out: Article[] = [];
-  for (const k of ARTICLE_KINDS) {
-    const a = kept.find((x) => x.kind === k) ?? (await listArticles(db, lang, k, 1))[0];
-    if (a) out.push(a);
-  }
-  return out;
+export type HomeBlockSort = Extract<ArticleSort, 'created' | 'views_week'>;
+export const BLOCK_SLOTS: { kind: ArticleKind; n: number }[] = [{ kind: 'publication', n: 2 }, { kind: 'video', n: 1 }, { kind: 'news', n: 1 }];
+const blockKey = (sort: ArticleSort, lang: Lang) => `home_block:${sort}:${lang}`;
+const BLOCK_SORTS: ArticleSort[] = ['created', 'views_week', 'published'];
+
+/** The block's rows in the slots' order from the rows found per kind (at most n of each; a kind without rows = no row). */
+export const blockRows = (byKind: Partial<Record<ArticleKind, Article[]>>): Article[] =>
+  BLOCK_SLOTS.flatMap(({ kind, n }) => (byKind[kind] ?? []).filter((a) => a.kind === kind).slice(0, n));
+const byKindOf = (items: Article[]): Partial<Record<ArticleKind, Article[]>> =>
+  Object.fromEntries(ARTICLE_KINDS.map((k) => [k, items.filter((a) => a.kind === k)]));
+
+/** The kept block (null = never received). `created` without a kept answer: the saved feed in that order (as «Нове на сайті» always did). */
+export async function cachedBlock(db: Db, lang: Lang, sort: ArticleSort): Promise<Article[] | null> {
+  const kept = (await cacheGet<Article[]>(db, blockKey(sort, lang)))?.value;
+  if (kept) return kept;
+  if (sort === 'views_week') return null; // a week's views are never guessed from saved copies (A-128: the last list received, or the line)
+  const local = await listArticles(db, lang);
+  return local.length ? blockRows(byKindOf(sortArticles(local, sort))) : null;
 }
-export async function fetchNewestByKind(db: Db, lang: Lang): Promise<Article[]> {
-  const pages = await Promise.allSettled(ARTICLE_KINDS.map((kind) => dataSource().articles(lang, null, { kind, limit: 1 })));
-  const got = pages.flatMap((p) => (p.status === 'fulfilled' ? parseArticles(p.value).items.slice(0, 1) : []));
-  if (got.length) {
-    const kept = (await cacheGet<Article[]>(db, newestKey(lang)))?.value ?? [];
-    await cacheSet(db, newestKey(lang), ARTICLE_KINDS.map((k) => got.find((a) => a.kind === k) ?? kept.find((a) => a.kind === k)).filter(Boolean));
-  }
-  return cachedNewestByKind(db, lang);
+
+/** The block from the server (3 requests: one per kind). Every kind failed = throws the first failure (the caller says why);
+ *  a kind failed = its kept rows stay. */
+export async function fetchBlock(db: Db, lang: Lang, sort: ArticleSort): Promise<Article[]> {
+  const pages = await Promise.allSettled(BLOCK_SLOTS.map(({ kind, n }) => queryPage(db, lang, { kind, sort, limit: n }, null)));
+  if (pages.every((p) => p.status === 'rejected')) throw (pages[0] as PromiseRejectedResult).reason;
+  const kept = byKindOf((await cacheGet<Article[]>(db, blockKey(sort, lang)))?.value ?? []);
+  const rows = blockRows(Object.fromEntries(BLOCK_SLOTS.map(({ kind }, i) => {
+    const p = pages[i];
+    return [kind, p.status === 'fulfilled' ? p.value.items : kept[kind] ?? []];
+  })));
+  await cacheSet(db, blockKey(sort, lang), rows);
+  return rows;
 }
 
 /**
@@ -208,7 +229,7 @@ export const myRating = async (db: Db, id: number): Promise<number | null> =>
 /** Casts a rating (200), or learns the one already cast (409) — either way the install's value is stored and the item's
  *  cached rating updated. Play Integrity (A-66): the shared cast body. */
 export async function rateArticle(db: Db, a: Article, value: number, lang: Lang): Promise<RatingAnswer> {
-  const ans = await dataSource().rate(a.id, await castBody(db, (i) => ['rating', a.id, value, i], { value }));
+  const ans = await sendCast(db, (i) => ['rating', a.id, value, i], { value }, (b) => dataSource().rate(a.id, b));
   await db.run('INSERT OR REPLACE INTO article_rating(id, value) VALUES (?, ?)', [a.id, ans.mine]);
   if (ans.rating) await storeArticles(db, lang, [{ ...a, rating: ans.rating }]);
   return ans;
@@ -221,8 +242,11 @@ export const queryText = (q: string): string => { const s = q.trim().replace(/\s
 
 /** R-44 / A-97: ONE page of a found / sorted list (the feed or a kind; `next` serves only THIS list); `signal` cancels it (a newer query).
  *  R-48 (P8): its `views_week` and `rating` go into the saved copies of its items, so a later OFFLINE sort orders them by the same numbers. */
-export async function fetchQuery(db: Db, lang: Lang, kind: ArticleKind | null, q: string, sort: ArticleSort, cursor: string | null, signal?: AbortSignal): Promise<ArticlesPage> {
-  const page = remember(parseArticles(await dataSource().articles(lang, cursor, { ...(kind ? { kind } : {}), ...(q ? { q } : {}), sort }, signal)));
+export const fetchQuery = (db: Db, lang: Lang, kind: ArticleKind | null, q: string, sort: ArticleSort, cursor: string | null, signal?: AbortSignal): Promise<ArticlesPage> =>
+  queryPage(db, lang, { ...(kind ? { kind } : {}), ...(q ? { q } : {}), sort }, cursor, signal);
+/** THE sorted / found page of the app (the «Публікації» list and the home's blocks - A-15). */
+async function queryPage(db: Db, lang: Lang, f: ArticleFilter, cursor: string | null, signal?: AbortSignal): Promise<ArticlesPage> {
+  const page = remember(parseArticles(await dataSource().articles(lang, cursor, f, signal)));
   await keepWeek(db, lang, page.items);
   return page;
 }

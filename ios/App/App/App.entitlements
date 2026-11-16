@@ -6,6 +6,10 @@
 	     /.well-known/apple-app-site-association, REQUEST R-50; the same paths as Android's App Links) -->
 	<key>aps-environment</key>
 	<string>production</string>
+	<!-- cloud_39 (A-127, contract §3 R-53): App Attest keys of the PRODUCTION environment - the server accepts only those (a TestFlight /
+	     App Store build is production anyway; this makes an Xcode run production too) -->
+	<key>com.apple.developer.devicecheck.appattest-environment</key>
+	<string>production</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:inok.info</string>

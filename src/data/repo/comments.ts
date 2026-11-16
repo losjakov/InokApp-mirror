@@ -3,7 +3,7 @@ import type { Article, Comment, Comments, L10n, VoteValue, Votes } from '@/data/
 import { keepCounts, type Counts } from './articles';
 import { dataSource } from '@/data/source';
 import { cacheGet, cacheSet } from './cache';
-import { castBody, castFailureNow, installId, type CastFailure } from './cast';
+import { sendCast, castFailureNow, installId, type CastFailure } from './cast';
 
 /**
  * Comments of a publication or a video (contract §3): read-only text (A-33: written in the site's own form), and under every comment
@@ -89,7 +89,7 @@ export type VoteResult = { ok: true; votes: Votes } | { ok: false; votes: Votes;
 export async function voteComment(db: Db, articleId: number, cid: number, value: VoteValue, before: Votes): Promise<VoteResult> {
   if (closed) return { ok: false, votes: before, failure: 'closed' };
   try {
-    const ans = parseVotes({ votes: await dataSource().vote(articleId, cid, await castBody(db, (i) => ['vote', articleId, cid, value, i], { value })) });
+    const ans = parseVotes({ votes: await sendCast(db, (i) => ['vote', articleId, cid, value, i], { value }, (b) => dataSource().vote(articleId, cid, b)) });
     await keepVotes(db, articleId, cid, ans);
     return { ok: true, votes: ans };
   } catch (e) {
@@ -114,7 +114,7 @@ export { NO_VOTES };
  */
 export async function reportComment(db: Db, articleId: number, cid: number): Promise<{ ok: true } | { ok: false; failure: CastFailure }> {
   try {
-    await dataSource().report(articleId, cid, await castBody(db, (i) => ['report', articleId, cid, i], {}));
+    await sendCast(db, (i) => ['report', articleId, cid, i], {}, (b) => dataSource().report(articleId, cid, b));
     return { ok: true };
   } catch (e) {
     return { ok: false, failure: await castFailureNow(e) };

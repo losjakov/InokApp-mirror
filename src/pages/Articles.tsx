@@ -3,7 +3,7 @@ import { SearchField } from '@/components/SearchField';
 import { checkmark, searchOutline, swapVerticalOutline } from 'ionicons/icons';
 import { Busy } from '@/components/Busy';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { MoreButton } from '@/components/MoreButton';
 import { TextSizeButtons } from '@/components/TextSize';
 import { PageHeader } from '@/components/PageHeader';
@@ -38,13 +38,38 @@ export const QUERY_DEBOUNCE_MS = 400;
  *  mounted (A-27), so a kind chosen later is kept as before. InokSite ruling 355 is the site's twin. */
 export const ENTRY_KIND: ArticleKind = 'publication';
 
+/**
+ * A-128: «Усі» of a home block opens «Публікації» on «Усі» in THAT block's order - for this entry only. The order travels in the ROUTE
+ * (`?sort=`), the entry's mark in the location's state (a new tap = a new entry); the person's own tab and order are not touched, so the tab
+ * bar's «Публікації» (always the bare `/articles`, A-27) shows them as before. ONE builder of that address (Home uses it).
+ */
+export const articlesEntry = (sort: ArticleSort): { to: string; state: { entry: number } } => ({ to: `/articles?sort=${sort}`, state: { entry: Date.now() } });
+const entrySortOf = (v: string | null, sorts: ArticleSort[]): ArticleSort | null => (v && (sorts as string[]).includes(v) ? (v as ArticleSort) : null);
+
 export function ArticlesPage() {
   const { db, t, lang, articlesVersion, refreshArticles, config } = useApp();
   const wide = useWide();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const loc = useLocation();
   const id = params.get('id') ? Number(params.get('id')) : null;
-  const [kind, setKind] = useState<string>(ENTRY_KIND);
+  const [ownKind, setOwnKind] = useState<string>(ENTRY_KIND);
+  // A-97 (R-44): search + sort in the header - only when the server takes them (`config.features.articles_query`)
+  const canQuery = !!config?.features.articles_query;
+  const sorts = articleSorts(config?.features); // R-48: views_week / rating only when the server takes them (P2)
+  const [searching, setSearching] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [q, setQ] = useState('');
+  const [chosen, setSortS] = useState<ArticleSort>(sessionSort);
+  // A-128: an entry from a home block («Усі»): its own tab («Усі» first) and order while the route carries `?sort=`; a new entry starts over
+  const entrySort = canQuery ? entrySortOf(params.get('sort'), sorts) : null;
+  const entryMark = (loc.state as { entry?: number } | null)?.entry ?? 0;
+  const [entryView, setEntryView] = useState<{ mark: number; kind: string; sort: ArticleSort } | null>(null);
+  const entry = entrySort ? (entryView && entryView.mark === entryMark ? entryView : { mark: entryMark, kind: 'all', sort: entrySort }) : null;
+  const kind = entry ? entry.kind : ownKind;
+  const setKind = (k: string) => (entry ? setEntryView({ ...entry, kind: k }) : setOwnKind(k));
+  const sort: ArticleSort = entry ? entry.sort : sorts.includes(chosen) ? chosen : 'published'; // a kept v2 order on a server without it = the default
+  const setSort = (s: ArticleSort) => { if (entry) { setEntryView({ ...entry, sort: s }); return; } sessionSort = s; setSortS(s); };
   const [items, setItems] = useState<Article[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -67,15 +92,6 @@ export function ArticlesPage() {
     return () => { on = false; };
   }, [db, lang, kind, articlesVersion]);
   const refresh = useRefresh(useCallback(async () => { setOffline(!(await refreshArticles())); }, [refreshArticles]));
-  // A-97 (R-44): search + sort in the header - only when the server takes them (`config.features.articles_query`)
-  const canQuery = !!config?.features.articles_query;
-  const [searching, setSearching] = useState(false);
-  const [typed, setTyped] = useState('');
-  const [q, setQ] = useState('');
-  const sorts = articleSorts(config?.features); // R-48: views_week / rating only when the server takes them (P2)
-  const [chosen, setSortS] = useState<ArticleSort>(sessionSort);
-  const sort: ArticleSort = sorts.includes(chosen) ? chosen : 'published'; // a kept v2 order on a server without it = the default
-  const setSort = (s: ArticleSort) => { sessionSort = s; setSortS(s); };
   const searchbar = useRef<HTMLIonSearchbarElement>(null);
   useEffect(() => { const h = window.setTimeout(() => setQ(queryText(typed)), typed ? QUERY_DEBOUNCE_MS : 0); return () => window.clearTimeout(h); }, [typed]);
   useEffect(() => { if (searching) window.setTimeout(() => void searchbar.current?.setFocus(), 150); }, [searching]);
@@ -122,7 +138,8 @@ export function ArticlesPage() {
       if (cursor) { const p = await fetchOlder(lang, cursor); setOlder({ items: [...(older?.items ?? []), ...p.items], next: p.next }); }
     } catch (e) { setMoreFail(await netFailure(e)); setFailKey(`${kind}|${lang}`); } finally { setMore(false); } // A-125: the cause under the button, «Повторити»
   };
-  const open = (a: number) => navigate(`/articles?id=${a}`);
+  // an article opened inside a block's entry keeps the entry in its address: Back returns to the same list (its tab, its order)
+  const open = (a: number) => navigate(entry ? `/articles?sort=${entrySort}&id=${a}` : `/articles?id=${a}`, entry ? { state: { entry: entry.mark } } : undefined);
   const shown = active ? (fv ? fv.items : null) : tab ? tab.items : items && [...items, ...(older?.items ?? []).filter((a) => (kind === 'all' || a.kind === kind) && !items.some((b) => b.id === a.id))];
   const hasMore = active ? !!fv?.next : tab ? !!tab.next : older ? !!older.next : !!next;
   const list = (

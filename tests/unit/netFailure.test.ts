@@ -30,6 +30,7 @@ describe('netFailure', () => {
     const g = globalThis as { localStorage?: unknown };
     g.localStorage = { getItem: (k: string) => (k === 'inok.platform' ? 'ios' : null) }; // the browser's play of an iPhone (src/native/platform.ts)
     try { expect(castMessage(castFailure(e, true), 'rating')).toBe('cast.ios'); } finally { delete g.localStorage; }
-    expect((uk as Record<string, string>)['cast.ios']).toMatch(/iPhone/);
+    expect((uk as Record<string, string>)['cast.ios']).toMatch(/iPhone/); // A-127: the device cannot attest (no «not yet» - the site does check)
+    expect((uk as Record<string, string>)['cast.ios']).not.toMatch(/працюємо/);
   });
 });

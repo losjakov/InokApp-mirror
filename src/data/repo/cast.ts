@@ -1,37 +1,18 @@
 import type { Db } from '@/data/db/types';
-import { getMeta, setMeta } from '@/data/db/schema';
 import { ApiError } from '@/data/api/client';
 import { playIntegrityToken } from '@/native/integrity';
 import { netMessageKey } from '@/data/netFailure';
 import { online } from '@/native/network';
 import { isIos } from '@/native/platform';
+import { installId, requestHash, type CastParts } from './castLine';
+import { AttestError, attestActive, attestedCast, type AttestFields } from './attest';
+
+export { installId, uuidV4, requestHash } from './castLine';
 
 /**
  * ONE code for everything the install casts on the site (A-34, A-49 + contract §3): the article's stars, the comments' likes /
  * dislikes and the reports (R-32) share the install id, the Play Integrity request hash and the reading of a refusal.
  */
-
-/** The install's id (contract §3: uuid v4; one rating per install per item, one vote state per install per comment) — made once, kept in meta. */
-export async function installId(db: Db): Promise<string> {
-  let id = await getMeta(db, 'install_id');
-  if (!id) { id = uuidV4(); await setMeta(db, 'install_id', id); }
-  return id;
-}
-
-/** RFC 4122 v4 from `crypto.getRandomValues` (A-46: `crypto.randomUUID` is Chrome 92, the floor is lower). */
-export function uuidV4(rnd: (a: Uint8Array) => Uint8Array = (a) => crypto.getRandomValues(a)): string {
-  const b = rnd(new Uint8Array(16));
-  b[6] = (b[6] & 0x0f) | 0x40;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-
-/** Contract §3: Play Integrity's `requestHash` = the lowercase hex SHA-256 of the cast's own line (`rating|<id>|<value>|<install>`, `vote|<id>|<cid>|<value>|<install>`, `report|<id>|<cid>|<install>`, `view|article|<id>|<install>`). */
-export async function requestHash(parts: (string | number)[]): Promise<string> {
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(parts.join('|')));
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 /** Where a token comes from: the phone's Play Integrity (src/native/integrity.ts); unit tests put a fake here. */
 export type IntegrityProvider = (requestHash: string) => Promise<string | null>;
@@ -45,7 +26,7 @@ const TOKEN_FORM = /^[A-Za-z0-9_.=-]{20,16000}$/;
  * A-66: the Play Integrity STANDARD token of ONE write, bound to its contract line by `requestHash`. No token (the web, a phone without
  * Play, an emulator, Google busy) = null: the write goes without it - the server's switch decides (off until the owner's word).
  */
-export async function integrityToken(parts: (string | number)[]): Promise<string | null> {
+export async function integrityToken(parts: CastParts): Promise<string | null> {
   try {
     const t = await provider(await requestHash(parts));
     return t && TOKEN_FORM.test(t) ? t : null;
@@ -55,10 +36,30 @@ export async function integrityToken(parts: (string | number)[]): Promise<string
 }
 
 /** THE body of every write of the app (A-15): `install_id` + the token of the write's contract line (`line(install_id)`, contract §3). */
-export async function castBody<T extends object>(db: Db, line: (install: string) => (string | number)[], body: T): Promise<T & { install_id: string; integrity_token?: string }> {
+export async function castBody<T extends object>(db: Db, line: (install: string) => CastParts, body: T): Promise<T & { install_id: string; integrity_token?: string }> {
   const install_id = await installId(db);
   const token = await integrityToken(line(install_id));
   return { ...body, install_id, ...(token ? { integrity_token: token } : {}) };
+}
+
+/** The fields a cast body may carry beside its own (contract §3): Android's token, or iOS's App Attest fields (R-53). */
+export type CastFields = { install_id: string; integrity_token?: string } & Partial<AttestFields>;
+
+/** A-127: casts leave ONE at a time, in order (an App Attest key's counter must grow; the same order on Android - one path). */
+let queue: Promise<unknown> = Promise.resolve();
+function enqueue<T>(job: () => Promise<T>): Promise<T> {
+  const run = queue.then(job, job);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+/**
+ * THE way every cast of the app leaves (A-15): stars, comment votes, reports, a view. An attesting iPhone (A-127, R-53) sends an App
+ * Attest assertion over the cast's line; any other device the Play Integrity token of the same line (none on the web / a simulator =
+ * the server's answer decides, `cast.ios` on an iPhone that cannot attest).
+ */
+export function sendCast<B extends object, T>(db: Db, line: (install: string) => CastParts, body: B, send: (b: B & CastFields) => Promise<T>): Promise<T> {
+  return enqueue(async () => ((await attestActive(db)) ? attestedCast(db, line, body, send) : send(await castBody(db, line, body))));
 }
 
 /** What a refusal means to the person (every cast: stars, votes, reports): closed before the Play release, too many, refused, no network
@@ -68,6 +69,7 @@ const CLOSED = new Set(['vote_closed', 'rating_closed', 'report_closed']);
 export function castFailure(e: unknown, deviceOnline = false): CastFailure {
   // cloud_38 (A1): the server's own answer of the last refused cast, readable by the simulator ring (scripts/ios_sim_tour.sh) - never shown
   (globalThis as { __inokLastCast?: string }).__inokLastCast = e instanceof ApiError ? `${e.status} ${e.code}` : `no answer: ${String(e).slice(0, 80)}`;
+  if (e instanceof AttestError) return 'error'; // Apple's own refusal on the device - not the network
   if (!(e instanceof ApiError)) return deviceOnline ? 'unreachable' : 'offline'; // no answer: the device's own network decides which (A-125)
   if (e.status === 503 && CLOSED.has(e.code)) return 'closed';
   if (e.status === 429) return 'rate_limited';
@@ -83,4 +85,4 @@ export const castMessage = (f: CastFailure, what: 'rating' | 'vote' | 'report'):
   f === 'closed' ? `cast.closed_${what}` : f === 'offline' || f === 'unreachable' ? netMessageKey(f) : `cast.${f}`; // A-125: the shared net words
 
 /** The same, the device's network read now (the casts' callers are async). */
-export const castFailureNow = async (e: unknown): Promise<CastFailure> => castFailure(e, e instanceof ApiError ? true : await online());
+export const castFailureNow = async (e: unknown): Promise<CastFailure> => castFailure(e, e instanceof ApiError || e instanceof AttestError ? true : await online());

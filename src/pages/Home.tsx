@@ -13,7 +13,13 @@ import { MonasteryRow } from '@/components/MonasteryRow';
 import { churchOutline } from '@/components/icons';
 import { listChannels } from '@/data/repo/channels';
 import { nearbyMonasteries } from '@/data/repo/monasteries';
-import { cachedNewestByKind, fetchNewestByKind } from '@/data/repo/articles';
+import { cachedBlock, fetchBlock, type HomeBlockSort } from '@/data/repo/articles';
+import type { ArticleSort } from '@/data/repo/articleOrder';
+import { SocialLinks } from '@/components/SocialLinks';
+import { NetNotice } from '@/components/NetNotice';
+import { Busy } from '@/components/Busy';
+import { netFailure, type NetFailure } from '@/data/netFailure';
+import { articlesEntry } from './Articles';
 import { MoreButton } from '@/components/MoreButton';
 import { tileRow } from '@/components/sideRow';
 import { ArticleRow } from '@/components/ArticleRow';
@@ -37,7 +43,7 @@ const NEAR_RADIUS_KM = 200;
  * (the newest cached articles, stage 4), and the data's freshness. Everything but the live status comes from SQLite (offline).
  */
 export function HomePage() {
-  const { db, t, lang, live, articlesVersion, refreshing, lastCheck } = useApp();
+  const { db, t, lang, live, refreshing, lastCheck, config } = useApp();
   const navigate = useNavigate();
   useEffect(() => {
     bootLog('home mounted');
@@ -52,15 +58,7 @@ export function HomePage() {
   const [pos, setPos] = useState<Position | null>(null);
   const [posError, setPosError] = useState(false);
   useEffect(() => { listChannels(db, lang).then(setChannels); }, [db, lang]);
-  // «Нове на сайті» (A-25 #3): the newest publication, video and news — the cache at once (offline), then the server once the feed refreshed
-  const [fresh, setFresh] = useState<Article[]>([]);
   const [allLive, setAllLive] = useState(false);
-  useEffect(() => {
-    let on = true;
-    cachedNewestByKind(db, lang).then((a) => on && setFresh(a));
-    if (articlesVersion > 0) fetchNewestByKind(db, lang).then((a) => on && setFresh(a), () => undefined);
-    return () => { on = false; };
-  }, [db, lang, articlesVersion]);
   const locate = useCallback(async () => {
     try { setPos(await currentPosition()); setPosError(false); } catch { setPosError(true); }
   }, []);
@@ -82,9 +80,10 @@ export function HomePage() {
     { to: '/streams', icon: videocamOutline, label: t('home.streams'), id: 'streams', live: online.length > 0 },
     { to: '/articles', icon: newspaperOutline, label: t('home.articles'), id: 'articles' },
   ];
-  const header = (label: string, to: string, testId?: string) => (
-    <ListHeading className="home__h" testId={testId} label={label} end={<Link to={to} className="home__all">{t('home.all')}</Link>} />
-  );
+  const header = (label: string, to: string, testId?: string) => <HomeHeading label={label} to={to} testId={testId} />;
+  // A-128: «Нове на сайті» by the date of placing, «Популярне за тиждень» by the week's views - only the orders the server takes (R-44 / R-48)
+  const newSort: ArticleSort = config && !config.features.articles_query ? 'published' : 'created';
+  const popular = !config || !!config.features.articles_sort_v2;
   return (
     <IonPage>
       <PageHeader title={t('app.name')} end={refresh.button} />
@@ -116,9 +115,11 @@ export function HomePage() {
               <IonLabel className="ion-text-wrap">{posError ? t('monasteries.no_location') : t('home.near_invite')}</IonLabel>
             </IonItem>
           )}
-          {header(t('home.new'), '/articles', 'home-new')}
-          {fresh.length === 0 ? <IonItem lines="none"><IonLabel className="home__quiet">{t('articles.empty')}</IonLabel></IonItem>
-            : fresh.map((a) => <ArticleRow key={a.id} a={a} onSelect={(id) => navigate(`/articles?id=${id}`)} />)}
+          <ArticleBlock sort={newSort} title={t('home.new')} testId="home-new" />
+          {popular && <ArticleBlock sort="views_week" title={t('home.popular')} testId="home-popular" />}
+        </IonList>
+        <SocialLinks />
+        <IonList className="home__list home__list--end">
           <IonItem button detail={false} onClick={() => void runRefresh()} disabled={refreshing} lines="none" className="home__fresh" data-testid="home-fresh">
             <IonIcon slot="start" icon={refreshOutline} aria-hidden="true" />
             <IonLabel className="home__quiet" data-testid="home-checked">{lastCheck ? checkedLabel(t, lang, lastCheck) : t('more.update')}</IonLabel>
@@ -126,5 +127,51 @@ export function HomePage() {
         </IonList>
       </IonContent>
     </IonPage>
+  );
+}
+
+/** A section head of «Головна» with its «Усі» (A-88: an item of the list whose words are a level-2 heading). */
+function HomeHeading({ label, to, testId, state }: { label: string; to: string; testId?: string; state?: unknown }) {
+  const { t } = useApp();
+  return <ListHeading className="home__h" testId={testId} label={label} end={<Link to={to} state={state} className="home__all" data-testid={testId && `${testId}-all`}>{t('home.all')}</Link>} />;
+}
+
+/**
+ * A-128: ONE block of the site's materials on «Головна» («Нове на сайті», «Популярне за тиждень») - 2 «Статті», a «Відео», a «Новина» in the
+ * block's order; the kept list at once (offline too), then the server once the feed was tried this run; nothing to show = the shared
+ * A-125 line with «Повторити», never an empty block without a word, never a spinner for ever (the request has its timeout).
+ * «Усі» = «Публікації» on «Усі» in THIS block's order, for this entry only (`articlesEntry`).
+ */
+function ArticleBlock({ sort, title, testId }: { sort: ArticleSort; title: string; testId: string }) {
+  const { db, t, lang, articlesVersion } = useApp();
+  const navigate = useNavigate();
+  const [rows, setRows] = useState<Article[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [fail, setFail] = useState<NetFailure | null>(null);
+  const [tries, setTries] = useState(0);
+  useEffect(() => {
+    let on = true;
+    void (async () => {
+      const kept = await cachedBlock(db, lang, sort);
+      if (!on) return;
+      setRows(kept);
+      if (articlesVersion === 0 && tries === 0) return; // the feed's own try first (A-25 #3: no second burst at start)
+      setBusy(true);
+      try { const r = await fetchBlock(db, lang, sort); if (on) { setRows(r); setFail(null); } }
+      catch (e) { const f = await netFailure(e); if (on) setFail(f); }
+      finally { if (on) setBusy(false); }
+    })();
+    return () => { on = false; };
+  }, [db, lang, sort, articlesVersion, tries]);
+  const empty = !rows || rows.length === 0;
+  const entry = articlesEntry(sort as HomeBlockSort);
+  return (
+    <>
+      <HomeHeading label={title} to={entry.to} state={entry.state} testId={testId} />
+      {!empty ? rows.map((a) => <ArticleRow key={a.id} a={a} onSelect={(id) => navigate(`/articles?id=${id}`)} />)
+        : busy ? <ListBox><div className="empty empty--row"><Busy /></div></ListBox>
+          : !fail && rows ? <IonItem lines="none"><IonLabel className="home__quiet">{t('articles.empty')}</IonLabel></IonItem> : null}
+      <ListBox><NetNotice failure={empty && !busy ? fail : null} onRetry={() => setTries((n) => n + 1)} testId={`${testId}-net`} /></ListBox>
+    </>
   );
 }

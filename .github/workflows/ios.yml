@@ -25,11 +25,12 @@ permissions:
 env:
   PROJECT: ios/App/App.xcodeproj
 jobs:
-  # cloud_38 (A-124, standing): THE simulator ring, one device and one task per job so each fits its limit (the 1.0.11 release job walked
-  # iPhone + iPad + the App Store set in one job and ran out of its 150 min). `walk` = the trouble spots of Android + every screen with taps
-  # (scripts/ios_sim_tour.sh: exits 1 on ANY FAIL spot); `appstore` = the App Store set from the LIVE export (exits 1 unless whole and
-  # checked). The Debug bundle alone carries the remote hand (VITE_SIM_DRIVER=1, src/app/simDriver.ts) and may call http://localhost.
-  # The TestFlight upload below waits for EVERY job of this matrix: one red / cancelled job = no upload (A-124).
+  # cloud_38 (A-124, standing) + cloud_39 (A-127): THE simulator ring = the WALKS, one device per job so each fits its limit: the trouble spots
+  # of Android + every screen with taps (scripts/ios_sim_tour.sh: exits 1 on ANY FAIL spot). OUTSIDE the lock by A-127 (written OUT /
+  # NOT-PROVABLE, never FAIL): the WebGL map and the PICTURE of a frame after it (a GPU-less runner cannot draw them; their DOM checks stay
+  # in) and a live iOS cast (no App Attest on a simulator: the honest line is what the ring checks). The Debug bundle alone carries the
+  # remote hand (VITE_SIM_DRIVER=1, src/app/simDriver.ts) and may call http://localhost. The TestFlight upload waits for EVERY job of
+  # this matrix: one red / cancelled job = no upload (A-124).
   simulator:
     if: ${{ !github.event.repository.private }}
     runs-on: macos-26
@@ -42,8 +43,6 @@ jobs:
           - { runtime: oldest, device: ipad, task: walk }
           - { runtime: newest, device: iphone, task: walk }
           - { runtime: newest, device: ipad, task: walk }
-          - { runtime: newest, device: iphone, task: appstore }
-          - { runtime: newest, device: ipad, task: appstore }
     name: simulator (${{ matrix.task }} ${{ matrix.runtime }} ${{ matrix.device }})
     steps:
       - uses: actions/checkout@v7
@@ -52,31 +51,28 @@ jobs:
         run: python3 -I scripts/ci_infra.py facts
       - uses: ./.github/actions/ios-setup
         with: { google_plist_b64: '${{ secrets.GOOGLE_SERVICE_INFO_PLIST_B64 }}' }
-      - name: The simulator bundle - the remote hand in, localhost allowed (this job only; nothing is committed)
-        run: |
-          VITE_SIM_DRIVER=1 npm run build && npx cap sync ios
-          /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity dict' ios/App/App/Info.plist 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true' ios/App/App/Info.plist
-          python3 -m venv "$RUNNER_TEMP/py" && "$RUNNER_TEMP/py/bin/pip" install -q pillow && echo "PY=$RUNNER_TEMP/py/bin/python" >> "$GITHUB_ENV"
-      - name: Build for the simulator (Debug, not signed)
-        run: |
-          set -o pipefail
-          xcodebuild -project "$PROJECT" -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C" build > "$RUNNER_TEMP/sim-build.log" 2>&1 \
-            || { grep -E 'error:|warning: .*deprecated' "$RUNNER_TEMP/sim-build.log" | head -40; tail -60 "$RUNNER_TEMP/sim-build.log"; exit 1; }
-          tail -3 "$RUNNER_TEMP/sim-build.log"; grep -m1 'GoogleService-Info.plist:' "$RUNNER_TEMP/sim-build.log" | tee -a "$GITHUB_STEP_SUMMARY" || true
-          echo "simulator App.app: $(du -sk "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" | cut -f1) KB" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: The ring - ${{ matrix.task }} on the ${{ matrix.runtime }} iOS, ${{ matrix.device }}
-        timeout-minutes: 70
-        run: |
-          O="ios-out/${{ matrix.task }}-${{ matrix.runtime }}-${{ matrix.device }}"
-          bash scripts/ios_sim_tour.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "$O" ${{ matrix.runtime }} ${{ matrix.device }} ${{ matrix.task }}; rc=$?
-          { echo "### iOS ${{ matrix.task }} ${{ matrix.runtime }} ${{ matrix.device }} (exit $rc)"; grep '^== ' "$O/runtimes.txt"; echo '```'; cat "$O/a3.txt" 2>/dev/null; cat "$O/blank.txt" 2>/dev/null; echo '```';
-            cat "$O/sizes.txt" 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
-          exit $rc
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with: { name: 'ios-${{ matrix.task }}-${{ matrix.runtime }}-${{ matrix.device }}', path: ios-out/, retention-days: 30, if-no-files-found: ignore }
+      - uses: ./.github/actions/ios-sim-run
+        with: { runtime: '${{ matrix.runtime }}', device: '${{ matrix.device }}', task: '${{ matrix.task }}' }
+
+  # cloud_39 (A-127): the App Store set (the newest iOS, the LIVE export; exits 1 unless whole and checked) - its OWN job, OUTSIDE the
+  # A-124 lock (never in `testflight`'s needs): its result is read and written in the REPORT; the same code as the ring (ios-sim-run).
+  appstore:
+    if: ${{ !github.event.repository.private }}
+    runs-on: macos-26
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runtime: newest, device: iphone, task: appstore }
+          - { runtime: newest, device: ipad, task: appstore }
+    name: appstore (${{ matrix.device }})
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/ios-setup
+        with: { google_plist_b64: '${{ secrets.GOOGLE_SERVICE_INFO_PLIST_B64 }}' }
+      - uses: ./.github/actions/ios-sim-run
+        with: { runtime: '${{ matrix.runtime }}', device: '${{ matrix.device }}', task: '${{ matrix.task }}' }
 
   # the Release archive WITHOUT signing (green whenever the code builds) + the size of the app
   archive:
@@ -166,7 +162,7 @@ jobs:
             APP="$RUNNER_TEMP/x/Payload/App.app"
             codesign -dvv "$APP" 2>&1 | grep -E '^Authority=' | head -2 | tee -a "$GITHUB_STEP_SUMMARY"
             codesign -d --entitlements :- "$APP" 2>/dev/null > "$RUNNER_TEMP/ent.plist" || true
-            for k in aps-environment com.apple.developer.associated-domains; do
+            for k in aps-environment com.apple.developer.associated-domains com.apple.developer.devicecheck.appattest-environment; do
               /usr/libexec/PlistBuddy -c "Print :$k" "$RUNNER_TEMP/ent.plist" > /dev/null 2>&1 && echo "entitlement $k: present" | tee -a "$GITHUB_STEP_SUMMARY" \
                 || { echo "::error::entitlement $k LOST in the App Store signature ($HOW archive)"; rc=1; }
             done

@@ -58,6 +58,8 @@ t = max(pref or ts, key=num); print(t["identifier"] + "|" + t["name"])' "$RTID" 
 A3="$OUT/a3.txt"
 OFFER14="not met"   # the A2 offer as spot 14 meets it
 a3() { echo "$TAG | iOS $RTV | $1 | $2 | $3" | tee -a "$A3"; }
+# A-127: «yes» when the text is the app's honest iOS cast line (`cast.ios`) in one of the three languages - read from the app's own i18n files
+honest() { "${PY:-python3}" -I -c 'import json, sys; t = sys.argv[1]; print("yes" if any(json.load(open(f"{sys.argv[2]}/src/i18n/{l}.json", encoding="utf-8"))["cast.ios"] in t for l in ("uk", "ru", "en")) else "no")' "$1" "$ROOT"; }
 # cloud_38 (A8: «blank screenshots on iOS 26.5 while the DOM checks passed»): every shot is read by its pixels (scripts/store_png.py --paint);
 # a BLANK one is taken again after 3 s and both verdicts are written to blank.txt - the cause is measured, never guessed
 shot() {
@@ -85,7 +87,11 @@ launch() { # (re)start the app with its console captured; wait for «home painte
 
 # ios run 1 (D12): a WebGL map leaves the simulator's picture white / frozen (the DOM goes on) even across app restarts - the device itself
 # is restarted after every screen with a map; the app's data stays on it
+# A-127 (cloud_39): a WebGL map on screen since the last reboot = the simulator's PICTURE is not evidence (AFTER_GL=1) - a frame that fails
+# ONLY by its pixels then is OUT (outside the A-124 lock, written, never FAIL); its DOM checks stay in the lock
+AFTER_GL=0
 reboot_sim() {
+  AFTER_GL=0
   xcrun simctl shutdown "$U" > /dev/null 2>&1 || true
   xcrun simctl boot "$U"; xcrun simctl bootstatus "$U" -b > /dev/null
   xcrun simctl ui "$U" appearance light
@@ -122,7 +128,7 @@ a3_walk() {
   # (each arrow tapped after the page's transition and its map are over - a tap during the transition is refused, D45)
   nav go /monasteries; node "$NAVJS" wait '[data-testid^="mrow-"]' >> "$OUT/nav.txt" 2>&1; sleep 2; nav click '[data-testid^="mrow-"]'; sleep 4
   local c1; c1=$(node "$NAVJS" url); nav click '[data-testid="back"]'; sleep 3; local u1; u1=$(node "$NAVJS" url)
-  nav go /more/eparchies/1; node "$NAVJS" wait '[data-testid="eparchy-title"]' >> "$OUT/nav.txt" 2>&1; sleep 2; nav click '[data-testid="eparchy-map"]'; sleep 4
+  nav go /more/eparchies/1; node "$NAVJS" wait '[data-testid="eparchy-title"]' >> "$OUT/nav.txt" 2>&1; sleep 2; AFTER_GL=1; nav click '[data-testid="eparchy-map"]'; sleep 4
   node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1; sleep 2
   local m1; m1=$(node "$NAVJS" url); nav click '[data-testid="back"]'; sleep 3; local u2; u2=$(node "$NAVJS" url)
   local wide; wide=$(ev "innerWidth >= 600 ? 'wide' : 'phone'")
@@ -132,7 +138,7 @@ a3_walk() {
   reboot_sim   # the eparchy's mini-map (WebGL) of spot 2: the next frames from a fresh simulator (ios run 1, D12)
   guard_crash spot3
   # 3 the map online: drawn, clustered houses + the three lavras whole
-  nav go /map; sleep 3; node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
+  AFTER_GL=1; nav go /map; sleep 3; node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
   node "$NAVJS" "do" fitLavras >> "$OUT/nav.txt" 2>&1; sleep 2; node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
   v=$(ev "(() => { const m = window.__inokMap; if (!m) return 'none'; return m.queryRenderedFeatures({ layers: ['points', 'clusters', 'lavras'] }).length + ' marks drawn'; })()")
   local lv; lv=$(check lavras)
@@ -140,7 +146,9 @@ a3_walk() {
   v="$v; at $(node "$NAVJS" url); $(ev "(() => { const c = document.createElement('canvas'); const g = c.getContext('webgl2') || c.getContext('webgl'); const m = Array.from(document.querySelectorAll('.maplibregl-map')).map((e) => e.dataset.drawn); const mp = window.__inokMap; const w = performance.getEntriesByType('resource').map((x) => x.name).filter((n) => /mapWorker|worker/i.test(n));
       return (g ? 'webgl ' + (g.getParameter(g.VERSION) || '?') : 'NO webgl') + ', maps drawn=' + (m.join('/') || 'none') + (mp ? ', style loaded ' + mp.isStyleLoaded() + ', loaded ' + mp.loaded()
         + ', houses source ' + (mp.getSource('monasteries') ? mp.isSourceLoaded('monasteries') : 'none') : '') + ', worker fetched ' + (w.join(' ').slice(-80) || 'no') + ', worker ' + JSON.stringify(window.__inokMapWorker || null) + ', map errors [' + (window.__inokMapErrors || []).join(' | ') + ']'; })()")"
-  [ "$lv" = ok ] && [ "${v%% *}" -gt 0 ] 2>/dev/null && a3 "map online" PASS "$v; lavras $lv" || a3 "map online" FAIL "$v; lavras $lv"; shot "$OUT/a3-map__$TAG.png"
+  # A-127: the WebGL map is OUTSIDE the A-124 lock (a GPU-less runner cannot draw it): measured and written, never FAIL - proven by the Android
+  # emulator, the browser set and the owner's iPhone
+  [ "$lv" = ok ] && [ "${v%% *}" -gt 0 ] 2>/dev/null && a3 "map online" PASS "$v; lavras $lv" || a3 "map online" OUT "$v; lavras $lv"; shot "$OUT/a3-map__$TAG.png"
   reboot_sim   # D12: after a WebGL map the simulator's picture stays frozen / white - every later frame from a fresh simulator
   a3 "map offline" NOT-PROVABLE "the simulator shares the Mac's network (no airplane mode) - the browser ring proves the logic (map-offline, map-offline-weak x4 profiles); the owner's iPhone in airplane mode"
   guard_crash spot4
@@ -240,7 +248,10 @@ a3_walk() {
   r1=$(ev "(() => { const s = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]'); return (s && s.dataset.lit === '1' ? 'lit' : 'not lit') + '; server ' + (window.__inokLastCast || 'ok'); })()")
   rt=$(ev "(Array.from(document.querySelectorAll('ion-toast')).map((t) => t.message).filter(Boolean).pop()) || 'no toast'")
   shot "$OUT/a3-rating__$TAG.png"
-  case "$r1" in lit*'server ok') a3 "rating cast (A1)" PASS "$r0 -> $r1";; *) a3 "rating cast (A1)" FAIL "$r0 -> $r1; toast «${rt}»";; esac
+  # A-127: a simulator has no App Attest (isSupported = false) - the ring checks the HONEST line there (`cast.ios`, never «try again»); the
+  # live cast with an assertion is the owner's iPhone (PHONE_TEST_BACKLOG cloud_39), outside the lock
+  case "$r1|$(honest "$rt")" in "not lit; server 403 integrity_required|yes") a3 "rating cast (A1)" PASS "$r0 -> $r1; the honest line «${rt}»";;
+    *) a3 "rating cast (A1)" FAIL "$r0 -> $r1; toast «${rt}»";; esac
   nav scroll '[data-testid^="vote-up-"]'; sleep 2
   ev "window.__inokLastCast = null, 'ok'" > /dev/null
   v0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none'")
@@ -248,8 +259,9 @@ a3_walk() {
   v1=$(ev "((document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none') + '; server ' + (window.__inokLastCast || 'ok')")
   vs=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=vote-status]')||{}).textContent || ''")
   shot "$OUT/a3-like__$TAG.png"
-  case "$v0|$v1" in "n|y; server ok") a3 "comment like (A1)" PASS "mine $v0 -> $v1"; nav click '[data-testid^="vote-up-"]'; sleep 4;;  # withdrawn: the desired state «none»
+  case "$v0|$v1|$(honest "$vs")" in "n|n; server 403 integrity_required|yes") a3 "comment like (A1)" PASS "mine $v0 -> $v1; the honest line «${vs}»";;
     *) a3 "comment like (A1)" FAIL "mine $v0 -> $v1; «${vs}»";; esac
+  a3 "App Attest cast (A1)" NOT-PROVABLE "no App Attest on a simulator (isSupported false) - the stars / like with an assertion: the owner's iPhone from TestFlight (A-127; unit appAttest.test.ts proves the client)"
   guard_crash spot15
   # 15 A2: the soft offer (read in spot 14) and «Ще → Сповіщення»
   v="$OFFER14"   # spot 14 met the offer over the first opened article - THE moment Android asks (a re-ask after a reset is not the rule)
@@ -266,6 +278,7 @@ a3_walk() {
     more:/more favourites:/more/favourites language:/more/language notifications:/more/notifications commission:/more/commission \
     contacts:/more/contacts eparchies:/more/eparchies eparchy:/more/eparchies/1 about:/more/about; do
     name="${sc%%:*}"; path="${sc#*:}"; guard_crash "a8-$name"
+    case "$name" in map|eparchy|contacts) AFTER_GL=1;; esac   # a WebGL map (or mini-map) on this screen
     nav go "$path"; sleep 5; [ "$name" = map ] && node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
     # an A2 offer left open (a modal over every screen until answered - ios run 2's sheet) is answered «Ні, дякую» before the frame
     ev "(() => { Array.from(document.querySelectorAll('ion-alert.soft-ask:not(.overlay-hidden)')).forEach((a) => Array.from(a.querySelectorAll('.alert-button')).pop()?.click()); return 'ok'; })()" > /dev/null; sleep 2
@@ -273,7 +286,9 @@ a3_walk() {
       const t = Array.from(pg.querySelectorAll('[data-testid=page-title], ion-title')).find((e) => e.getClientRects().length > 0); const ov = document.documentElement.scrollWidth > innerWidth + 1;
       return (document.querySelector('[data-testid=crash]') ? 'CRASH' : 'ok') + ' title «' + ((t && t.textContent) || '').trim().slice(0, 40) + '» ' + (ov ? 'SIDEWAYS' : 'fits') + ' ' + location.pathname + location.search; })()")
     shot "$OUT/a8-${name}__$TAG.png"; local p; p=$("${PY:-python3}" -I "$ROOT/scripts/store_png.py" --paint "$OUT/a8-${name}__$TAG.png" 2>/dev/null || echo '?')
-    case "$v|$p" in "ok title «"*"» fits "*"|ok") a3 "screen $name (A8)" PASS "$v; pixels $p";; *) a3 "screen $name (A8)" FAIL "$v; pixels $p";; esac
+    case "$v|$p|$AFTER_GL" in "ok title «"*"» fits "*"|ok|"*) a3 "screen $name (A8)" PASS "$v; pixels $p";;
+      "ok title «"*"» fits "*"|1") a3 "screen $name (A8)" OUT "$v; pixels $p - the picture after a WebGL map (A-127: outside the lock; the DOM checks passed)";;
+      *) a3 "screen $name (A8)" FAIL "$v; pixels $p";; esac
     case "$name" in map|eparchy|contacts) reboot_sim;; esac   # a WebGL map on screen: the next frame from a fresh simulator (D12)
   done
   a3 "VoiceOver" NOT-PROVABLE "the simulator has no VoiceOver - names / roles / order are the a11y tree of the same DOM (axe 0); the owner's iPhone"
@@ -289,13 +304,9 @@ appstore() { # set(phone|tablet) dir-name
   launch
   for lang in uk ru en; do
     set_lang "$lang"; units_ok "$lang" || return 1
-    # ios run 1 (D12): after a WebGL map the simulator's picture stays white, even across app restarts - every other frame first, the map
-    # frame LAST in its language, then the simulator is rebooted (the app's settings, the language included, stay on the device)
+    # A-127: the App Store set goes WITHOUT 04-eparchy / 05-map - a GPU-less runner's simulator cannot draw a WebGL map (ios run 1, D12);
+    # phone 6, iPad 5 per language (Apple takes 1-10); those two frames: the owner's iPhone or the browser engine (REPORT cloud_39 C2)
     STORE_SKIP='eparchy|map' shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
-    STORE_ONLY=eparchy shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1   # its mini-map is WebGL too
-    reboot_sim
-    STORE_ONLY=map shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
-    reboot_sim
   done
 }
 

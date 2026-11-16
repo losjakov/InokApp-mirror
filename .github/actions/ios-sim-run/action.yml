@@ -1,0 +1,36 @@
+name: ios-sim-run
+description: cloud_39 (A-127) - THE simulator work of one job (the A-124 ring's walks AND the App Store set, two jobs, one code) - the Debug bundle with the remote hand, the simulator build, scripts/ios_sim_tour.sh, its artifact
+inputs:
+  runtime: { description: 'oldest | newest', required: true }
+  device: { description: 'iphone | ipad', required: true }
+  task: { description: 'walk | appstore', required: true }
+runs:
+  using: composite
+  steps:
+    - name: The simulator bundle - the remote hand in, localhost allowed (this job only; nothing is committed)
+      shell: bash
+      run: |
+        VITE_SIM_DRIVER=1 npm run build && npx cap sync ios
+        /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity dict' ios/App/App/Info.plist 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true' ios/App/App/Info.plist
+        python3 -m venv "$RUNNER_TEMP/py" && "$RUNNER_TEMP/py/bin/pip" install -q pillow && echo "PY=$RUNNER_TEMP/py/bin/python" >> "$GITHUB_ENV"
+    - name: Build for the simulator (Debug, not signed)
+      shell: bash
+      run: |
+        set -o pipefail
+        xcodebuild -project "$PROJECT" -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C" build > "$RUNNER_TEMP/sim-build.log" 2>&1 \
+          || { grep -E 'error:|warning: .*deprecated' "$RUNNER_TEMP/sim-build.log" | head -40; tail -60 "$RUNNER_TEMP/sim-build.log"; exit 1; }
+        tail -3 "$RUNNER_TEMP/sim-build.log"; grep -m1 'GoogleService-Info.plist:' "$RUNNER_TEMP/sim-build.log" | tee -a "$GITHUB_STEP_SUMMARY" || true
+        echo "simulator App.app: $(du -sk "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" | cut -f1) KB" | tee -a "$GITHUB_STEP_SUMMARY"
+    - name: The tour - ${{ inputs.task }} on the ${{ inputs.runtime }} iOS, ${{ inputs.device }}
+      shell: bash
+      run: |
+        O="ios-out/${{ inputs.task }}-${{ inputs.runtime }}-${{ inputs.device }}"
+        bash scripts/ios_sim_tour.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "$O" ${{ inputs.runtime }} ${{ inputs.device }} ${{ inputs.task }}; rc=$?
+        { echo "### iOS ${{ inputs.task }} ${{ inputs.runtime }} ${{ inputs.device }} (exit $rc)"; grep '^== ' "$O/runtimes.txt"; echo '```'; cat "$O/a3.txt" 2>/dev/null; cat "$O/blank.txt" 2>/dev/null; echo '```';
+          cat "$O/sizes.txt" 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
+        exit $rc
+    - uses: actions/upload-artifact@v7
+      if: always()
+      with: { name: 'ios-${{ inputs.task }}-${{ inputs.runtime }}-${{ inputs.device }}', path: ios-out/, retention-days: 30, if-no-files-found: ignore }

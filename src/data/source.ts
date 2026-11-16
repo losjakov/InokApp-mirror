@@ -1,9 +1,12 @@
-import { ApiError, apiBytes, apiJson, readJson } from './api/client';
+import { ApiError, apiBytes, apiJson, readJson, type FetchOptions } from './api/client';
 import { decodeExport, manifestFile } from './api/exportLoader';
 import type { AppConfig, Article, ArticlesPage, Comments, Directory, LiveStatus, Manifest, MonasteryPhotos, RatingAnswer, ReportAnswer, ViewsAnswer, VoteAnswer, VoteValue } from './api/types';
 import type { Lang } from '@/i18n';
 import { isNative } from '@/native/platform';
 import { sortArticles, type ArticleSort } from '@/data/repo/articleOrder';
+
+/** Contract §3: what every cast carries beside its own fields - Android's Play Integrity token, or iOS's App Attest fields (R-53). */
+export type CastBody = { install_id: string; integrity_token?: string; platform?: 'ios'; key_id?: string; assertion?: string };
 
 /**
  * Where the data comes from. Native builds talk to the live API (contract §2–§3). The browser build (Playwright
@@ -21,15 +24,19 @@ export type DataSource = {
   article(id: number, lang: Lang): Promise<Article>;
   /** R-27: with the install id the answer carries this install's vote on every comment and reply */
   comments(id: number, installId: string): Promise<Comments>;
-  rate(id: number, body: { value: number; install_id: string; integrity_token?: string }): Promise<RatingAnswer>;
+  rate(id: number, body: { value: number } & CastBody): Promise<RatingAnswer>;
   /** R-27: a comment's like / dislike — the DESIRED state (`none` withdraws) */
-  vote(id: number, cid: number, body: { value: VoteValue; install_id: string; integrity_token?: string }): Promise<VoteAnswer>;
+  vote(id: number, cid: number, body: { value: VoteValue } & CastBody): Promise<VoteAnswer>;
   /** R-32 (A-49): ONE comment to the site's moderation */
-  report(id: number, cid: number, body: { install_id: string; integrity_token?: string }): Promise<ReportAnswer>;
+  report(id: number, cid: number, body: CastBody): Promise<ReportAnswer>;
   /** R-38 (A-65): the page's eye - `articles/<id>/views` | `monasteries/<code>/views` (no-store) */
   views(path: string): Promise<ViewsAnswer>;
   /** R-38: ONE view of that page (202, the same whether counted or not) */
-  view(path: string, body: { token: string; install_id: string; integrity_token?: string }): Promise<ReportAnswer>;
+  view(path: string, body: { token: string } & CastBody): Promise<ReportAnswer>;
+  /** R-53 step 1: a one-use challenge for THIS install's App Attest registration (300 s) */
+  attestChallenge(body: { platform: 'ios'; install_id: string }): Promise<{ challenge: string; expires_in: number }>;
+  /** R-53 step 3: the attested key becomes the install's key (200 `{ ok: true }`) */
+  attestKey(body: { platform: 'ios'; install_id: string; key_id: string; attestation: string; challenge: string }): Promise<ReportAnswer>;
   /** R-49 (A-109): a card's gallery, asked on a tap only (online); 404 = unknown / inactive card */
   monasteryPhotos(code: number): Promise<MonasteryPhotos>;
 };
@@ -49,7 +56,7 @@ export const articlesQuery = (lang: Lang, since?: string | null, f?: ArticleFilt
  *  (views.json `__week`, absent = 0); pages of 4 by an index cursor,
  *  so «Показати більше» of a found list is exercised; a cursor of another list -> 400 as the server does. */
 async function fixtureQuery(f: ArticleFilter, since: string | null | undefined, lang: Lang): Promise<ArticlesPage> {
-  const key = `${f.kind ?? ''}|${f.q ?? ''}|${f.sort ?? ''}|${lang}`;
+  const key = `${f.kind ?? ''}|${f.q ?? ''}|${f.sort ?? ''}|${lang}|${f.limit ?? ''}`;
   const [all, video, views] = await Promise.all([fx<ArticlesPage>(`articles.json?q=${encodeURIComponent(f.q ?? '')}&sort=${f.sort ?? ''}`), fx<ArticlesPage>('articles_video.json'),
     fx<Record<string, number | null> & { __week?: Record<string, number> }>('views.json')]);
   const q = (f.q ?? '').toLowerCase().replace(/\s+/g, ' ');
@@ -57,8 +64,9 @@ async function fixtureQuery(f: ArticleFilter, since: string | null | undefined, 
     .map((a) => ({ ...a, created_at: a.published_at, views: views?.[`articles/${a.id}/views`] ?? null, views_week: views?.__week?.[String(a.id)] ?? 0 })), f.sort ?? 'published');
   const [ck, at] = since ? since.split('#') : [key, '0'];
   if (ck !== key) throw new ApiError(400, 'bad_request');
-  const from = Number(at); const page = items.slice(from, from + 4);
-  return { items: page, next: from + 4 < items.length ? `${key}#${from + 4}` : null };
+  const size = Math.min(f.limit ?? 4, 4); // a home block's `limit` 1 / 2 (A-128); else pages of 4
+  const from = Number(at); const page = items.slice(from, from + size);
+  return { items: page, next: from + size < items.length ? `${key}#${from + size}` : null };
 }
 
 const mode = (): 'live' | 'fixtures' => {
@@ -66,6 +74,9 @@ const mode = (): 'live' | 'fixtures' => {
   if (env === 'live' || env === 'fixtures') return env;
   return isNative() ? 'live' : 'fixtures';
 };
+
+/** A POST of the API. An App Attest assertion is single-use (its counter): such a cast is sent ONCE - the cast code retries with a new one. */
+const post = (body: object): FetchOptions => ({ method: 'POST', body, ...('assertion' in body ? { once: true } : {}) });
 
 const live: DataSource = {
   manifest: () => apiJson<Manifest>('export/manifest.json'),
@@ -78,14 +89,16 @@ const live: DataSource = {
   articles: (lang, since, f, signal) => apiJson<ArticlesPage>(articlesQuery(lang, since, f), signal ? { signal } : undefined),
   article: (id, lang) => apiJson<Article>(`articles/${id}?lang=${lang}`),
   comments: (id, install) => apiJson<Comments>(`articles/${id}/comments?install_id=${encodeURIComponent(install)}`),
-  vote: (id, cid, body) => apiJson<VoteAnswer>(`articles/${id}/comments/${cid}/vote`, { method: 'POST', body }),
-  report: (id, cid, body) => apiJson<ReportAnswer>(`articles/${id}/comments/${cid}/report`, { method: 'POST', body }),
+  vote: (id, cid, body) => apiJson<VoteAnswer>(`articles/${id}/comments/${cid}/vote`, post(body)),
+  report: (id, cid, body) => apiJson<ReportAnswer>(`articles/${id}/comments/${cid}/report`, post(body)),
   views: (path) => apiJson<ViewsAnswer>(path),
-  view: (path, body) => apiJson<ReportAnswer>(path, { method: 'POST', body }),
+  view: (path, body) => apiJson<ReportAnswer>(path, post(body)),
+  attestChallenge: (body) => apiJson<{ challenge: string; expires_in: number }>('app-attest/challenge', post(body)),
+  attestKey: (body) => apiJson<ReportAnswer>('app-attest/key', post(body)),
   monasteryPhotos: (code) => apiJson<MonasteryPhotos>(`monasteries/${code}/photos`),
   async rate(id, body) {
     try {
-      return await apiJson<RatingAnswer>(`articles/${id}/rating`, { method: 'POST', body });
+      return await apiJson<RatingAnswer>(`articles/${id}/rating`, post(body));
     } catch (e) {
       // 409 «already»: one rating per install, never changed (contract §3) — the answer still carries the rating and `mine`
       if (e instanceof ApiError && e.status === 409 && e.body) return e.body as unknown as RatingAnswer;
@@ -167,6 +180,9 @@ const fixtures: DataSource = {
     return { views: all[path] ?? null, token: 'fixture.dwell', gi, gn };
   },
   view: async (path) => { await fx<unknown>(`views.json?view=${encodeURIComponent(path)}`); return { ok: true }; },
+  // R-53: no browser attests (no App Attest outside an iPhone); the answers keep the contract's shape for a stand-in device
+  attestChallenge: async () => ({ challenge: 'fixture-challenge-0123456789abcdefghijklmnopqrstu', expires_in: 300 }),
+  attestKey: async () => ({ ok: true }),
   // fixtures/monastery_photos.json: the live R-49 answers of 242 (40), 16 / 275 (one), 47 (none), 14.11.2026, keyed by code; any other
   // code = 404 as the server answers an unknown card (`?code=` lets a screen count / refuse the request)
   async monasteryPhotos(code) {

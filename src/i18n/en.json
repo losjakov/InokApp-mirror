@@ -142,6 +142,7 @@
   "home.near": "Nearby",
   "home.near_invite": "Show the nearest monasteries — needs location access",
   "home.new": "New on the site",
+  "home.popular": "Popular this week",
   "home.all": "All",
   "notifications.articles": "New publications",
   "notifications.articles_hint": "Articles, videos and news of inok.info",
@@ -323,5 +324,5 @@
   "net.server": "The inok.info server answered with an error. Try again later.",
   "net.retry": "Retry",
   "net.later": "No internet connection. The change is saved and will apply once the network is back.",
-  "cast.ios": "Ratings and votes from iPhone and iPad are not accepted yet: the site does not verify them for iOS. We are working on it."
+  "cast.ios": "Ratings and votes are not accepted from this iPhone or iPad: the device cannot confirm to the site that they come from the genuine app."
 }

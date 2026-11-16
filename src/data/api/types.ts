@@ -120,7 +120,8 @@ export interface AppConfig {
   /** R-41 (A-80; window C adds it): `store_links` = the Play listing is public (share + rate shown); absent = false */
   features: { comments_write: boolean; embedded_player: boolean; store_links?: boolean; /** R-44: the server takes `q` / `sort` (A-97 buttons) */ articles_query?: boolean;
     /** R-48 (A-101): the server takes `sort=views_week|rating` (the sheet's two new orders) */ articles_sort_v2?: boolean;
-    /** R-49 (A-109): the server answers `monasteries/<code>/photos` - the card's gallery opens in the app's viewer; absent = 1.0.7's `gallery_url` */ monastery_photos?: boolean };
+    /** R-49 (A-109): the server answers `monasteries/<code>/photos` - the card's gallery opens in the app's viewer; absent = 1.0.7's `gallery_url` */ monastery_photos?: boolean;
+    /** R-53 (A-127): the server takes iOS casts with an App Attest assertion; absent = every iOS cast answers 403 `integrity_required` */ app_attest?: boolean };
   donate_url: string;
   privacy_url: string;
   /** R-41: the Play listing's address; absent = the one built from the package id (src/native/play.ts) */

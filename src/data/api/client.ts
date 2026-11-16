@@ -26,6 +26,8 @@ export interface FetchOptions {
   method?: 'GET' | 'POST';
   body?: unknown;
   signal?: AbortSignal;
+  /** ONE attempt, no retry on 429 / 5xx: the body is single-use (an App Attest assertion - contract §3, R-53) */
+  once?: boolean;
 }
 
 const TIMEOUT_MS = 30000;
@@ -69,7 +71,7 @@ export async function apiFetch(path: string, opts: FetchOptions = {}): Promise<R
       if (/html/i.test(res.headers.get('content-type') ?? '')) throw busy(res.status); // D72: a page, not the API's answer
       return res;
     }
-    if (retryable(res.status) && attempt < 3 && !(await final(res))) {
+    if (retryable(res.status) && attempt < 3 && !opts.once && !(await final(res))) {
       attempt++;
       await sleep(500 * 2 ** attempt);
       continue;

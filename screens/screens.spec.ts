@@ -587,6 +587,20 @@ const bannerContrast = async (p: Page, id: string) => {
     expect(c.ratio, `${id} ${what}: ${c.ink} on ${c.bg}`).toBeGreaterThanOrEqual(4.5);
   }
 };
+/** NOTE 2 (REVIEW cloud_38): a snackbar is shot FULLY shown - its wrapper's enter animation over (opacity 1), never half-faded */
+const toastShown = async (p: Page, id: string) => {
+  const t = p.locator(`ion-toast[data-testid="${id}"]`);
+  await expect.poll(() => t.evaluate((e) => getComputedStyle(e.shadowRoot!.querySelector('.toast-wrapper')!).opacity), { message: `${id} fully shown` }).toBe('1');
+  return t;
+};
+/** NOTE 3 (REVIEW cloud_38): the snackbar's action («Повторити») and its text >= 4.5 : 1 - the DRAWN pixels, both themes */
+const toastContrast = async (p: Page, id: string) => {
+  const t = await toastShown(p, id);
+  for (const [what, sel] of [['action', `[data-testid="${id}-retry"]`], ['label', '.toast-message']] as const) {
+    const c = await drawnContrast(p, (await t.locator(sel).boundingBox())!);
+    expect(c.ratio, `${id} ${what}: ${c.ink} on ${c.bg}`).toBeGreaterThanOrEqual(4.5);
+  }
+};
 const UK = ['phone-light', 'phone-dark', 'tablet'];
 /** A-109 (R-49): every request of a card's gallery - the list (`monastery_photos.json?code=`) and the gallery files (`/images/monasteries/<code>/<file>`;
  *  the covers live under `og_img/` / `medium/` and are not counted) - recorded from the page's first request */
@@ -651,6 +665,16 @@ const viewerGone = (p: Page) => expect(p.locator('ion-modal.viewer')).toHaveCoun
 
 /** A-55 (A-54 withdrawn): NO row in `scope` carries a lead line - each label holds only the title, the subtitle, «kind · date» and the badges line
  *  (cloud_19's row); every line stays inside the row (cloud_20 200 %: a long word wraps, never runs off the edge). Returns the NEWS rows checked. */
+/** A-128: the article rows of each home block, in the page's order (a block = its head and the rows up to the next head) */
+const homeBlocks = (p: Page) => p.evaluate(() => {
+  const out: Record<string, number[]> = {}; let cur = '';
+  for (const e of Array.from(document.querySelectorAll('.ion-page:not(.ion-page-hidden) .home__list > *'))) {
+    const id = e.getAttribute('data-testid') ?? '';
+    if (e.tagName === 'ION-LIST-HEADER') { cur = id === 'home-new' || id === 'home-popular' ? id : ''; if (cur) out[cur] = []; continue; }
+    if (cur && id.startsWith('arow-')) out[cur].push(Number(id.slice(5)));
+  }
+  return out;
+});
 const noLeads = async (p: Page, scope: string) => {
   const rows = await p.locator(`${scope} [data-testid^="arow-"]`).locator('visible=true').evaluateAll((es) => es.map((r) => {
     const label = r.querySelector('ion-label')!;
@@ -767,15 +791,108 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('home-live-1686')).toBeVisible(); // «Зараз в ефірі» from live-status
       await expect(p.getByTestId('mrow-37')).toContainText('км'); // «Поруч» (geolocation granted → Kyiv)
       await expect(p.getByTestId('home-checked')).toHaveText(/^(Перевірено сьогодні о|Проверено сегодня в|Checked today at) \d\d:\d\d$/, { timeout: 15_000 }); // A-52
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(3); // «Нове на сайті» (stage 4)
-      // A-25 #3: one of each kind, publication → video → news; A-25 #2: how many are live, in the header
-      expect(await p.locator('[data-testid^="arow-"]').evaluateAll((es) => es.map((e) => e.getAttribute('data-kind')))).toEqual(['publication', 'video', 'news']);
-      expect(await noLeads(p, 'ion-content'), 'A-55: «Нове на сайті» - the news row without a lead').toBe(1);
+      // A-128: «Нове на сайті» + «Популярне за тиждень», four rows each: 2 «Статті», «Відео», «Новина» (the blocks' own screen: home-blocks)
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8);
+      expect(await p.locator('[data-testid^="arow-"]').evaluateAll((es) => es.map((e) => e.getAttribute('data-kind')))).toEqual(['publication', 'publication', 'video', 'news', 'publication', 'publication', 'video', 'news']);
+      expect(await noLeads(p, 'ion-content'), 'A-55: the two news rows without a lead').toBe(2);
       await expect(p.getByTestId('home-live')).toContainText('(3)');
       await expect(p.getByTestId('home-live-more')).toHaveCount(0);
       // D65: the live ring follows the round avatar on every engine - box-shadow, never `outline` (square on Chrome 89-93)
       expect(await p.getByTestId('live-avatar').first().evaluate((e) => { const c = getComputedStyle(e); return [c.outlineStyle, /\b4px\b/.test(c.boxShadow)].join(); })).toBe('none,true');
       await avatarsLoaded(p);
+    } },
+  // A-128 (owner 16.11.2026): the home's two blocks of the site's materials - the SAME four places in a fixed order (2 «Статті», «Відео»,
+  // «Новина»), «Нове на сайті» by the date of placing (sort=created), «Популярне за тиждень» by the week's views (sort=views_week); under them
+  // the social block (the fourth place of SocialLinks), the «checked / refresh» line LAST. The fixture's orders: created 2869, 2868 | 1892 |
+  // 2871; views_week 2869, 2738 | 1892 | 2871 (fixtures/views.json `__week`). Red on 1.0.12 (three rows, one block, no social block).
+  { name: 'home-blocks', path: '/home', tall: 2400, ready: async (p) => {
+      await expect(onShown(p, 'home-popular')).toBeVisible({ timeout: 15_000 });
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
+      expect(await homeBlocks(p)).toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [2869, 2738, 1892, 2871] });
+      const [nw, pop] = await words(p, ['home.new', 'home.popular']);
+      await expect(onShown(p, 'home-new').getByRole('heading', { level: 2 })).toHaveText(nw);
+      await expect(onShown(p, 'home-popular').getByRole('heading', { level: 2 })).toHaveText(pop);
+      const order = await p.evaluate(() => ['home-new', 'home-popular', 'social', 'home-fresh'].map((id) => document.querySelector(`.ion-page:not(.ion-page-hidden) [data-testid="${id}"]`))
+        .every((e, i, a) => !!e && (i === 0 || !!(a[i - 1]!.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING))));
+      expect(order, 'new -> popular -> social -> the «checked» line last').toBe(true);
+      await expect(onShown(p, 'social-row').locator('a')).toHaveCount(3);
+      await expect(onShown(p, 'home-new-net')).toHaveText(''); await expect(onShown(p, 'home-popular-net')).toHaveText('');
+      await onShown(p, 'social').scrollIntoViewIfNeeded();
+    } },
+  { name: 'home-blocks-font200', path: '/home', font: 200, tall: 3600, only: ['phone-light', 'phone-dark'], ready: async (p) => {
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
+      expect(await homeBlocks(p)).toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [2869, 2738, 1892, 2871] });
+      const cut = await p.locator('.ion-page:not(.ion-page-hidden) [data-testid="home-popular"], .ion-page:not(.ion-page-hidden) [data-testid="home-popular-all"]')
+        .evaluateAll((es) => es.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+      expect(cut, 'the block head and its «Усі» whole at 200 %').toEqual([]);
+      await onShown(p, 'home-popular').scrollIntoViewIfNeeded();
+    } },
+  // A-128: «Усі» of a block = «Публікації» on «Усі» in THAT block's order, set and shown (the sort button's mark + its spoken name)
+  ...([['home-new-all', 'home-new', 'created'], ['home-popular-all', 'home-popular', 'views_week']] as const).map(([name, block, sort]) => ({ name, path: '/home',
+    only: ['phone-light', 'phone-dark', 'tablet'], ready: async (p: Page) => {
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
+      await onShown(p, `${block}-all`).click();
+      await expect.poll(() => new URL(p.url()).pathname + new URL(p.url()).search).toBe(`/articles?sort=${sort}`);
+      await entryKind(p, 'all');
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', sort);
+      await expect(onShown(p, 'sort-mark')).toBeVisible();
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('aria-label', new RegExp((await words(p, [`articles.sort_${sort}`]))[0]));
+      await expect(onShown(p, 'kinds')).toHaveAttribute('data-query', new RegExp(`\\|all\\|\\|${sort}$`), { timeout: 5000 });
+      const want = sort === 'created' ? 2869 : 2871; // the fixture's first by date of placing / by the week's views (2871: 25)
+      await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]').first()).toHaveAttribute('data-testid', `arow-${want}`);
+    } })),
+  // A-128: the block's order holds for THAT entry only: the tab bar's «Публікації» = the person's own tab («Статті», A-117) and own order
+  { name: 'home-all-then-tabbar', path: '/articles', only: ['phone-light', 'tablet'], ready: async (p) => {
+      await entryKind(p, 'publication');
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-rating"]').click(); // the person's own order
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', 'rating');
+      await onShown(p, 'back').click();
+      await expect(onShown(p, 'home-popular-all')).toBeVisible({ timeout: 15_000 });
+      await onShown(p, 'home-popular-all').click();
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', 'views_week');
+      await entryKind(p, 'all');
+      await p.locator('ion-tab-button[tab="articles"]').click();
+      await expect.poll(() => new URL(p.url()).search).toBe('');
+      await entryKind(p, 'publication');
+      await expect(onShown(p, 'sort-open'), 'the person\'s own order back, untouched by the entry').toHaveAttribute('data-sort', 'rating');
+    } },
+  // A-128 + A-125: offline - the kept lists stay (no line under them, never a spinner); nothing kept and no answer = THE «no connection»
+  // line with «Повторити» (a polite live region, in the page before), which brings the block
+  { name: 'home-offline-kept', path: '/home', only: ['phone-light'], tall: 2400, ready: async (p) => {
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
+      const before = await homeBlocks(p);
+      await p.context().setOffline(true);
+      await onShown(p, 'refresh').click();
+      await expect(onShown(p, 'refresh')).toHaveAttribute('data-busy', '0', { timeout: 15_000 });
+      await expect(p.locator('.ion-page:not(.ion-page-hidden) .home__list ion-spinner')).toHaveCount(0);
+      expect(await homeBlocks(p), 'the last lists received').toEqual(before);
+      await expect(onShown(p, 'home-popular-net')).toHaveText('');
+      await onShown(p, 'home-popular').scrollIntoViewIfNeeded();
+    } },
+  { name: 'home-popular-offline-none', path: '/home', only: ['phone-light', 'phone-dark', 'tablet'], tall: 2000, before: async (p) => {
+      await p.addInitScript(() => localStorage.setItem('inok.net', JSON.stringify({ connected: false, metered: false, dataSaver: false })));
+      await p.route(/fixtures\/articles\.json\?.*sort=views_week/, (r) => r.abort());
+    }, ready: async (p) => {
+      const live = onShown(p, 'home-popular-net');
+      await expect(live).toHaveAttribute('role', 'status');
+      const [off, retry] = await words(p, ['net.offline', 'net.retry']);
+      await expect(live).toContainText(off, { timeout: 15_000 });
+      await expect(homeBlocks(p)).resolves.toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [] });
+      await expect(p.locator('.ion-page:not(.ion-page-hidden) .home__list ion-spinner')).toHaveCount(0);
+      await live.scrollIntoViewIfNeeded();
+      const r = await live.getByRole('button', { name: retry }).boundingBox();
+      expect(r && r.height, '«Повторити» 48 dp').toBeGreaterThanOrEqual(48);
+    } },
+  { name: 'home-popular-retry', path: '/home', only: ['phone-light'], before: async (p) => {
+      await p.route(/fixtures\/articles\.json\?.*sort=views_week/, (r) => r.abort());
+    }, ready: async (p) => {
+      const live = onShown(p, 'home-popular-net');
+      const [silent, retry] = await words(p, ['net.unreachable', 'net.retry']);
+      await expect(live, 'the device online, the site silent: never «no internet»').toContainText(silent, { timeout: 15_000 });
+      await p.unroute(/fixtures\/articles\.json\?.*sort=views_week/);
+      await live.getByRole('button', { name: retry }).click();
+      await expect.poll(async () => (await homeBlocks(p))['home-popular'], { message: '«Повторити» brings the block' }).toEqual([2869, 2738, 1892, 2871]);
+      await expect(live).toHaveText('');
     } },
   // A-25 #5 (R-24): the calendar in paragraphs as /live/ on a phone — folded 2, unfolded all 5 with their emphasis; at 17:30 Kyiv the
   // site already shows the next day and the strip says so (the clock is fixed: the fixture's calendar is of 2 Nov)
@@ -2334,11 +2451,25 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       const live = onShown(p, 'articles-more-net');
       await expect(live, 'the live region is in the page before the tap').toHaveAttribute('role', 'status');
       await expect(live).toHaveText('');
-      const n = await onShown(p, 'articles').locator('[data-testid^="arow-"]').count();
       await p.context().setOffline(true);
       await onShown(p, 'articles-more').click();
       const [off, retry] = await words(p, ['net.offline', 'net.retry']);
       await expect(live).toContainText(off);
+      await expect(live.getByRole('button', { name: retry })).toBeVisible();
+      // NOTE 1 (REVIEW cloud_38): the frame is taken AFTER the tap, the button AND its line in view (the owner's own case, seen)
+      await live.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+      await expect(onShown(p, 'articles-more')).toBeInViewport({ ratio: 1 });
+      await expect(live).toBeInViewport({ ratio: 1 });
+    } },
+  { name: 'net-articles-more-retry', path: '/articles', only: ['phone-light'], ready: async (p) => {
+      await toAll(p);
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-views_week"]').click();
+      await expect(onShown(p, 'kinds')).toHaveAttribute('data-query', /\|all\|\|views_week$/, { timeout: 5000 });
+      const live = onShown(p, 'articles-more-net');
+      const n = await onShown(p, 'articles').locator('[data-testid^="arow-"]').count();
+      await p.context().setOffline(true);
+      await onShown(p, 'articles-more').click();
+      const [retry] = await words(p, ['net.retry']);
       await expect(live.getByRole('button', { name: retry })).toBeVisible();
       await p.context().setOffline(false);
       await live.getByRole('button', { name: retry }).click();
@@ -2371,31 +2502,40 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(onShown(p, 'article-missing')).toHaveCount(0);
       await expect(note.getByRole('button', { name: (await words(p, ['net.retry']))[0] })).toBeVisible();
     } },
-  { name: 'net-outer-link-offline', path: '/more/commission', only: ['phone-light'], before: recordOpens, ready: async (p) => {
+  { name: 'net-outer-link-offline', path: '/more/commission', only: ['phone-light', 'phone-dark'], before: recordOpens, ready: async (p) => {
       await expect(onShown(p, 'social')).toBeAttached();
       await p.context().setOffline(true);
       await onShown(p, 'social-telegram').click();
       const t = p.locator('ion-toast[data-testid="net-toast"]');
       await expect(t).toHaveText(new RegExp((await words(p, ['net.offline']))[0].replace(/[.()]/g, '\\$&')));
       expect(await p.evaluate(() => (window as any).__opened), 'nothing opened into an error page').toEqual([]);
+      await toastContrast(p, 'net-toast'); // NOTE 2 + 3: shot fully shown; «Повторити» readable in both themes
+    } },
+  { name: 'net-outer-link-retry', path: '/more/commission', only: ['phone-light'], before: recordOpens, ready: async (p) => {
+      await expect(onShown(p, 'social')).toBeAttached();
+      await p.context().setOffline(true);
+      await onShown(p, 'social-telegram').click();
+      const t = await toastShown(p, 'net-toast');
       await p.context().setOffline(false);
       await t.locator('[data-testid="net-toast-retry"]').click();
       await expect.poll(() => p.evaluate(() => (window as any).__opened.length), { message: '«Повторити» opens it' }).toBe(1);
     } },
-  { name: 'net-refresh-offline', path: '/articles', only: ['phone-light'], ready: async (p) => {
+  { name: 'net-refresh-offline', path: '/articles', only: ['phone-light', 'phone-dark'], ready: async (p) => {
       await expect(onShown(p, 'articles')).toBeVisible();
       await p.context().setOffline(true);
       await onShown(p, 'refresh').click();
       await expect(p.locator('ion-toast[data-testid="net-toast"]')).toContainText((await words(p, ['net.offline']))[0]);
       await expect(onShown(p, 'refresh')).toHaveAttribute('data-busy', '0'); // never an endless spinner
+      await toastContrast(p, 'net-toast');
     } },
-  { name: 'net-rating-offline', path: '/articles?id=2869', only: ['phone-light'], ready: async (p) => {
+  { name: 'net-rating-offline', path: '/articles?id=2869', only: ['phone-light', 'phone-dark'], ready: async (p) => {
       await expect(onShown(p, 'rating')).toBeVisible();
       await p.context().setOffline(true);
       await onShown(p, 'star-5').click();
       const t = p.locator('ion-toast[data-testid="rating-toast"]');
       await expect(t).toContainText((await words(p, ['net.offline']))[0]);
       await expect(t.locator('[data-testid="rating-toast-retry"]')).toBeAttached();
+      await toastContrast(p, 'rating-toast'); // NOTE 3 (REVIEW cloud_38): «ПОВТОРИТИ» was dark teal on dark grey
     } },
   { name: 'net-push-later', path: '/more/notifications', only: ['phone-light'], before: pushPerm('granted'), ready: async (p) => {
       await expect(p.getByTestId('topic-articles')).toBeVisible();
@@ -2679,14 +2819,14 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.route(/\/fixtures\/manifest\.json/, async (r) => (n++ === 0 ? r.fallback() : r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!DOCTYPE html><html><head><title>Захищена сторінка</title></head><body></body></html>' })));
     }, ready: async (p) => {
       // the first manifest = the first-run import; the START refresh already meets the page: silent (no message), no «checked» time
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(3, { timeout: 15_000 });
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 }); // A-128: two blocks of four
       await expect(onShown(p, 'refresh')).toHaveAttribute('data-busy', '0', { timeout: 15_000 });
       await expect(p.locator('ion-toast.refresh-toast')).toHaveCount(0);
       await expect(p.getByTestId('home-checked')).toHaveText('Оновити дані');
       await onShown(p, 'refresh').click();
       await expect(p.locator('ion-toast.refresh-toast')).toHaveText('Сервер зайнятий, спробуйте пізніше.');
       await toastAboveTabs(p, 'ion-toast.refresh-toast'); // D73
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(3);
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8);
       await expect(p.getByTestId('tiles')).toBeVisible();
     } },
   // A-51 (R-35): an opened article takes its item from the server - an admin's edit shows without a restart (the feed still has the old copy)
@@ -3034,18 +3174,29 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       // the name a screen reader says starts with the WHOLE word («Трансляції» + the live hint when a service is on)
       for (const x of m) await expect(p.getByRole('tablist').getByRole('tab', { name: new RegExp(`^${x.word}( |$)`) })).toHaveCount(1);
       expect(Math.min(...m.map((x) => x.bw)), 'every tab >= 48 dp wide').toBeGreaterThanOrEqual(48);
+      // NOTE 4 (REVIEW cloud_38): the header's title never breaks INSIDE a word («Монастирськи / й» at 320 dp x 200 % in 1.0.11 / 1.0.12)
+      const broken = await onShown(p, 'page-title').evaluate((h) => {
+        const node = h.firstChild!; const text = node.textContent!; const out: string[] = []; let at = 0;
+        for (const w of text.split(' ')) { const r = document.createRange(); r.setStart(node, at); r.setEnd(node, at + w.length); at += w.length + 1;
+          if (new Set(Array.from(r.getClientRects()).map((b) => Math.round(b.top))).size > 1) out.push(w); }
+        return out; });
+      expect(broken, 'words of the title broken inside').toEqual([]);
+      const tb = await onShown(p, 'page-title').evaluate((h) => ({ over: h.scrollWidth > h.clientWidth + 1, size: parseFloat(getComputedStyle(h).fontSize) }));
+      expect(tb.over, 'the title inside its room').toBe(false);
+      expect(tb.size, 'never below 14 px').toBeGreaterThanOrEqual(14);
     } })),
   // NOTE 5 (REVIEW cloud_36): the iPad 13" (1032 x 1376 pt) - tiles, calendar and the lists of «Головна» share ONE column edge (cloud_36: the
   // calendar ran edge to edge, the rows stopped at the 960-px column)
   { name: 'home-ipad13', path: '/home', width: 1032, tall: 1376, only: ['tablet'], ready: async (p: Page) => {
       await expect(onShown(p, 'calendar')).toBeVisible(); await expect(onShown(p, 'home-new')).toBeVisible();
       const e = await p.locator(SHOWN).evaluate((pg) => { const r = (s: string) => pg.querySelector(s)!.getBoundingClientRect();
-        const tiles = Array.from(pg.querySelectorAll('.tiles .tile')).map((t) => t.getBoundingClientRect());
-        return { tilesL: Math.round(tiles[0].left), tilesR: Math.round(tiles[tiles.length - 1].right), calL: Math.round(r('.cal').left), calR: Math.round(r('.cal').right),
+        const tiles = Array.from(pg.querySelectorAll('[data-testid="tiles"] .tile')).map((t) => t.getBoundingClientRect()); // the home row, not the social one (A-128)
+        return { socialL: Math.round(r('.social').left), socialR: Math.round(r('.social').right), tilesL: Math.round(tiles[0].left), tilesR: Math.round(tiles[tiles.length - 1].right), calL: Math.round(r('.cal').left), calR: Math.round(r('.cal').right),
           listL: Math.round(r('.home__list').left), listR: Math.round(r('.home__list').right), vw: innerWidth }; });
       expect([e.calL, e.calR], `the calendar on the tiles' edges ${JSON.stringify(e)}`).toEqual([e.tilesL, e.tilesR]);
       expect(Math.abs((e.listL + e.listR) / 2 - e.vw / 2), `the lists centred in the same column ${JSON.stringify(e)}`).toBeLessThanOrEqual(1);
       expect(e.listR - e.tilesR, `the list's edge = the tiles' row edge + its 12 px inset ${JSON.stringify(e)}`).toBe(12);
+      expect([e.socialL, e.socialR], `A-128: the social block in the lists' column ${JSON.stringify(e)}`).toEqual([e.listL, e.listR]);
     } },
   // NOTE 8 (REVIEW cloud_37, the Play tablet10 dark home): ONE dark tone - the 960 column's lists are the page's tone, no lighter band
   { name: 'home-wide-dark-one-tone', path: '/home', width: 1280, tall: 720, only: ['tablet'], ready: async (p: Page) => {

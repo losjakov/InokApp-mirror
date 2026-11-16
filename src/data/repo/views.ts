@@ -3,7 +3,7 @@ import { getMeta, setMeta } from '@/data/db/schema';
 import { dataSource } from '@/data/source';
 import { kyivToday } from '@/data/live/streams';
 import { cacheGet, cacheSet } from './cache';
-import { castBody } from './cast';
+import { sendCast } from './cast';
 
 /**
  * A-65 / R-38 (contract §3): the site's eye on an OPENED article or monastery, and ONE app view of it by the site's rules.
@@ -39,7 +39,7 @@ export async function sendView(db: Db, t: ViewTarget, token: string, now: Date =
   const today = kyivToday(now);
   if ((await getMeta(db, mk)) === today) return false;
   try {
-    await dataSource().view(viewsPath(t), await castBody(db, (i) => viewLine(t, i), { token }));
+    await sendCast(db, (i) => viewLine(t, i), { token }, (b) => dataSource().view(viewsPath(t), b));
     await setMeta(db, mk, today);
     return true;
   } catch {

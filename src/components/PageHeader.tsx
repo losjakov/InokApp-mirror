@@ -13,6 +13,9 @@ import logo from '@/assets/brand/inok.svg?url'; // ONE brand source: the launche
  * off the home screen it is the way home (the owner's word 01.11: the common «logo = home» convention; «Ще → Головна» as well).
  * A-25 #6: the back arrow on EVERY screen but «Головна», the SAME handler as the system Back (`useGoBack`, one history).
  */
+/** NOTE 4: the smallest size a header title shrinks to so that no word is broken inside (the type scale's secondary size) */
+const TITLE_MIN_PX = 14;
+
 export function PageHeader({ title, end, search, fit }: { title: string; end?: ReactNode; search?: ReactNode;
   /** A-97: the title's TEXT is dropped (never cut, never wrapped) where it does not fit beside the buttons - the toolbar keeps its name */
   fit?: boolean }) {
@@ -20,8 +23,16 @@ export function PageHeader({ title, end, search, fit }: { title: string; end?: R
   const h1 = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
     const el = h1.current;
-    if (!fit || !el || typeof ResizeObserver === 'undefined') return;
-    const check = () => { el.dataset.dropped = el.scrollWidth > el.clientWidth + 1 ? '1' : '0'; }; // measured with the text laid out (transparent, not removed)
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    // NOTE 4 (REVIEW cloud_38): a wrapping title never breaks INSIDE a word - a word wider than the room shrinks the title's size step by step
+    // (to 14 px at least; only a word longer even then may break: `data-long`); measured again whenever the room changes
+    const shrink = () => {
+      el.style.fontSize = ''; el.dataset.long = '0';
+      let px = parseFloat(getComputedStyle(el).fontSize);
+      while (el.scrollWidth > el.clientWidth + 1 && px > TITLE_MIN_PX) { px -= 1; el.style.fontSize = `${px}px`; }
+      if (el.scrollWidth > el.clientWidth + 1) el.dataset.long = '1';
+    };
+    const check = fit ? () => { el.dataset.dropped = el.scrollWidth > el.clientWidth + 1 ? '1' : '0'; } : shrink; // fit: measured with the text laid out (transparent, not removed)
     const ro = new ResizeObserver(check);
     ro.observe(el); check();
     return () => ro.disconnect();

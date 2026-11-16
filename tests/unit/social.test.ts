@@ -24,12 +24,13 @@ describe('social block (A-120 1)', () => {
       expect(src.filter(([, s]) => s.includes(host)).map(([f]) => f), host).toEqual([join('src', 'data', 'links', 'social.ts')]);
     }
   });
-  it('one component on «Про комісію», «Про застосунок» and «Контакти» (A-126), after the content (Commission, Contacts: right above the share strip)', () => {
+  it('one component on «Про комісію», «Про застосунок», «Контакти» (A-126) and «Головна» (A-128), after the content (Commission, Contacts: right above the share strip; Home: under the two blocks, the «checked» line last)', () => {
     const com = readFileSync('src/pages/Commission.tsx', 'utf8'); const about = readFileSync('src/pages/About.tsx', 'utf8');
     expect(com).toMatch(/<SocialLinks \/>\s*<ShareFooter/);
     expect(about).toMatch(/<\/IonList>\s*<SocialLinks \/>\s*<\/IonContent>/);
     expect(readFileSync('src/pages/Contacts.tsx', 'utf8')).toMatch(/\{c && <SocialLinks \/>\}\s*\{c && <ShareFooter/);
-    expect(files('src').filter((f) => readFileSync(f, 'utf8').includes('<SocialLinks')).sort()).toEqual([join('src', 'pages', 'About.tsx'), join('src', 'pages', 'Commission.tsx'), join('src', 'pages', 'Contacts.tsx')]);
+    expect(readFileSync('src/pages/Home.tsx', 'utf8')).toMatch(/testId="home-popular" \/>\}\s*<\/IonList>\s*<SocialLinks \/>\s*<IonList className="home__list home__list--end">\s*<IonItem[^\n]*data-testid="home-fresh"/);
+    expect(files('src').filter((f) => readFileSync(f, 'utf8').includes('<SocialLinks')).sort()).toEqual([join('src', 'pages', 'About.tsx'), join('src', 'pages', 'Commission.tsx'), join('src', 'pages', 'Contacts.tsx'), join('src', 'pages', 'Home.tsx')]);
   });
   it('the heading in three languages', () => {
     expect([uk, ru, en].map((d) => (d as Record<string, string>)['social.title'])).toEqual(['У соціальних мережах', 'В социальных сетях', 'On social media']);

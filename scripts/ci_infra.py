@@ -43,7 +43,8 @@ NOT_FOUND = re.compile(r'Could not find ([\w.\-]+:[\w.\-]+:[\w.\-]+)')
 WHOLE_CLASSPATH = 5
 # cloud_32 (REVIEW cloud_31 answer 3, emulator 43560886828 API 35): gfxstream errors, then `error: device offline` - the emulator died after
 # every check had run; adb's own words for a lost device
-EMU_LOST = re.compile(r'error: device offline|error: no devices/emulators found|error: device \S* ?not found|error: closed', re.I)
+# cloud_39 (REVIEW cloud_38 NOTE 5, emulator 43906475640 API 35): newer adb says «adb: device offline» - the same loss
+EMU_LOST = re.compile(r'(?:error|adb): device offline|error: no devices/emulators found|error: device \S* ?not found|error: closed', re.I)
 HOST = re.compile(r'(?:https?://)?((?:[a-z0-9-]+\.)+(?:com|org|net|io|dev|info|cloud|googleapis\.com|ubuntu\.com))\b', re.I)
 
 
@@ -146,6 +147,8 @@ def self_test():
     assert classify('emu', "error: device 'emulator-5554' not found", 1).startswith('INFRA the emulator')
     assert classify('emu', 'device', 1) == 'CODE' and classify('emu', 'FAIL no-db', 1) == 'CODE' and classify('emu', 'error: device offline', 0) == 'OK'
     assert classify('test', 'error: device offline', 1) == 'CODE'  # a test step never turns INFRA by its log
+    nav = 'adb: device offline\nadb: device offline\nemulator smoke 35-google_apis: FAIL nav FAIL:articles-top'  # run 43906475640, NOTE 5
+    assert classify('emu', nav, 1) == 'INFRA the emulator (adb: adb: device offline)', classify('emu', nav, 1)
     assert classify('net', '', 124) == 'INFRA timeout' and classify('test', '', 124) == 'CODE' and classify('net', 'x', 0) == 'OK'
     import tempfile
     global CI_DIR

@@ -6,5 +6,6 @@ import Capacitor
 class InokBridgeViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(FcmTopicsPlugin())
+        bridge?.registerPluginInstance(AppAttestPlugin()) // cloud_39: App Attest for iOS casts (A-127, R-53)
     }
 }
