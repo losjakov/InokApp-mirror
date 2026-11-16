@@ -125,6 +125,17 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     // A-127: no App Attest on a simulator - the ring checks the HONEST line (cast.ios) there; the live cast = the owner's iPhone
     expect(tourB1).toMatch(/a3 "rating cast \(A1\)" PASS "[^"]*honest line/);
     expect(tourB1).toMatch(/a3 "App Attest cast \(A1\)" NOT-PROVABLE/);
+    // ios run 1 of cloud_39: ONE status bar override with an ISO time (Xcode 26.6 refuses «10:00» - the real clock was in the frames);
+    // the tour step under `set +e` (a missing blank.txt ended a green App Store set red); a sparse page (99 %) is not a blank one
+    expect(tourB1.match(/simctl status_bar "\$U" override/g)).toHaveLength(2);
+    expect(tourB1).toMatch(/--time 2026-11-16T10:00:00\+00:00 "\$\{a\[@\]\}"[^\n]*\\\n\s*\|\| xcrun simctl status_bar "\$U" override --time 10:00/);
+    expect(read('.github/actions/ios-sim-run/action.yml')).toMatch(/run: \|\n\s+set \+e/);
+    expect(tourB1).toMatch(/case "\$p" in "BLANK \(100%"\*\) ;; BLANK\*\) p="ok \(sparse/);
+    // the WebGL map screen and the eparchy's way back over its map: OUT, never FAIL; the list's way back stays in the lock; toasts recorded in the page
+    expect(tourB1).toMatch(/a3 "screen \$name \(A8\)" OUT "\$\{v:-no answer from the page\}/);
+    expect(tourB1).toMatch(/a3 "back over the map \(header arrow\)" OUT/);
+    expect(tourB1).toMatch(/a3 "back \(header arrow\)" FAIL/);
+    expect(tourB1).toMatch(/toast_watch\n\s+nav click '\[data-testid="article"\] \[data-testid="star-5"\]'/);
     // the tour: ANY FAIL spot = exit 1; the App Store task only whole and clean
     const tour = read('scripts/ios_sim_tour.sh');
     expect(tour).toMatch(/if grep -q '\| FAIL \|' "\$A3" 2>\/dev\/null; then [^\n]*RC=1; fi/);

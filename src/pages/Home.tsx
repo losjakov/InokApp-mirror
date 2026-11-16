@@ -133,7 +133,10 @@ export function HomePage() {
 /** A section head of «Головна» with its «Усі» (A-88: an item of the list whose words are a level-2 heading). */
 function HomeHeading({ label, to, testId, state }: { label: string; to: string; testId?: string; state?: unknown }) {
   const { t } = useApp();
-  return <ListHeading className="home__h" testId={testId} label={label} end={<Link to={to} state={state} className="home__all" data-testid={testId && `${testId}-all`}>{t('home.all')}</Link>} />;
+  // A-95 (cloud_39): four «Усі» on one screen - each link's name says WHICH list («Усі: Популярне за тиждень»), the visible word first
+  // (WCAG 2.5.3 label in name), so TalkBack / VoiceOver's link list tells them apart
+  return <ListHeading className="home__h" testId={testId} label={label} end={<Link to={to} state={state} className="home__all" aria-label={`${t('home.all')}: ${label}`}
+    data-testid={testId && `${testId}-all`}>{t('home.all')}</Link>} />;
 }
 
 /**

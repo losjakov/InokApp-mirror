@@ -161,7 +161,7 @@ export const ACTIONS = {
     m.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: pad, duration: 0 });
     return 'ok';
   })()`,
-  /** cloud_38 NOTE 9: the smallest scroll (0 ... 64 px) at which no row, heading or tile of the page is cut by the tab bar or the header */
+  /** cloud_38 NOTE 9: the smallest scroll (0 ... 200 px - cloud_39: the A-128 home's article rows are taller than 64 px) at which no row, heading or tile of the page is cut by the tab bar or the header */
   wholeRows: `(async () => {
     const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden')).pop();
     const ct = pg?.querySelector('ion-content'); if (!ct) return 'none';
@@ -171,7 +171,7 @@ export const ACTIONS = {
     const atoms = Array.from(pg.querySelectorAll('ion-item, .home__h, ion-list-header, .cal, .tile > ion-icon, .tile > span:not(.tile__dot)')).filter((e) => e.getClientRects().length > 0)
       .map((e) => { const b = e.getBoundingClientRect(); return [b.top, b.bottom]; });
     const cut = (sc) => atoms.some(([t, b]) => (t - sc < top - 1 && b - sc > top + 1) || (t - sc < bottom - 1 && b - sc > bottom + 1));
-    for (let sc = 0; sc <= 64; sc++) if (!cut(sc)) { if (sc) await ct.scrollByPoint(0, sc, 0); await new Promise((ok) => setTimeout(ok, 300)); return 'ok'; }
+    for (let sc = 0; sc <= 200; sc++) if (!cut(sc)) { if (sc) await ct.scrollByPoint(0, sc, 0); await new Promise((ok) => setTimeout(ok, 300)); return 'ok'; }
     return 'none';
   })()`,
   /** tablet frame 06: the selected article's row of the list in view (its centre), «Показати більше» until it is there (at most 15 pages) */

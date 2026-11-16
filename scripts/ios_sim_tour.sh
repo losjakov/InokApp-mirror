@@ -19,7 +19,19 @@ S="$OUT"; ART=${STORE_ARTICLE:-1832}
 # shellcheck source=scripts/store_lib.sh
 . "$ROOT/scripts/store_lib.sh"
 # cloud_38 (E5, ios run 2: the App Store frames of iOS 26.5 showed the real clock): the status bar override is re-applied before EVERY frame
-demo_all() { xcrun simctl status_bar "$U" override --time 10:00 --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100 2>>"$OUT/nav.txt" || true; sleep 1; }
+# cloud_39 (ios run 1 of the session, iOS 26.5 / Xcode 26.6): `--time 10:00` is refused («Invalid, non-ISO date/time string») and the REAL
+# clock showed in the App Store frames (E5 again) - an ISO time first, the short form only where an older simctl wants it; ONE override
+sb_override() {
+  local a=(--dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100)
+  xcrun simctl status_bar "$U" override --time 2026-11-16T10:00:00+00:00 "${a[@]}" 2>>"$OUT/nav.txt" \
+    || xcrun simctl status_bar "$U" override --time 10:00 "${a[@]}" 2>>"$OUT/nav.txt" || true
+}
+# ios run 1 (cloud_39): a snackbar lives 2.5 s and one remote-hand call can take longer - every toast shown is RECORDED in the page from
+# before the tap (testid|message, every 100 ms) and read back after it; never a poll from outside
+toast_watch() { ev "(() => { window.__toasts = []; clearInterval(window.__toastTimer); window.__toastTimer = setInterval(() => document.querySelectorAll('ion-toast').forEach((t) => {
+  const k = (t.getAttribute('data-testid') || '') + '|' + (t.message || ''); if (t.message && !window.__toasts.includes(k)) window.__toasts.push(k); }), 100); return 'ok'; })()" > /dev/null; }
+toasts() { ev "(window.__toasts || []).join(' ; ') || 'no toast'"; }
+demo_all() { sb_override; sleep 1; }
 ev() { local o; o=$(node "$NAVJS" eval "$1" 2>>"$OUT/nav.txt") || true; o="${o%%$'\n'*}"; printf '%s\n' "${o#eval: }"; }
 
 # ---- the runtime: newest / oldest iOS the runner has; for «oldest» first try to download iOS 15 (the app's floor), then 16, 17
@@ -95,7 +107,7 @@ reboot_sim() {
   xcrun simctl shutdown "$U" > /dev/null 2>&1 || true
   xcrun simctl boot "$U"; xcrun simctl bootstatus "$U" -b > /dev/null
   xcrun simctl ui "$U" appearance light
-  xcrun simctl status_bar "$U" override --time 10:00 --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100 2>>"$OUT/nav.txt" || true
+  sb_override
   xcrun simctl location "$U" set 50.4344,30.5571 2>>"$OUT/nav.txt" || true
   launch
 }
@@ -132,8 +144,11 @@ a3_walk() {
   node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1; sleep 2
   local m1; m1=$(node "$NAVJS" url); nav click '[data-testid="back"]'; sleep 3; local u2; u2=$(node "$NAVJS" url)
   local wide; wide=$(ev "innerWidth >= 600 ? 'wide' : 'phone'")
-  if { [ "$wide" = wide ] || { [ "${c1#/monasteries/}" != "$c1" ] && [ "$u1" = /monasteries ]; }; } && [ "${m1#/map}" != "$m1" ] && [ "$u2" = /more/eparchies/1 ]; then
-    a3 "back (header arrow)" PASS "list->$c1->back=$u1; eparchy->$m1->back=$u2 ($wide)"; else a3 "back (header arrow)" FAIL "list->$c1->back=$u1; eparchy->$m1->back=$u2 ($wide)"; fi
+  if [ "$wide" = wide ] || { [ "${c1#/monasteries/}" != "$c1" ] && [ "$u1" = /monasteries ]; }; then
+    a3 "back (header arrow)" PASS "list->$c1->back=$u1 ($wide)"; else a3 "back (header arrow)" FAIL "list->$c1->back=$u1 ($wide)"; fi
+  # A-127: the eparchy's way back crosses its WebGL map - outside the lock (ios run 1 of cloud_39: the page stopped answering on the map)
+  if [ "${m1#/map}" != "$m1" ] && [ "$u2" = /more/eparchies/1 ]; then a3 "back over the map (header arrow)" PASS "eparchy->$m1->back=$u2"
+  else a3 "back over the map (header arrow)" OUT "eparchy->$m1->back=$u2 - the WebGL map on the way (A-127)"; fi
   a3 "back (edge swipe)" NOT-PROVABLE "a system gesture: no DOM tap reaches it - the owner's iPhone (PHONE_TEST_BACKLOG cloud_37)"
   reboot_sim   # the eparchy's mini-map (WebGL) of spot 2: the next frames from a fresh simulator (ios run 1, D12)
   guard_crash spot3
@@ -180,11 +195,9 @@ a3_walk() {
   # 6 «Очистити збережені фото»: the space read (the gallery above saved photos), the button, its confirmation, the toast, the space after
   nav go /more; sleep 3; local before after
   before=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=photos-used]')||{}).textContent||'none'")
-  nav click '[data-testid="photos-clear"]'; sleep 2
-  ev "(document.querySelector('ion-alert [data-testid=photos-confirm-do]')||{}).click?.(), 'ok'" > /dev/null; sleep 1
-  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do # the files are deleted first, then the toast (~2 s): polled, not read once (ios run 2: «15,9 МБ -> 0 МБ», toast missed)
-    v=$(ev "document.querySelector('ion-toast[data-testid=photos-cleared]') ? 'toast' : 'none'"); [ "$v" = toast ] && break; sleep 1
-  done; shot "$OUT/a3-photos-clear__$TAG.png"; sleep 3
+  nav click '[data-testid="photos-clear"]'; sleep 2; toast_watch
+  ev "(document.querySelector('ion-alert [data-testid=photos-confirm-do]')||{}).click?.(), 'ok'" > /dev/null; sleep 4; shot "$OUT/a3-photos-clear__$TAG.png"
+  case "$(toasts)" in *photos-cleared\|*) v=toast;; *) v=none;; esac; sleep 2
   after=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=photos-used]')||{}).textContent||'none'")
   [ "$v" = toast ] && a3 "clear saved photos" PASS "$before -> $after, the toast shown" || a3 "clear saved photos" FAIL "$before -> $after, toast: $v"
   guard_crash spot7
@@ -243,10 +256,10 @@ a3_walk() {
   ev "(() => { const b = Array.from(document.querySelectorAll('ion-alert.soft-ask:not(.overlay-hidden) .alert-button')).pop(); b && b.click(); return 'ok'; })()" > /dev/null; sleep 2
   local r0 r1 rt v0 v1 vs
   r0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]')||{}).disabled ? 'cast before' : 'open'")
-  ev "window.__inokLastCast = null, 'ok'" > /dev/null
+  ev "window.__inokLastCast = null, 'ok'" > /dev/null; toast_watch
   nav click '[data-testid="article"] [data-testid="star-5"]'; sleep 3
+  rt=$(toasts)
   r1=$(ev "(() => { const s = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]'); return (s && s.dataset.lit === '1' ? 'lit' : 'not lit') + '; server ' + (window.__inokLastCast || 'ok'); })()")
-  rt=$(ev "(Array.from(document.querySelectorAll('ion-toast')).map((t) => t.message).filter(Boolean).pop()) || 'no toast'")
   shot "$OUT/a3-rating__$TAG.png"
   # A-127: a simulator has no App Attest (isSupported = false) - the ring checks the HONEST line there (`cast.ios`, never «try again»); the
   # live cast with an assertion is the owner's iPhone (PHONE_TEST_BACKLOG cloud_39), outside the lock
@@ -255,7 +268,7 @@ a3_walk() {
   nav scroll '[data-testid^="vote-up-"]'; sleep 2
   ev "window.__inokLastCast = null, 'ok'" > /dev/null
   v0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none'")
-  nav click '[data-testid^="vote-up-"]'; sleep 6
+  nav click '[data-testid^="vote-up-"]'; sleep 3   # the vote's status line lives 6 s (CommentsBlock): read inside it
   v1=$(ev "((document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none') + '; server ' + (window.__inokLastCast || 'ok')")
   vs=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=vote-status]')||{}).textContent || ''")
   shot "$OUT/a3-like__$TAG.png"
@@ -286,9 +299,15 @@ a3_walk() {
       const t = Array.from(pg.querySelectorAll('[data-testid=page-title], ion-title')).find((e) => e.getClientRects().length > 0); const ov = document.documentElement.scrollWidth > innerWidth + 1;
       return (document.querySelector('[data-testid=crash]') ? 'CRASH' : 'ok') + ' title «' + ((t && t.textContent) || '').trim().slice(0, 40) + '» ' + (ov ? 'SIDEWAYS' : 'fits') + ' ' + location.pathname + location.search; })()")
     shot "$OUT/a8-${name}__$TAG.png"; local p; p=$("${PY:-python3}" -I "$ROOT/scripts/store_png.py" --paint "$OUT/a8-${name}__$TAG.png" 2>/dev/null || echo '?')
-    case "$v|$p|$AFTER_GL" in "ok title «"*"» fits "*"|ok|"*) a3 "screen $name (A8)" PASS "$v; pixels $p";;
+    # ios run 1 (cloud_39): «Мова» on an iPad is a white page with 3 rows - 99 % one colour is a sparse page, not a blank one; only 100 % is
+    case "$p" in "BLANK (100%"*) ;; BLANK*) p="ok (sparse: ${p#BLANK })";; esac
+    local ok8=no; case "$v|$p" in "ok title «"*"» fits "*"|ok"*) ok8=yes;; esac
+    if [ "$name" = map ] && [ "$ok8" = no ]; then   # A-127: the WebGL map screen as a whole is outside the lock
+      a3 "screen $name (A8)" OUT "${v:-no answer from the page}; pixels $p - the WebGL map screen itself (A-127: outside the lock)"; else
+    case "$v|$p|$AFTER_GL" in "ok title «"*"» fits "*"|ok"*) a3 "screen $name (A8)" PASS "$v; pixels $p";;
       "ok title «"*"» fits "*"|1") a3 "screen $name (A8)" OUT "$v; pixels $p - the picture after a WebGL map (A-127: outside the lock; the DOM checks passed)";;
       *) a3 "screen $name (A8)" FAIL "$v; pixels $p";; esac
+    fi
     case "$name" in map|eparchy|contacts) reboot_sim;; esac   # a WebGL map on screen: the next frame from a fresh simulator (D12)
   done
   a3 "VoiceOver" NOT-PROVABLE "the simulator has no VoiceOver - names / roles / order are the a11y tree of the same DOM (axe 0); the owner's iPhone"
@@ -322,7 +341,7 @@ for kind in $KINDS; do
   echo "== $TAG: ${DT#*|} on iOS $RTV ($U)" | tee -a "$OUT/runtimes.txt"
   xcrun simctl boot "$U"; xcrun simctl bootstatus "$U" -b > /dev/null
   xcrun simctl ui "$U" appearance light
-  xcrun simctl status_bar "$U" override --time 10:00 --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100 2>>"$OUT/nav.txt" || true
+  sb_override
   xcrun simctl location "$U" set 50.4344,30.5571 2>>"$OUT/nav.txt" || true   # the Lavra: «Поруч»
   xcrun simctl install "$U" "$APP"
   xcrun simctl privacy "$U" grant location "$BUNDLE" 2>>"$OUT/nav.txt" || true

@@ -816,6 +816,11 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
         .every((e, i, a) => !!e && (i === 0 || !!(a[i - 1]!.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING))));
       expect(order, 'new -> popular -> social -> the «checked» line last').toBe(true);
       await expect(onShown(p, 'social-row').locator('a')).toHaveCount(3);
+      // A-95: the four «Усі» are told apart by the screen reader - each named by its list, the visible word first (label in name)
+      const all = (await words(p, ['home.all']))[0];
+      for (const [id, w] of [['home-new', nw], ['home-popular', pop]]) await expect(onShown(p, `${id}-all`)).toHaveAccessibleName(`${all}: ${w}`);
+      const names = await p.locator(`${SHOWN} .home__all`).evaluateAll((es) => es.map((e) => e.getAttribute('aria-label')));
+      expect(new Set(names).size, `every «${all}» its own name ${JSON.stringify(names)}`).toBe(names.length);
       await expect(onShown(p, 'home-new-net')).toHaveText(''); await expect(onShown(p, 'home-popular-net')).toHaveText('');
       await onShown(p, 'social').scrollIntoViewIfNeeded();
     } },

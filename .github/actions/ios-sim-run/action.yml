@@ -26,6 +26,7 @@ runs:
     - name: The tour - ${{ inputs.task }} on the ${{ inputs.runtime }} iOS, ${{ inputs.device }}
       shell: bash
       run: |
+        set +e   # ios run 1 (cloud_39): under the runner's `bash -e` a missing blank.txt below ended a GREEN set red - only the tour decides
         O="ios-out/${{ inputs.task }}-${{ inputs.runtime }}-${{ inputs.device }}"
         bash scripts/ios_sim_tour.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "$O" ${{ inputs.runtime }} ${{ inputs.device }} ${{ inputs.task }}; rc=$?
         { echo "### iOS ${{ inputs.task }} ${{ inputs.runtime }} ${{ inputs.device }} (exit $rc)"; grep '^== ' "$O/runtimes.txt"; echo '```'; cat "$O/a3.txt" 2>/dev/null; cat "$O/blank.txt" 2>/dev/null; echo '```';
