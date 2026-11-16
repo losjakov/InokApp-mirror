@@ -4,12 +4,14 @@
 # SAME commands as the Android emulator (scripts/emu_nav.mjs: go, click, wait, check, do, drawn) reach it through scripts/ios_relay.mjs.
 # A «tap» = a DOM click on the element inside the real WKWebView (as on the emulator); the system's own UI (share sheet, Safari view,
 # permission prompts) has no DOM - those spots are screenshots or NOT-PROVABLE (a line for the owner's iPhone).
-#   bash scripts/ios_sim_tour.sh <App.app> <out dir> newest|oldest
+#   bash scripts/ios_sim_tour.sh <App.app> <out dir> newest|oldest [iphone|ipad|both] [walk|appstore]
+# cloud_38 (A-124 / P10): one device and one task per CI job (the 1.0.11 release job ran out of its 150 min); a walk exits 1 on ANY FAIL
+# spot (the TestFlight upload waits for every simulator job to be green); the App Store task exits 1 unless its set is whole and checked.
 # Output: <out>/runtimes.txt (what the runner has and what was downloaded), a3.txt (one line per trouble spot: device | runtime | spot |
 # PASS / FAIL / NOT-PROVABLE | evidence), a3-<spot>__<device>.png, <device>_console.txt; newest only: appstore/<lang>/<iphone|ipad>/NN-*.png
 # (A-122: the App Store set from the LIVE export, the frames of scripts/store_frames.txt, the read-backs of scripts/store_lib.sh) + sizes.txt.
 set -uo pipefail
-APP="$1"; OUT="$2"; WHICH="$3"; ROOT="$(cd "$(dirname "$0")/.." && pwd)"; BUNDLE=info.inok.app
+APP="$1"; OUT="$2"; WHICH="$3"; DEV="${4:-both}"; MODE="${5:-$([ "$WHICH" = newest ] && echo both || echo walk)}"; ROOT="$(cd "$(dirname "$0")/.." && pwd)"; BUNDLE=info.inok.app
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 export INOK_NAV_RELAY=http://localhost:8765
 NAVJS="$ROOT/scripts/emu_nav.mjs"
@@ -54,7 +56,22 @@ t = max(pref or ts, key=num); print(t["identifier"] + "|" + t["name"])' "$RTID" 
 
 A3="$OUT/a3.txt"
 a3() { echo "$TAG | iOS $RTV | $1 | $2 | $3" | tee -a "$A3"; }
-shot() { xcrun simctl io "$U" screenshot --type=png "$1" > /dev/null 2>&1 || echo "SHOT FAIL $1" >> "$OUT/nav.txt"; }
+# cloud_38 (A8: «blank screenshots on iOS 26.5 while the DOM checks passed»): every shot is read by its pixels (scripts/store_png.py --paint);
+# a BLANK one is taken again after 3 s and both verdicts are written to blank.txt - the cause is measured, never guessed
+shot() {
+  xcrun simctl io "$U" screenshot --type=png "$1" > /dev/null 2>&1 || { echo "SHOT FAIL $1" >> "$OUT/nav.txt"; return 1; }
+  local p; p=$("${PY:-python3}" -I "$ROOT/scripts/store_png.py" --paint "$1" 2>/dev/null || echo '?')
+  case "$p" in BLANK*) sleep 3; xcrun simctl io "$U" screenshot --type=png "$1" > /dev/null 2>&1
+    local q; q=$("${PY:-python3}" -I "$ROOT/scripts/store_png.py" --paint "$1" 2>/dev/null || echo '?')
+    echo "$(basename "$1") | iOS $RTV | first: $p | after 3 s: $q" >> "$OUT/blank.txt";; esac
+}
+# REVIEW cloud_37 NOTE 5 (the «gallery» frame showed the eparchy): a frame is shot only when what its NAME promises is on the screen -
+# $2 = the CSS that proves it (on the page on top or an open overlay); else the file gets «-WRONG» and the spot FAILs
+shotof() {
+  local on; on=$(ev "(() => { const e = Array.from(document.querySelectorAll('$2')).find((x) => x.getClientRects().length > 0 && !x.closest('.ion-page-hidden') && !x.closest('.overlay-hidden')); return e ? 'yes' : 'no'; })()")
+  if [ "$on" = yes ]; then shot "$1"; return 0; fi
+  shot "${1%.png}-WRONG.png"; echo "WRONG CONTENT $(basename "$1"): no $2" >> "$OUT/nav.txt"; return 1
+}
 capture() { shot "$1"; }
 launch() { # (re)start the app with its console captured; wait for «home painted» and for the remote hand to ask the relay
   xcrun simctl terminate "$U" "$BUNDLE" > /dev/null 2>&1 || true
@@ -116,13 +133,13 @@ a3_walk() {
   nav go /monasteries/242; node "$NAVJS" wait '[data-testid="card"]' >> "$OUT/nav.txt" 2>&1; sleep 2
   nav click '[data-testid="card"] [data-testid="photo-load"]'; sleep 3; node "$NAVJS" wait '[data-testid="card"] [data-testid="gallery"]' >> "$OUT/nav.txt" 2>&1
   nav click '[data-testid="card"] [data-testid="gallery"]'; sleep 5
-  local g1 g2 g3; g1=$(ev "(document.querySelector('[data-testid=viewer-count]')||{}).textContent||'none'")
-  shot "$OUT/a3-gallery__$TAG.png"
+  local g1 g2 g3 gs=ok; g1=$(ev "(document.querySelector('[data-testid=viewer-count]')||{}).textContent||'none'")
+  sleep 2; shotof "$OUT/a3-gallery__$TAG.png" 'ion-modal.viewer [data-testid=viewer-count]' || gs=WRONG
   ev "document.querySelector('ion-modal.viewer [data-testid=viewer-next]').click(), 'ok'" > /dev/null; sleep 3
   g2=$(ev "(document.querySelector('[data-testid=viewer-count]')||{}).textContent||'none'")
   ev "document.querySelector('ion-modal.viewer [data-testid=viewer-close]').click(), 'ok'" > /dev/null; sleep 3
   g3=$(ev "document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed'")
-  case "$g1|$g2|$g3" in "1 / "*"|2 / "*"|closed") a3 "gallery (app's viewer)" PASS "$g1 -> $g2 -> $g3";; *) a3 "gallery (app's viewer)" FAIL "$g1 -> $g2 -> $g3";; esac
+  case "$g1|$g2|$g3|$gs" in "1 / "*"|2 / "*"|closed|ok") a3 "gallery (app's viewer)" PASS "$g1 -> $g2 -> $g3; the frame = the viewer";; *) a3 "gallery (app's viewer)" FAIL "$g1 -> $g2 -> $g3; frame $gs";; esac
   guard_crash spot5
   # 5 «Автозавантаження фото» = «Вручну» (the select's dialog, tapped), then a card's cover waits with its button; back to Wi-Fi and mobile
   nav go /more; sleep 2; nav click '[data-testid="photos-mode"]'; sleep 2
@@ -193,6 +210,53 @@ a3_walk() {
   nav click '[data-testid="social-telegram"]'; sleep 6; shot "$OUT/a3-external__$TAG.png"
   case "$v" in *Telegram=https://t.me/inokinfo*Facebook=*Instagram=*) a3 "social block + outside link" PASS "$v; the Safari view = a3-external__$TAG.png";; *) a3 "social block + outside link" FAIL "$v";; esac
   launch
+  guard_crash spot14
+  # 14 A1 (A-124: «оцінки й лайки не ставляться» on iOS): a star and a like on article 1833 (it has comments) - the server's own answer read back
+  nav go "/articles?id=1833"; node "$NAVJS" wait '[data-testid="article"] [data-testid="rating"]' >> "$OUT/nav.txt" 2>&1; sleep 3
+  local r0 r1 rt v0 v1 vs
+  r0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]')||{}).disabled ? 'cast before' : 'open'")
+  ev "window.__inokLastCast = null, 'ok'" > /dev/null
+  nav click '[data-testid="article"] [data-testid="star-5"]'; sleep 8
+  r1=$(ev "(() => { const s = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]'); return (s && s.dataset.lit === '1' ? 'lit' : 'not lit') + '; server ' + (window.__inokLastCast || 'ok'); })()")
+  rt=$(ev "(Array.from(document.querySelectorAll('ion-toast')).map((t) => t.message).filter(Boolean).pop()) || 'no toast'")
+  shot "$OUT/a3-rating__$TAG.png"
+  case "$r1" in lit*'server ok') a3 "rating cast (A1)" PASS "$r0 -> $r1";; *) a3 "rating cast (A1)" FAIL "$r0 -> $r1; toast «$rt»";; esac
+  nav scroll '[data-testid^="vote-up-"]'; sleep 2
+  ev "window.__inokLastCast = null, 'ok'" > /dev/null
+  v0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none'")
+  nav click '[data-testid^="vote-up-"]'; sleep 6
+  v1=$(ev "((document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none') + '; server ' + (window.__inokLastCast || 'ok')")
+  vs=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=vote-status]')||{}).textContent || ''")
+  shot "$OUT/a3-like__$TAG.png"
+  case "$v0|$v1" in "n|y; server ok") a3 "comment like (A1)" PASS "mine $v0 -> $v1"; nav click '[data-testid^="vote-up-"]'; sleep 4;;  # withdrawn: the desired state «none»
+    *) a3 "comment like (A1)" FAIL "mine $v0 -> $v1; «$vs»";; esac
+  guard_crash spot15
+  # 15 A2: the soft offer of «Публікації» after the first opened article (as on Android) - our dialog, never the system's prompt first
+  ev "(async () => { const P = Capacitor.Plugins.Preferences; const v = (await P.get({ key: 'settings' })).value; const s = Object.assign(v ? JSON.parse(v) : {}, { asked: [] });
+    await P.set({ key: 'settings', value: JSON.stringify(s) }); return 'ok'; })()" > /dev/null
+  launch; nav go "/articles?id=1832"; sleep 6
+  v=$(ev "(() => { const a = Array.from(document.querySelectorAll('ion-alert.soft-ask--articles')).find((e) => !e.classList.contains('overlay-hidden')); return a ? 'offer: ' + a.querySelector('.alert-title')?.textContent + ' / ' + Array.from(a.querySelectorAll('.alert-button')).map((b) => b.textContent.trim()).join(' | ') : 'no offer'; })()")
+  shotof "$OUT/a3-push-offer__$TAG.png" 'ion-alert.soft-ask--articles' > /dev/null
+  case "$v" in offer:*) a3 "notifications offer (A2)" PASS "$v";; *) a3 "notifications offer (A2)" FAIL "$v";; esac
+  ev "(() => { const b = Array.from(document.querySelectorAll('ion-alert.soft-ask--articles .alert-button')).pop(); b && b.click(); return 'ok'; })()" > /dev/null; sleep 2   # «Ні, дякую»
+  nav go /more/notifications; sleep 3
+  v=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=push-status]')||{}).textContent || 'none'")
+  shotof "$OUT/a3-notifications__$TAG.png" '[data-testid=push-list]' > /dev/null
+  [ "$v" != none ] && a3 "«Сповіщення» screen (A2)" PASS "«$v»" || a3 "«Сповіщення» screen (A2)" FAIL "no status line"
+  a3 "system permission prompt + delivery (A2)" NOT-PROVABLE "a simulator shows no APNs prompt result / no FCM delivery - the owner's iPhone (PHONE_TEST_BACKLOG cloud_38)"
+  # 16 A8 (A-124 «все, що забаговано»): EVERY screen of the app - the frame, its pixels (never blank), no crash, the page's title on top
+  local sc path name
+  for sc in home:/home monasteries:/monasteries card:/monasteries/242 map:/map streams:/streams articles:/articles article:/articles?id=1832 \
+    more:/more favourites:/more/favourites language:/more/language notifications:/more/notifications commission:/more/commission \
+    contacts:/more/contacts eparchies:/more/eparchies eparchy:/more/eparchies/1 about:/more/about; do
+    name="${sc%%:*}"; path="${sc#*:}"; guard_crash "a8-$name"
+    nav go "$path"; sleep 5; [ "$name" = map ] && node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
+    v=$(ev "(() => { const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden')).pop(); if (!pg) return 'no page';
+      const t = Array.from(pg.querySelectorAll('[data-testid=page-title], ion-title')).find((e) => e.getClientRects().length > 0); const ov = document.documentElement.scrollWidth > innerWidth + 1;
+      return (document.querySelector('[data-testid=crash]') ? 'CRASH' : 'ok') + ' title «' + ((t && t.textContent) || '').trim().slice(0, 40) + '» ' + (ov ? 'SIDEWAYS' : 'fits') + ' ' + location.pathname + location.search; })()")
+    shot "$OUT/a8-${name}__$TAG.png"; local p; p=$("${PY:-python3}" -I "$ROOT/scripts/store_png.py" --paint "$OUT/a8-${name}__$TAG.png" 2>/dev/null || echo '?')
+    case "$v|$p" in "ok title «"*"» fits "*"|ok") a3 "screen $name (A8)" PASS "$v; pixels $p";; *) a3 "screen $name (A8)" FAIL "$v; pixels $p";; esac
+  done
   a3 "VoiceOver" NOT-PROVABLE "the simulator has no VoiceOver - names / roles / order are the a11y tree of the same DOM (axe 0); the owner's iPhone"
   a3 "share sheet / call / directions (Apple Maps)" NOT-PROVABLE "system sheets and other apps - the owner's iPhone"
 }
@@ -214,7 +278,8 @@ node "$ROOT/scripts/ios_relay.mjs" > "$OUT/relay.log" 2>&1 &
 RELAY=$!
 trap 'kill $RELAY 2>/dev/null' EXIT
 RC=0
-for kind in iPhone iPad; do
+KINDS="iPhone iPad"; case "$DEV" in iphone) KINDS=iPhone;; ipad) KINDS=iPad;; esac
+for kind in $KINDS; do
   TAG="$(echo "$kind" | tr 'A-Z' 'a-z')"
   DT="$(devtype "$kind")"; [ -n "$DT" ] || { echo "::error::no $kind for $RTID"; RC=1; continue; }
   U="$(xcrun simctl create "inok-$TAG-$WHICH" "${DT%%|*}" "$RTID")"
@@ -227,15 +292,19 @@ for kind in iPhone iPad; do
   xcrun simctl privacy "$U" grant location "$BUNDLE" 2>>"$OUT/nav.txt" || true
   if ! launch; then a3 "start" FAIL "no «home painted» / no remote hand - ${TAG}_console.txt"; RC=1; xcrun simctl shutdown "$U"; continue; fi
   a3 "start + live import" PASS "$(grep -a 'InokBoot' "$OUT/${TAG}_console.txt" | tail -2 | sed 's/.*InokBoot: //' | tr '\n' ';' | cut -c1-200)"
-  a3_walk
-  if [ "$WHICH" = newest ]; then
-    if [ "$kind" = iPhone ]; then appstore phone iphone; else appstore tablet ipad; fi || echo "App Store set STOPPED ($TAG): $(grep -E 'FAIL' "$OUT/nav.txt" | tail -1)" | tee -a "$OUT/demo.txt"
-  fi
+  case "$MODE" in walk|both) a3_walk;; esac
+  case "$MODE" in appstore|both)
+    if [ "$kind" = iPhone ]; then appstore phone iphone; else appstore tablet ipad; fi || { echo "App Store set STOPPED ($TAG): $(grep -E 'FAIL' "$OUT/nav.txt" | tail -1)" | tee -a "$OUT/demo.txt"; RC=1; };;
+  esac
   xcrun simctl shutdown "$U" || true
 done
-if [ "$WHICH" = newest ]; then
-  "${PY:-python3}" -I "$ROOT/scripts/store_png.py" --appstore "$OUT/appstore" | tee "$OUT/sizes.txt"
+if [ "$MODE" = appstore ] || [ "$MODE" = both ]; then
+  "${PY:-python3}" -I "$ROOT/scripts/store_png.py" --appstore "$OUT/appstore" "$(echo "$KINDS" | tr 'A-Z' 'a-z')" | tee "$OUT/sizes.txt"
   store_summary | tee -a "$OUT/sizes.txt"
+  # A-124 / E11: the set counts only when whole and every read-back clean (every summary line «…: 0»)
+  grep -q 'store screenshots: PASS' "$OUT/sizes.txt" || RC=1
+  grep -E ': [1-9][0-9]*$' "$OUT/sizes.txt" | grep -v '^on air' && RC=1
 fi
-grep -c '| FAIL |' "$A3" > /dev/null && { echo "::warning::A3: $(grep -c '| FAIL |' "$A3") spot(s) FAIL - $A3"; }
+# A-124: a walk with ANY FAIL spot is red - the TestFlight upload of this run waits for every simulator job to be green
+if grep -q '| FAIL |' "$A3" 2>/dev/null; then echo "::error::A3: $(grep -c '| FAIL |' "$A3") spot(s) FAIL - $A3"; RC=1; fi
 exit $RC

@@ -1,5 +1,7 @@
 import UIKit
 import Capacitor
+import FirebaseCore
+import FirebaseMessaging
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,8 +9,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // cloud_38 (A2): Firebase Messaging for the site's FCM topics - only when the CI put GoogleService-Info.plist into the bundle
+        // (never in git); without it the app runs as before and src/native/push.ts says why the topics are not kept
+        if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil { FirebaseApp.configure() }
         return true
+    }
+
+    // cloud_38 (A2): the APNs token - to Firebase (FirebaseAppDelegateProxyEnabled = NO in Info.plist: no swizzling) and to
+    // @capacitor/push-notifications, whose `registration` event src/native/push.ts waits for (1.0.11 had neither: no iOS registration ever ended)
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        if FirebaseApp.app() != nil { Messaging.messaging().apnsToken = deviceToken }
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

@@ -71,6 +71,9 @@ shoot_set() { # set W H density
   local top; top=$(nav_top)
   if [ "${top:-0}" -gt 0 ] && [ "$W" -gt "$H" ]; then extra=$((H - top)); adb shell wm size ${W}x$((H + extra)); sleep 5; demo_all; fi
   echo "$set: ${W}x${H} @${dpi} navigation area ${extra}px (shot ${W}x$((H + extra)), cut to ${W}x${H})" | tee -a "$S/demo.txt"
+  # cloud_38 D16: a size / density change with pages (the map) kept in the WebView's stack drew the 1.0.11 map frames in a corner - every set
+  # starts from a FRESH app process at its final size (the settings, language included, live in Preferences and come back with it)
+  adb shell am force-stop $PKG; sleep 2; adb shell am start -n $PKG/.MainActivity >/dev/null; sleep 12; demo_all
   local lists=phone; [ "$set" = phone ] || lists=tablet
   for lang in uk ru en; do
     local d="$S/$lang/$set"

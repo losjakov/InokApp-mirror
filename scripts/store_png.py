@@ -4,7 +4,9 @@
 For every <dir>/<lang>/<set>/<NN>-<screen>.png: a shot taken taller than its set (a landscape set with a system navigation area at the
 bottom, emu_store.sh) is cut back to the set's exact size from the top; the alpha channel is dropped (24-bit RGB PNG: Play refuses
 alpha). Then every rule is checked and printed per file: exact 9:16 (phone) or 16:9 (tablets), short side >= 1080, RGB without alpha,
-<= 8 MB; and the counts 8 / 7 / 7 in each of uk / ru / en (--appstore <dir>: iphone 1320 x 2868 x 8, ipad 2064 x 2752 x 7). The last line says PASS or FAIL. Needs Pillow (apt python3-pil).
+<= 8 MB; cloud_38 (E11, D16): never a BLANK frame (one colour over the screen's body: a white WebView paint) and, for a map frame with
+its box written beside it (`<file>.png.maprect` = "x y w h" in the PNG's pixels, scripts/store_lib.sh), never a map canvas painted in part
+(white over more than MAP_WHITE_MAX of the box); and the counts 8 / 7 / 7 in each of uk / ru / en (--appstore <dir>: iphone 1320 x 2868 x 8, ipad 2064 x 2752 x 7). The last line says PASS or FAIL. Needs Pillow (apt python3-pil).
 """
 import os
 import sys
@@ -14,6 +16,8 @@ SETS = {'phone': (1080, 1920, 8), 'tablet7': (1920, 1080, 7), 'tablet10': (1920,
 APPSTORE = {'iphone': (1320, 2868, 8), 'ipad': (2064, 2752, 7)}
 LANGS = ('uk', 'ru', 'en')
 MAX_BYTES = 8 * 1024 * 1024
+BLANK_MIN = 0.985  # the share of the body (below the status bar, above the navigation) in ONE colour that makes a frame blank
+MAP_WHITE_MAX = 0.08  # the share of pure white (every channel >= 250) a drawn map may hold (the base map's land is #f8f4f0, never white)
 
 
 def finish(path, w, h):
@@ -45,6 +49,33 @@ def check(path, w, h):
         bad.append('mode %s (alpha)' % im.mode)
     if os.path.getsize(path) > MAX_BYTES:
         bad.append('over 8 MB')
+    return bad + paint(path)
+
+
+def pixels(im):
+    return [im.getpixel((x, y)) for y in range(im.size[1]) for x in range(im.size[0])]
+
+
+def paint(path):
+    """E11 / D16: what the pixels say - a blank frame; a map box (sidecar) painted only in part"""
+    from PIL import Image
+    im = Image.open(path).convert('RGB')
+    w, h = im.size
+    body = im.crop((0, int(h * 0.1), w, int(h * 0.88))).resize((90, 120))
+    px = pixels(body)
+    mode = max(set(px), key=px.count)
+    same = sum(1 for q in px if max(abs(q[i] - mode[i]) for i in range(3)) <= 8) / len(px)
+    bad = ['BLANK (%d%% of the body one colour %s)' % (same * 100, '#%02x%02x%02x' % mode)] if same >= BLANK_MIN else []
+    side = path + '.maprect'
+    if os.path.exists(side):
+        with open(side) as fh:
+            x, y, bw, bh = [int(float(v)) for v in fh.read().split()[:4]]
+        box = im.crop((max(0, x), max(0, y), min(w, x + bw), min(h, y + bh)))
+        box = box.resize((120, max(1, int(120 * box.size[1] / max(1, box.size[0])))))
+        q = pixels(box)
+        white = sum(1 for c in q if min(c) >= 250) / len(q)
+        if white > MAP_WHITE_MAX:
+            bad.append('MAP NOT PAINTED (%d%% of the map box white)' % (white * 100))
     return bad
 
 
@@ -61,7 +92,7 @@ def main(root, sets=SETS):
             if len(files) != n:
                 fails += 1
                 print('%s/%s: %d files, not %d - FAIL' % (lang, name, len(files), n))
-    rule = ('exact 9:16 / 16:9, short side >= 1080' if sets is SETS else 'exact iPhone 6.9" / iPad 13" size') + ', 24-bit PNG without alpha, <= 8 MB, ' \
+    rule = ('exact 9:16 / 16:9, short side >= 1080' if sets == SETS else 'exact iPhone 6.9" / iPad 13" size') + ', 24-bit PNG without alpha, <= 8 MB, ' \
         + ' / '.join(str(n) for _, _, n in sets.values()) + ' x uk ru en'
     print('store screenshots: %s (rules: %s)' % ('PASS' if not fails else 'FAIL (%d)' % fails, rule))
     return 0
@@ -75,16 +106,26 @@ def selftest():
         for name, (w, h, n) in SETS.items():
             os.makedirs(os.path.join(t, lang, name))
             for i in range(n):
-                Image.new('RGBA', (w, h + (60 if w > h else 0)), (10, 20, 30, 255)).save(os.path.join(t, lang, name, '0%d-x.png' % (i + 1)))
+                im = Image.new('RGBA', (w, h + (60 if w > h else 0)), (10, 20, 30, 255))
+                im.paste((240, 240, 240, 255), (0, 0, w // 2, h))  # content: a frame of one colour is BLANK (E11)
+                im.save(os.path.join(t, lang, name, '0%d-x.png' % (i + 1)))
     main(t)
     im = Image.open(os.path.join(t, 'uk', 'tablet7', '01-x.png'))
     assert im.size == (1920, 1080) and im.mode == 'RGB', (im.size, im.mode)
     assert check(os.path.join(t, 'uk', 'phone', '01-x.png'), 1080, 1920) == []
     Image.new('RGB', (1080, 2160)).save(os.path.join(t, 'bad.png'))
     assert 'not 9:16 / 16:9' in check(os.path.join(t, 'bad.png'), 1080, 2160)
+    Image.new('RGB', (1080, 1920), (255, 255, 255)).save(os.path.join(t, 'white.png'))
+    assert any(b.startswith('BLANK') for b in check(os.path.join(t, 'white.png'), 1080, 1920))
     print('store_png self-test: ok')
 
 
 if __name__ == '__main__':
     a = sys.argv[1:]
-    sys.exit(selftest() if a == ['--selftest'] else main(a[1], APPSTORE) if a[:1] == ['--appstore'] else main(a[0]))
+    if a[:1] == ['--paint']:  # one file: its paint problems (unit test, the browser ring)
+        print('; '.join(paint(a[1])) or 'ok')
+        sys.exit(0)
+    if a[:1] == ['--appstore']:  # [iphone|ipad ...]: one device's set (a CI job per device, cloud_38)
+        only = ' '.join(a[2:]).split() or list(APPSTORE)
+        sys.exit(main(a[1], {k: v for k, v in APPSTORE.items() if k in only}))
+    sys.exit(selftest() if a == ['--selftest'] else main(a[0]))

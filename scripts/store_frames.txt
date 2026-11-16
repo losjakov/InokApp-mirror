@@ -10,8 +10,8 @@ phone|05-map|/map|[data-testid="map"][data-ready="1"]|do:fitLavras
 phone|06-monasteries|/monasteries|[data-testid^="mrow-"]|-
 phone|07-publications|/articles|[data-testid^="arow-"]|[data-testid="kind-tab-publication"]
 phone|08-article|/articles?id=$ART|[data-testid="article"] .card__title|-
-tablet|01-home-dark|/home|[data-testid="home-near"]|-
-tablet|02-home|/home|[data-testid="home-near"]|-
+tablet|01-home-dark|/home|[data-testid="home-near"]|do:wholeRows
+tablet|02-home|/home|[data-testid="home-near"]|do:wholeRows
 tablet|03-card|/monasteries/242|[data-testid="card"] [data-testid="views"]|-
 tablet|04-eparchy|/more/eparchies/1|[data-testid="eparchy-title"]|-
 tablet|05-map|/map|[data-testid="map"][data-ready="1"]|-

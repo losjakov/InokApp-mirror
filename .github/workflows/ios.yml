@@ -25,24 +25,33 @@ permissions:
 env:
   PROJECT: ios/App/App.xcodeproj
 jobs:
-  # the simulator build + the iPhone / iPad shots (uk, light): the app paints its home, never a white screen. cloud_37 (A-121, A-122): the
-  # trouble spots of Android walked WITH TAPS on the NEWEST and on the OLDEST iOS runtime (oldest: iOS 15 downloaded if the runner allows it),
-  # iPhone + iPad (scripts/ios_sim_tour.sh); on the newest also the App Store set from the LIVE export. Its Debug bundle alone carries the
-  # remote hand (VITE_SIM_DRIVER=1, src/app/simDriver.ts) and may call http://localhost (the relay) - neither reaches the archive below.
+  # cloud_38 (A-124, standing): THE simulator ring, one device and one task per job so each fits its limit (the 1.0.11 release job walked
+  # iPhone + iPad + the App Store set in one job and ran out of its 150 min). `walk` = the trouble spots of Android + every screen with taps
+  # (scripts/ios_sim_tour.sh: exits 1 on ANY FAIL spot); `appstore` = the App Store set from the LIVE export (exits 1 unless whole and
+  # checked). The Debug bundle alone carries the remote hand (VITE_SIM_DRIVER=1, src/app/simDriver.ts) and may call http://localhost.
+  # The TestFlight upload below waits for EVERY job of this matrix: one red / cancelled job = no upload (A-124).
   simulator:
     if: ${{ !github.event.repository.private }}
     runs-on: macos-26
-    timeout-minutes: 150
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        runtime: [newest, oldest]
+        include:
+          - { runtime: oldest, device: iphone, task: walk }
+          - { runtime: oldest, device: ipad, task: walk }
+          - { runtime: newest, device: iphone, task: walk }
+          - { runtime: newest, device: ipad, task: walk }
+          - { runtime: newest, device: iphone, task: appstore }
+          - { runtime: newest, device: ipad, task: appstore }
+    name: simulator (${{ matrix.task }} ${{ matrix.runtime }} ${{ matrix.device }})
     steps:
       - uses: actions/checkout@v7
       - name: Facts - which repository and event run this
         env: { EXPR_PRIVATE: '${{ github.event.repository.private }}', MIRROR_LIVE: '${{ vars.MIRROR_LIVE }}' }
         run: python3 -I scripts/ci_infra.py facts
       - uses: ./.github/actions/ios-setup
+        with: { google_plist_b64: '${{ secrets.GOOGLE_SERVICE_INFO_PLIST_B64 }}' }
       - name: The simulator bundle - the remote hand in, localhost allowed (this job only; nothing is committed)
         run: |
           VITE_SIM_DRIVER=1 npm run build && npx cap sync ios
@@ -55,21 +64,19 @@ jobs:
           xcodebuild -project "$PROJECT" -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C" build > "$RUNNER_TEMP/sim-build.log" 2>&1 \
             || { grep -E 'error:|warning: .*deprecated' "$RUNNER_TEMP/sim-build.log" | head -40; tail -60 "$RUNNER_TEMP/sim-build.log"; exit 1; }
-          tail -3 "$RUNNER_TEMP/sim-build.log"
+          tail -3 "$RUNNER_TEMP/sim-build.log"; grep -m1 'GoogleService-Info.plist:' "$RUNNER_TEMP/sim-build.log" | tee -a "$GITHUB_STEP_SUMMARY" || true
           echo "simulator App.app: $(du -sk "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" | cut -f1) KB" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: iPhone + iPad simulator - the app paints its home (uk, light)
-        if: matrix.runtime == 'newest'
-        continue-on-error: true # ios run 5: a simulator that booted slowly killed this step and the walk + the App Store set never ran; the walk checks the start itself
-        run: bash scripts/ios_sim_shots.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" ios-out && cat ios-out/result.txt >> "$GITHUB_STEP_SUMMARY"
-      - name: The trouble spots with taps (A-121) + the App Store set on the newest (A-122)
+      - name: The ring - ${{ matrix.task }} on the ${{ matrix.runtime }} iOS, ${{ matrix.device }}
+        timeout-minutes: 70
         run: |
-          bash scripts/ios_sim_tour.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "ios-out/${{ matrix.runtime }}" ${{ matrix.runtime }}; rc=$?
-          { echo "### iOS ${{ matrix.runtime }}"; grep '^== ' "ios-out/${{ matrix.runtime }}/runtimes.txt"; echo '```'; cat "ios-out/${{ matrix.runtime }}/a3.txt" 2>/dev/null; echo '```';
-            cat "ios-out/${{ matrix.runtime }}/sizes.txt" 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
+          O="ios-out/${{ matrix.task }}-${{ matrix.runtime }}-${{ matrix.device }}"
+          bash scripts/ios_sim_tour.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" "$O" ${{ matrix.runtime }} ${{ matrix.device }} ${{ matrix.task }}; rc=$?
+          { echo "### iOS ${{ matrix.task }} ${{ matrix.runtime }} ${{ matrix.device }} (exit $rc)"; grep '^== ' "$O/runtimes.txt"; echo '```'; cat "$O/a3.txt" 2>/dev/null; cat "$O/blank.txt" 2>/dev/null; echo '```';
+            cat "$O/sizes.txt" 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
           exit $rc
       - uses: actions/upload-artifact@v7
         if: always()
-        with: { name: 'ios-simulator-${{ matrix.runtime }}', path: ios-out/, retention-days: 30, if-no-files-found: ignore }
+        with: { name: 'ios-${{ matrix.task }}-${{ matrix.runtime }}-${{ matrix.device }}', path: ios-out/, retention-days: 30, if-no-files-found: ignore }
 
   # the Release archive WITHOUT signing (green whenever the code builds) + the size of the app
   archive:
@@ -79,6 +86,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/ios-setup
+        with: { google_plist_b64: '${{ secrets.GOOGLE_SERVICE_INFO_PLIST_B64 }}' }
       - name: Release archive, NOT signed (+ the size of the app)
         run: |
           set -o pipefail
@@ -93,17 +101,22 @@ jobs:
   # the SIGNED archive by the App Store Connect API key (cloud-managed signing), exported as a signed IPA (proof), or UPLOADED to
   # TestFlight on the release snapshot / a manual run with `upload`. A refusal by Apple is written as it comes (REPORT / QUESTIONS),
   # never worked around - and it never turns the unsigned archive red (its own job).
+  # A-124 (standing): it RUNS after the whole simulator ring (`needs`) and always signs (the proof), but it UPLOADS only when every
+  # simulator job of THIS run is green (needs.simulator.result == 'success') AND the run is a release snapshot (or a manual `upload`).
   testflight:
-    if: ${{ !github.event.repository.private }}
+    if: ${{ always() && !github.event.repository.private }}
+    needs: [simulator]
     runs-on: macos-26
     timeout-minutes: 60
     env:
-      UPLOAD: "${{ (github.event_name == 'workflow_dispatch' && inputs.upload) || (github.event_name == 'push' && contains(github.event.head_commit.message, ': release: v')) }}"
+      RING: ${{ needs.simulator.result }}
+      UPLOAD: "${{ needs.simulator.result == 'success' && ((github.event_name == 'workflow_dispatch' && inputs.upload) || (github.event_name == 'push' && contains(github.event.head_commit.message, ': release: v'))) }}"
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/ios-setup
-      - name: Upload in this run?
-        run: echo "upload to TestFlight in this run - $UPLOAD" | tee -a "$GITHUB_STEP_SUMMARY"
+        with: { google_plist_b64: '${{ secrets.GOOGLE_SERVICE_INFO_PLIST_B64 }}' }
+      - name: Upload in this run? (A-124 - only after a green simulator ring)
+        run: echo "simulator ring of this run - $RING; upload to TestFlight in this run - $UPLOAD" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Signing secrets present (names only)
         id: keys
         env:

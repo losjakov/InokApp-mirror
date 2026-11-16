@@ -1,4 +1,4 @@
-import { IonContent, IonItem, IonLabel, IonList, IonNote, IonToggle, IonPage } from '@ionic/react';
+import { IonButton, IonContent, IonItem, IonLabel, IonList, IonNote, IonToggle, IonPage } from '@ionic/react';
 import { SearchField } from '@/components/SearchField';
 import { ListBox, ListHeading } from '@/components/ListHeading';
 import { useEffect, useRef, useState } from 'react';
@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { ChannelAvatar } from '@/components/StreamRow';
 import { listChannels } from '@/data/repo/channels';
 import { field, type ChannelRow } from '@/data/repo/types';
-import { ARTICLE_KINDS, articleKinds, withArticleKinds, type ArticleKind } from '@/native/push';
+import { ARTICLE_KINDS, articleKinds, openNotificationSettings, withArticleKinds, type ArticleKind } from '@/native/push';
 import { normalize } from '@/data/search/normalize';
 
 const SEARCH_FROM = 12;
@@ -48,7 +48,13 @@ export function NotificationsPage() {
     <IonPage>
       <PageHeader title={t('notifications.title')} />
       <IonContent>
-        <IonNote className="ion-padding-horizontal notifications__status" data-testid="push-status">{status}</IonNote>
+        <IonNote className="ion-padding-horizontal notifications__status" data-testid="push-status" role="status">{status}</IonNote>
+        {/* cloud_38 (A2): refused in the system = the line above says so AND the way back is one tap (iOS asks only once; Android 13+ too) */}
+        {push === 'denied' && (
+          <IonButton fill="outline" expand="block" className="ion-margin-horizontal notifications__settings" onClick={() => void openNotificationSettings()} data-testid="push-open-settings">
+            {t('ask.open_settings')}
+          </IonButton>
+        )}
         <IonList data-testid="push-list">
           {/* A-11: «Нові статті» = the master switch; under it the three kinds (all on = `articles`, some = their kind topics) */}
           <IonItem lines="none">

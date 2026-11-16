@@ -6,6 +6,7 @@ import { Navigate, Route, useLocation, useNavigate } from 'react-router-dom';
 import { ellipsisHorizontalOutline, mapOutline, newspaperOutline, videocamOutline } from 'ionicons/icons';
 import { churchOutline } from '@/components/icons';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { useFitTabLabels } from './tabLabels';
 import { routeForPush } from '@/data/live/pushRoute';
 import { EPARCHIES_PATH, TabButton, useHardwareBack } from './nav';
 import { StartRoute, useAppLinks } from './links';
@@ -44,6 +45,7 @@ function ScreenAnalytics(): null {
 function Tabs() {
   const { t, liveChannelIds, pushTap, clearPushTap, live } = useApp();
   const navigate = useNavigate();
+  useFitTabLabels([t]); // NOTE 3 (cloud_38): the five labels whole at any width and text size
   useHardwareBack();
   useAppLinks(); // A-76: an inok.info article / card link from Telegram, mail… opens here (a cold start's: StartRoute, A-78 1)
   // a tapped notification (contract §4): stream → the YouTube app (A-4.2) + the streams tab; article → the article

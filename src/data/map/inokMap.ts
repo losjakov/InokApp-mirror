@@ -39,7 +39,31 @@ export async function fetchBasemap(url: string, wait = BASEMAP_WAIT_MS): Promise
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<null>((ok) => { timer = setTimeout(() => ok(null), wait); });
   const got = fetch(url).then((r) => (r.ok ? (r.json() as Promise<StyleSpecification>) : null)).then((j) => (j && j.version === 8 && Array.isArray(j.layers) ? j : null), () => null);
-  try { return await Promise.race([got, late]); } finally { clearTimeout(timer); }
+  try {
+    const style = await Promise.race([got, late]);
+    return style && (await withLiveSprite(style, wait));
+  } finally { clearTimeout(timer); }
+}
+
+/** cloud_38 (the tester's Android 8: a weak signal, only the lavras drawn): MapLibre holds EVERY picture of the map - ours too - until the
+ *  style's sprite has answered; a sprite that never answers left every pin waiting. The sprite (its JSON and picture at this screen's
+ *  density) is asked first within `wait`; what does not answer is dropped from the style (the base map loses its road shields and POI
+ *  icons; our houses never wait on the network). An answered sprite is in the WebView's cache when MapLibre asks for it. */
+export async function withLiveSprite(style: StyleSpecification, wait = BASEMAP_WAIT_MS): Promise<StyleSpecification> {
+  const sprites = typeof style.sprite === 'string' ? [style.sprite] : Array.isArray(style.sprite) ? style.sprite.map((x) => x.url) : [];
+  if (!sprites.length) return style;
+  const hi = typeof devicePixelRatio === 'number' && devicePixelRatio > 1 ? '@2x' : '';
+  const ask = (u: string) => fetch(u).then((r) => (r.ok ? r.arrayBuffer().then(() => true) : false), () => false);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<boolean>((ok) => { timer = setTimeout(() => ok(false), wait); });
+  const all = Promise.all(sprites.flatMap((u) => [ask(`${u}${hi}.json`), ask(`${u}${hi}.png`)])).then((r) => r.every(Boolean));
+  try {
+    if (await Promise.race([all, late])) return style;
+  } finally { clearTimeout(timer); }
+  console.info('InokMap: the base map sprite did not answer - the style is drawn without it');
+  const rest: StyleSpecification = { ...style };
+  delete rest.sprite;
+  return rest;
 }
 
 /**
@@ -150,6 +174,9 @@ export interface InokMapOptions {
   onLayers?: (map: MLMap) => void;
 }
 
+/** MapLibre's current Style object (internal): its identity tells a replaced style apart; `_loaded` = what addSource checks */
+const styleOf = (map: MLMap) => (map as unknown as { style?: { _loaded?: boolean } }).style;
+
 /** One map of the app: created once per mount, removed with `remove()`. */
 export class InokMap {
   readonly map: MLMap;
@@ -190,7 +217,8 @@ export class InokMap {
     // the network came back: a style that failed is asked again, lost tiles are asked again
     this.stopNet = onNetChange(() => {
       if (this.fellBack && this.appliedStyle) void this.loadBasemap(this.appliedStyle);
-      else if (this.tilesLost && this.basemap) { this.tilesLost = false; this.map.setStyle(this.basemap, { diff: false, transformStyle: basemapTransform(this.lang) }); }
+      // cloud_38: the reload after a network change asks the style AND its sprite again within the wait (a weak signal never hangs our pins)
+      else if (this.tilesLost && this.basemap && this.appliedStyle) { this.tilesLost = false; void this.loadBasemap(this.appliedStyle); }
     });
     if (interactive) {
       map.touchZoomRotate.disableRotation();
@@ -219,6 +247,17 @@ export class InokMap {
       }
       void this.addLayers();
     });
+    // cloud_38 D16 (the Play map frames drawn in a corner / half white while `data-drawn` stayed 1): a WebView loses the GL context when
+    // the screen's size or density changes (the emulator's `wm size`); MapLibre's own restore brings the canvas back stale and without our
+    // pictures. So: lost = not drawn; restored = the canvas sized to the box again and the style re-applied whole (our layers, the
+    // pictures and the data come back on its style.load) - one path for every map of the app
+    map.on('webglcontextlost', () => { console.info('InokMap: GL context lost'); this.setDrawn('0'); });
+    map.on('webglcontextrestored', () => {
+      console.info('InokMap: GL context restored - style re-applied');
+      if (this.removed) return;
+      map.resize();
+      map.setStyle(this.basemap ?? LOCAL_STYLE, { diff: false, transformStyle: basemapTransform(this.lang) });
+    });
     // the slow tiles came after all (none failed): the note leaves
     map.on('idle', () => { if (this.tilesLost && this.basemap && this.tileErrors === 0) { this.tilesLost = false; o.onBasemap?.(); } });
     // D61: `data-drawn` = the map's own «drawn» signal for shots and tests (never a timer): '1' on MapLibre's `idle` (no camera movement,
@@ -246,8 +285,22 @@ export class InokMap {
   private async addLayers() {
     const map = this.map;
     if (map.getSource(SRC)) return;
-    await addMarkerImages(map); // style.load drops images: registered again for every style (the fallback included)
-    if (map.getSource(SRC)) return;
+    // cloud_38 D15 (iOS: «Style is not done loading.» = the crash screen): the style these layers are for is captured BEFORE the pictures'
+    // await; if another style replaced it meanwhile (the network style over the local one), this call gives up - that style's own
+    // style.load adds the layers. Anything MapLibre still throws is noted, never an unhandled rejection (= the app's crash screen).
+    const style = styleOf(map);
+    try {
+      await addMarkerImages(map); // style.load drops images: registered again for every style (the fallback included)
+      // `_loaded` = the style's own «done loading» (what addSource checks); isStyleLoaded() also waits for tiles - too strict here
+      if (styleOf(map) !== style || !style?._loaded || map.getSource(SRC)) return;
+      this.addOurLayers();
+    } catch (e) {
+      noteMapError({ error: { message: `addLayers: ${String(e)}` } });
+    }
+  }
+
+  private addOurLayers() {
+    const map = this.map;
     map.addSource(SRC, { type: 'geojson', data: EMPTY, cluster: true, clusterRadius: 48, clusterMaxZoom: 11, promoteId: 'code' });
     map.addSource(SRC_LAVRA, { type: 'geojson', data: EMPTY, promoteId: 'code' });
     map.addSource('place', { type: 'geojson', data: EMPTY });

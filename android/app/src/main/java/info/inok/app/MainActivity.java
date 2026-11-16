@@ -32,6 +32,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NetPolicyPlugin.class); // local plugin: metered network + Data Saver (A-20)
         registerPlugin(AnalyticsPlugin.class); // local plugin: Firebase Analytics, screens only (A-36)
         registerPlugin(IntegrityPlugin.class); // local plugin: Play Integrity standard tokens for every write (A-66)
+        registerPlugin(WindowColorsPlugin.class); // local plugin: the window colour under the system bars follows the app theme (cloud_38 NOTE 6)
         super.onCreate(savedInstanceState);
         if (bridge != null) bridge.addWebViewListener(new RenderGuard());
         // 1.0.5 round 2 (owner 11.11.2026, Huawei P30 Pro): the page learns how far it REALLY lies under the navigation bar (NavOverlap) -

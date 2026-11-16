@@ -1,0 +1,3 @@
+/* cloud_38 (A2, REQUEST R-52): a notification title in the language iOS shows the app in - the site sends the three titles
+   as title-loc-args [uk, ru, en] with title-loc-key INOK_PUSH_TITLE (no Notification Service Extension needed). */
+"INOK_PUSH_TITLE" = "%1$@";

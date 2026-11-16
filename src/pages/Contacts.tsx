@@ -12,6 +12,7 @@ import { callPhone, mailTo } from '@/native/intents';
 import { useApp } from '@/state/AppContext';
 import { MiniMap } from '@/components/MiniMap';
 import { ShareFooter } from '@/components/ShareFooter';
+import { SocialLinks } from '@/components/SocialLinks';
 import { sitePageUrl } from '@/data/links/sitePages';
 import { useNavigate } from 'react-router-dom';
 
@@ -61,6 +62,8 @@ export function ContactsPage() {
           </section>
           </>
         )}
+        {/* A-126: the SAME block as «Про комісію» / «Про застосунок» (one component, one place for the addresses), above «Поділитися» */}
+        {c && <SocialLinks />}
         {c && <ShareFooter title={title} url={sitePageUrl('/more/contacts', lang)} />}
       </IonContent>
     </IonPage>

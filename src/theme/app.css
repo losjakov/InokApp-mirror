@@ -40,12 +40,14 @@ ion-back-button + .toolbar__logo { margin-inline-start: 0; }
 .item ion-label > h2, .inok-title { font-size: var(--inok-type-title); font-weight: 500; line-height: 1.3; }
 .item ion-label > p, ion-note, .inok-secondary { font-size: var(--inok-type-secondary); line-height: var(--inok-line); }
 ion-item ion-label { font-size: var(--inok-type-body); }
-ion-tab-button ion-label { font-size: min(var(--inok-type-caption), calc(12px * var(--inok-chrome-max))); white-space: nowrap; }
+ion-tab-button ion-label { font-size: calc(min(var(--inok-type-caption), calc(12px * var(--inok-chrome-max))) * var(--inok-tab-label-scale, 1)); white-space: nowrap; }
+/* cloud_38 NOTE 3: --inok-tab-label-scale (src/app/tabLabels.ts) shrinks the five labels together until they fit - never «Монаст…» */
+ion-tab-button ion-label { text-overflow: clip; }
 /* the tabs share the bar by their labels' length (a long «Трансляції» beside a short «Ще»), never wider than the screen */
 /* the toolbar's icon buttons are chrome too (at 200 % each took 96 px of a 360 px bar and the title broke) */
 ion-toolbar ion-buttons { font-size: min(1rem, calc(16px * var(--inok-chrome-max))); }
 ion-toolbar ion-button.button-has-icon-only { --chrome-btn: min(3rem, calc(48px * var(--inok-chrome-max))); max-width: var(--chrome-btn) !important; max-height: var(--chrome-btn) !important; } /* only a ceiling: Ionic sizes it in rem from inside; at 100 % its own size stays */
-ion-tab-button { flex: 1 1 auto; min-width: 0; --padding-start: 2px; --padding-end: 2px; }
+ion-tab-button { flex: 1 1 auto; min-width: 48px; --padding-start: 2px; --padding-end: 2px; } /* cloud_38: a 48 dp target even for «Ще» */
 ion-chip { font-size: var(--inok-type-secondary); }
 h2.inok-heading, .inok-heading { font-size: var(--inok-type-heading); font-weight: 600; margin: 16px 16px 6px; line-height: 1.25; }
 /* all caps only where Ionic's platform style demands it (the solid primary button); none in our own labels */
@@ -70,7 +72,10 @@ ion-button, ion-chip { text-transform: none; letter-spacing: normal; } /* D10 / 
 .tile__dot { position: absolute; top: 6px; right: 8px; width: 9px; height: 9px; border-radius: 50%; background: var(--ion-color-live); }
 /* NOTE 5 (REVIEW cloud_36, the iPad 13"): ONE 960-px column for the whole of «Головна» - tiles, the calendar and the lists end on the same edge */
 @media (min-width: 600px) { .tiles { max-width: 960px; margin: 0 auto; } .home__list.home__list { max-width: 960px; margin: 0 auto; } /* doubled: Ionic's runtime `.list-md { margin: 0 }` came later and won (the list sat at 0-960) */
-  .home .streams__cal { max-width: calc(960px - 24px); margin-inline: auto; } }
+  .home .streams__cal { max-width: calc(960px - 24px); margin-inline: auto; }
+  /* NOTE 8 (REVIEW cloud_37, tablet10 dark): the 960 column's lists drew the item tone (#1e1e1e) between two bands of the page tone
+     (#121212) - not meant: on a wide screen the lists take the page's tone, ONE dark surface (the tiles and the calendar stay cards) */
+  .ion-palette-dark .home__list.home__list { --ion-item-background: var(--ion-background-color); background: var(--ion-background-color); } }
 .home__h { --color: var(--ion-color-primary); font-size: var(--inok-type-heading); font-weight: 600; min-height: 40px; padding-top: 8px; align-items: baseline; }
 .home__h ion-label { margin: 0; flex: 1 1 auto; }
 .home__all { font-size: var(--inok-type-secondary); font-weight: 500; color: var(--ion-color-primary); text-decoration: none; padding-inline-end: 16px; }

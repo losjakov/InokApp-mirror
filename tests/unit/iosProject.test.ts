@@ -38,6 +38,16 @@ describe('iOS project', () => {
       if (l === 'uk') expect(v).toBe(base);
       expect(pbx).toContain(`path = ${l}.lproj/InfoPlist.strings;`);
     }
+    // cloud_38 (Apple's letter on 10011, ITMS-90683): the «always and when in use» purpose is REQUIRED beside the when-in-use one, although
+    // the app asks «when in use» only (src/native/geolocation.ts) - x3 languages, uk = the original, and it says «only while in use»
+    const always = plistValue(info, 'NSLocationAlwaysAndWhenInUseUsageDescription')?.[2];
+    expect(always, 'ITMS-90683').toMatch(/лише під час користування/);
+    for (const l of ['uk', 'ru', 'en']) {
+      const v = /"NSLocationAlwaysAndWhenInUseUsageDescription" = "([^"]+)";/.exec(read(`ios/App/App/${l}.lproj/InfoPlist.strings`))?.[1];
+      expect(v, `ITMS-90683 ${l}`).toBeTruthy();
+      if (l === 'uk') expect(v).toBe(always);
+    }
+    expect(plistValue(info, 'NSLocationAlwaysUsageDescription'), 'no «always» ask of iOS 10').toBeFalsy();
     expect(pbx).toMatch(/PrivacyInfo\.xcprivacy in Resources/);
     expect(pbx).toMatch(/InfoPlist\.strings in Resources/);
   });
@@ -64,7 +74,8 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     const jobs = wf.slice(wf.indexOf('\njobs:'));
     const names = [...jobs.matchAll(/^ {2}([a-z-]+):\n/gm)].map((m) => m[1]);
     expect(names.length).toBeGreaterThan(0);
-    for (const n of names) expect(jobs.slice(jobs.indexOf(`  ${n}:\n`)).split('\n')[1], n).toBe("    if: ${{ !github.event.repository.private }}");
+    // testflight runs `always()` after the ring (A-124: it signs as proof, uploads only after a green ring) - still never in the home
+    for (const n of names) expect(jobs.slice(jobs.indexOf(`  ${n}:\n`)).split('\n')[1], n).toMatch(/^ {4}if: \$\{\{ (always\(\) && )?!github\.event\.repository\.private \}\}$/);
     expect([...jobs.matchAll(/runs-on: (\S+)/g)].map((m) => m[1]).every((r) => r === 'macos-26')).toBe(true);
   });
   it('no secret is echoed; the key file is removed; the build number is THE rule', () => {
@@ -85,7 +96,47 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     }
     expect(read('ios/App/App/Info.plist')).not.toContain('NSAllowsLocalNetworking');
     expect(read('src/main.tsx')).toMatch(/if \(import\.meta\.env\.VITE_SIM_DRIVER === '1'\) void import\('\.\/app\/simDriver'\)/);
-    expect(job('simulator')).toMatch(/runtime: \[newest, oldest\]/);
+  });
+  it('cloud_38 (A-124, standing): the TestFlight upload waits for EVERY simulator job of the same run - green ring = upload, else none', () => {
+    const jobs = wf.slice(wf.indexOf('\njobs:'));
+    const job = (n: string) => { const i = jobs.indexOf(`  ${n}:\n`); const j = jobs.slice(i + 3).search(/\n {2}[a-z-]+:\n/); return jobs.slice(i, j < 0 ? undefined : i + 3 + j); };
+    const tf = job('testflight');
+    expect(tf).toMatch(/needs: \[simulator\]/);
+    const upload = /UPLOAD: "(.*)"/.exec(tf)![1];
+    expect(upload.startsWith("${{ needs.simulator.result == 'success' && (")).toBe(true); // the ring first, then «release snapshot / manual upload»
+    expect(tf).toMatch(/\[ "\$UPLOAD" = true \]/); // the upload command itself is behind the variable
+    expect(tf.match(/export_to upload/g)).toHaveLength(1);
+    // the ring: one device and one task per job (each within its limit), walks on the oldest and the newest iOS, the App Store set
+    const sim = job('simulator');
+    for (const row of ['{ runtime: oldest, device: iphone, task: walk }', '{ runtime: oldest, device: ipad, task: walk }', '{ runtime: newest, device: iphone, task: walk }',
+      '{ runtime: newest, device: ipad, task: walk }', '{ runtime: newest, device: iphone, task: appstore }', '{ runtime: newest, device: ipad, task: appstore }']) expect(sim).toContain(row);
+    expect(sim).toMatch(/timeout-minutes: 90/);
+    expect(sim).not.toMatch(/continue-on-error/); // a red spot is never hidden
+    // the tour: ANY FAIL spot = exit 1; the App Store task only whole and clean
+    const tour = read('scripts/ios_sim_tour.sh');
+    expect(tour).toMatch(/if grep -q '\| FAIL \|' "\$A3" 2>\/dev\/null; then [^\n]*RC=1; fi/);
+    expect(tour).toMatch(/grep -q 'store screenshots: PASS' "\$OUT\/sizes.txt" \|\| RC=1/);
+  });
+  it('cloud_38 (A2): FCM on iOS - Firebase Messaging, the FcmTopics twin registered by the app\'s bridge, the APNs token handed over', () => {
+    const pbx = read('ios/App/App.xcodeproj/project.pbxproj');
+    expect(pbx).toMatch(/repositoryURL = "https:\/\/github\.com\/firebase\/firebase-ios-sdk";/);
+    expect(pbx).toMatch(/FirebaseMessaging in Frameworks/);
+    for (const f of ['FcmTopicsPlugin.swift in Sources', 'InokBridgeViewController.swift in Sources', 'Localizable.strings in Resources']) expect(pbx, f).toContain(f);
+    expect(pbx).toMatch(/GoogleService-Info\.plist: absent - Firebase off/); // the config is copied when the CI wrote it, never required
+    const plugin = read('ios/App/App/FcmTopicsPlugin.swift');
+    expect(plugin).toMatch(/jsName = "FcmTopics"/);
+    for (const m of ['subscribe', 'unsubscribe', 'openSettings', 'consumedArticles', 'liveChannels']) expect(plugin).toContain(`CAPPluginMethod(name: "${m}"`);
+    expect(read('ios/App/App/Base.lproj/Main.storyboard')).toMatch(/customClass="InokBridgeViewController" customModule="App"/);
+    expect(read('ios/App/App/InokBridgeViewController.swift')).toMatch(/registerPluginInstance\(FcmTopicsPlugin\(\)\)/);
+    const app = read('ios/App/App/AppDelegate.swift');
+    expect(app).toMatch(/Messaging\.messaging\(\)\.apnsToken = deviceToken/);
+    expect(app).toMatch(/post\(name: \.capacitorDidRegisterForRemoteNotifications, object: deviceToken\)/);
+    expect(app).toMatch(/if Bundle\.main\.path\(forResource: "GoogleService-Info", ofType: "plist"\) != nil \{ FirebaseApp\.configure\(\) \}/);
+    expect(plistValue(read('ios/App/App/Info.plist'), 'FirebaseAppDelegateProxyEnabled')?.[1]).toBe('false');
+    for (const [i, l] of ['uk', 'ru', 'en'].entries()) expect(read(`ios/App/App/${l}.lproj/Localizable.strings`)).toContain(`"INOK_PUSH_TITLE" = "%${i + 1}$@";`);
+    // the JS side: the topics on both platforms (one path), the soft offers on iOS too
+    expect(read('src/native/push.ts')).toMatch(/if \(!isNative\(\) \|\| !registered\) return;/);
+    expect(read('src/components/SoftAsk.tsx')).not.toMatch(/isIos/);
   });
   it('ios/ leaves for the mirror; a .p8 never does', () => {
     expect(read('scripts/mirror_paths.txt').split('\n')).toContain('ios/');

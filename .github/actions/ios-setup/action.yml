@@ -1,5 +1,10 @@
 name: ios-setup
 description: THE preparation of every iOS job (cloud_36) - node, npm ci, the web build, cap sync ios, the version pair from package.json
+inputs:
+  google_plist_b64:
+    description: cloud_38 (A2) - GoogleService-Info.plist, base64 (the mirror's secret GOOGLE_SERVICE_INFO_PLIST_B64); empty = Firebase off
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -12,4 +17,11 @@ runs:
       shell: bash
       run: |
         read -r V C < <(python3 -I scripts/app_version.py package.json); echo "V=$V" >> "$GITHUB_ENV"; echo "C=$C" >> "$GITHUB_ENV"
-        echo "$(xcodebuild -version | tr '\n' ' '); iOS $V, build $C; Firebase on iOS: OFF in 1.0.11 (ref/REF_ios_state.md)" | tee -a "$GITHUB_STEP_SUMMARY"
+        echo "$(xcodebuild -version | tr '\n' ' '); iOS $V, build $C" | tee -a "$GITHUB_STEP_SUMMARY"
+    - name: GoogleService-Info.plist from the secret (never in git; the value is never printed) - the project's script phase copies it into the app
+      shell: bash
+      env: { GPLIST: '${{ inputs.google_plist_b64 }}' }
+      run: |
+        if [ -n "$GPLIST" ]; then printf '%s' "$GPLIST" | base64 -D > ios/App/App/GoogleService-Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' ios/App/App/GoogleService-Info.plist > /dev/null 2>&1 && echo "Firebase on iOS: ON (GoogleService-Info.plist present, bundle $(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' ios/App/App/GoogleService-Info.plist))" | tee -a "$GITHUB_STEP_SUMMARY"
+        else echo "Firebase on iOS: OFF (no GOOGLE_SERVICE_INFO_PLIST_B64)" | tee -a "$GITHUB_STEP_SUMMARY"; fi

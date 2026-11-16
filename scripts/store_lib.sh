@@ -47,7 +47,13 @@ shot_frame() { # file name path ready steps
   case "$name" in *card*) v=$(check gallery); echo "gallery $f: $v" >> "$S/demo.txt"; [ "$v" = in-app ] || echo "GALLERY FAIL $f: $v" >> "$S/nav.txt";; esac
   case "$name" in *publications*) v=$(check kind); echo "kind $f: $v" >> "$S/demo.txt"; [ "$v" = publication ] || echo "KIND FAIL $f: $v" >> "$S/nav.txt";; esac
   case "$name" in 02-home) v=$(check live); echo "live on air $f: $v" >> "$S/demo.txt";; esac
+  case "$steps" in *do:wholeRows*) v=$(check rowsWhole); echo "rowsWhole $f: $v" >> "$S/demo.txt"; [ "$v" = ok ] || echo "ROWS CUT FAIL $f: $v" >> "$S/nav.txt";; esac
+  case "$steps" in *do:showSelected*) v=$(check listTop); echo "listTop $f: $v" >> "$S/demo.txt"; [ "$v" = ok ] || echo "LIST TOP FAIL $f: $v" >> "$S/nav.txt";; esac
+  case "$name" in *map*) v=$(check mapview); echo "mapview $f: $v" >> "$S/demo.txt"; [ "$v" = ok ] || echo "MAP VIEW FAIL $f: $v" >> "$S/nav.txt"
+    v=$(check mapbox); [ "$v" = none ] || echo "$v" > "$f.maprect";; esac   # D16: store_png.py reads the box and refuses a canvas painted in part
+  v=$(check crash); [ "$v" = none ] || echo "CRASH FAIL $f: $v" >> "$S/nav.txt"   # E11: the crash screen is never a frame
   capture "$f"
+  [ "$v" = none ] || rm -f "$f"   # E11: a crash frame is not kept (the set is then short: store_png.py says FAIL)
 }
 
 # one set in one language: every frame of store_frames.txt for `set`, in its order; the «-dark» frames in the dark theme
@@ -82,7 +88,8 @@ store_summary() {
     'anything over a frame - dialog, toast, banner (A-122):OVERLAY FAIL' 'gallery not in the app on the card (A-122):GALLERY FAIL' \
     '«Публікації» not on «Статті» (A-122):KIND FAIL' 'language / theme switches not taken:LANG FAIL|THEME FAIL' \
     'unit words / first frames wrong:UNITS FAIL|FIRST FRAME FAIL' 'lavras cut / steps failed:LAVRAS FAIL|STEP FAIL' 'article top cut:ARTICLE TOP FAIL' \
-    'colours wrong:COLOUR FAIL'; do
+    'colours wrong:COLOUR FAIL' 'crash screen in a frame (E11):CRASH FAIL' 'map view not on Ukraine / canvas not sized (D16):MAP VIEW FAIL' \
+    'list beside the article starts on a cut row (NOTE 7):LIST TOP FAIL' 'a home frame ends on a cut row (NOTE 9):ROWS CUT FAIL'; do
     echo "${w%%:*}: $(grep -cE "^(${w#*:})" "$S/nav.txt" 2>/dev/null || true)"
   done
   echo "on air at the minute of the frames: $(grep '^live on air' "$S/demo.txt" | sed 's/.*: //' | tr '\n' ' ')"

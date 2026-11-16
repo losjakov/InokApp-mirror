@@ -62,6 +62,8 @@ export async function castBody<T extends object>(db: Db, line: (install: string)
 export type CastFailure = 'closed' | 'rate_limited' | 'refused' | 'offline' | 'error';
 const CLOSED = new Set(['vote_closed', 'rating_closed', 'report_closed']);
 export function castFailure(e: unknown): CastFailure {
+  // cloud_38 (A1): the server's own answer of the last refused cast, readable by the simulator ring (scripts/ios_sim_tour.sh) - never shown
+  (globalThis as { __inokLastCast?: string }).__inokLastCast = e instanceof ApiError ? `${e.status} ${e.code}` : `no answer: ${String(e).slice(0, 80)}`;
   if (!(e instanceof ApiError)) return 'offline'; // fetch itself failed: no answer from the server
   if (e.status === 503 && CLOSED.has(e.code)) return 'closed';
   if (e.status === 429) return 'rate_limited';

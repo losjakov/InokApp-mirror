@@ -441,7 +441,7 @@ const recordOpens = async (p: Page) => { await p.addInitScript(() => { (window a
  *  screen, the caption whole (never cut) - also at 320 dp x font 200 %; a tap opens THE address by openLink (`open`) */
 const SOCIAL = [['telegram', 'Telegram', 'https://t.me/inokinfo'], ['facebook', 'Facebook', 'https://www.facebook.com/inok.info'],
   ['instagram', 'Instagram', 'https://www.instagram.com/inok.info/']] as const;
-const socialBlock = async (p: Page, commission: boolean, open: boolean) => {
+const socialBlock = async (p: Page, commission: boolean, open: boolean) => { // `commission` = a «Поділитися» follows (Про комісію, Контакти)
   const block = onShown(p, 'social');
   await block.scrollIntoViewIfNeeded();
   await expect(block.getByRole('heading', { level: 2 })).toHaveText(/^(У соціальних мережах|В социальных сетях|On social media)$/);
@@ -1475,6 +1475,61 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.evaluate(() => { const w = window as any; Object.defineProperty(HTMLImageElement.prototype, 'src', w.__src); for (const f of w.__held.splice(0)) f(); }); // the pictures come
       await expect.poll(() => p.evaluate(() => (window as any).__inokMap.getSource('me')?.serialize().data?.features?.length ?? -1), { timeout: 15_000 }).toBe(1);
     } },
+  // cloud_38 D15 (the iOS crash «Style is not done loading.»): the marker pictures of a new style held, and INSIDE the hold the style is
+  // replaced again by one that has not loaded yet (its JSON held) - the first addLayers must give up on the stale style, never add to the new
+  { name: 'map-style-replaced-during-icons', path: '/map', only: ['phone-light'], ready: async (p) => {
+      await mapReady(p);
+      let answer: (() => void) | null = null;
+      await p.route('**/held-style.json', async (r) => { await new Promise<void>((ok) => { answer = ok; }); await r.fulfill({ json: (globalThis as any).__d15style }); });
+      const base = await p.evaluate(() => { const m = (window as any).__inokMap; const st = m.getStyle(); const ours = new Set(['monasteries', 'lavras', 'place', 'me', 'radius']);
+        return { ...st, sources: Object.fromEntries(Object.entries(st.sources).filter(([k]) => !ours.has(k))), layers: st.layers.filter((l: any) => !ours.has(l.source)) }; });
+      (globalThis as any).__d15style = base;
+      await p.evaluate(() => { const w = window as any; const d = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!; w.__held = []; w.__src = d;
+        Object.defineProperty(HTMLImageElement.prototype, 'src', { configurable: true, get() { return d.get!.call(this); }, set(v) { w.__held.push(() => d.set!.call(this, v)); } }); });
+      await p.evaluate((st) => (window as any).__inokMap.setStyle(st, { diff: false }), base); // style A: its addLayers waits for the held pictures
+      await expect.poll(() => p.evaluate(() => (window as any).__held.length), { message: 'the pictures of style A are held' }).toBeGreaterThan(0);
+      await p.evaluate(() => (window as any).__inokMap.setStyle(location.origin + '/held-style.json', { diff: false })); // style B, not loaded
+      await p.evaluate(() => { const w = window as any; Object.defineProperty(HTMLImageElement.prototype, 'src', w.__src); for (const f of w.__held.splice(0)) f(); });
+      await p.waitForTimeout(1500); // the stale addLayers has run to its end
+      await expect(p.getByTestId('crash'), 'no crash screen («Style is not done loading.» on the iOS simulator)').toHaveCount(0);
+      await expect.poll(() => answer !== null, { message: 'style B asked' }).toBe(true);
+      answer!(); // style B arrives: its own style.load brings the houses back
+      await housesDrawn(p);
+    } },
+  // cloud_38 D16 (the nine Play `05-map` frames of 1.0.11: the base map in a corner, the rest white, `data-drawn` 1): the map page hidden
+  // in the tab stack, the screen's size AND density changed (the emulator's `wm size` / `wm density`) and the GL context lost and restored
+  // meanwhile; back on the map every cluster must be drawn whole (its circle's colour under its centre, read from the screenshot) and the
+  // canvas sized to the box. CDP (Chromium) only: WebKit has no device-metrics override.
+  { name: 'map-gl-restored-after-resize', path: '/map', only: ['phone-light'], ready: async (p) => {
+      if (p.context().browser()?.browserType().name() !== 'chromium') return;
+      const cdp = await p.context().newCDPSession(p);
+      const set = (width: number, height: number, deviceScaleFactor: number) => cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: true });
+      await set(360, 640, 3); await p.reload(); await mapReady(p);
+      const fresh = await p.evaluate(() => (window as any).__inokMap.getZoom()); // the app's own fit of every house at the target size
+      await set(411, 800, 2.625); await p.reload(); await mapReady(p);
+      await p.locator('ion-tab-button[tab=monasteries]').click(); await expect(p.getByTestId('map')).toBeHidden();
+      await p.evaluate(() => { const w = window as any; w.__lc = w.__inokMap.getCanvas().getContext('webgl2').getExtension('WEBGL_lose_context'); w.__lc.loseContext(); });
+      await set(360, 640, 3); await p.waitForTimeout(800);
+      await p.evaluate(() => (window as any).__lc.restoreContext()); await p.waitForTimeout(800);
+      await p.locator('ion-tab-button[tab=map]').click(); await mapReady(p);
+      const size = await p.evaluate(() => { const m = (window as any).__inokMap; const c = m.getCanvas(); const b = m.getContainer();
+        return { canvas: [c.width, c.height], want: [Math.round(b.clientWidth * devicePixelRatio), Math.round(b.clientHeight * devicePixelRatio)] }; });
+      expect(size.canvas, 'the canvas sized to its box').toEqual(size.want);
+      const view = await p.evaluate(() => { const m = (window as any).__inokMap; return { zoom: m.getZoom(), kyiv: m.getBounds().contains([30.52, 50.45]) }; });
+      console.log('D16 view', JSON.stringify({ fresh, ...view }));
+      expect(view.kyiv && Math.abs(view.zoom - fresh) < 0.35, `the view = the fit of a fresh start (zoom ${view.zoom.toFixed(2)} vs ${fresh.toFixed(2)})`).toBe(true);
+      const png = (await p.screenshot()).toString('base64');
+      const bad = await p.evaluate(async (b64) => {
+        const m = (window as any).__inokMap; const box = m.getContainer().getBoundingClientRect();
+        const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
+        const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d')!; g.drawImage(img, 0, 0);
+        const k = img.width / innerWidth;
+        return m.queryRenderedFeatures({ layers: ['clusters'] }).map((f: any) => m.project(f.geometry.coordinates)).filter((pt: any) => pt.x > 30 && pt.y > 30 && pt.x < box.width - 30 && pt.y < box.height - 30)
+          .map((pt: any) => { const [r, gg, bb] = g.getImageData(Math.round((box.left + pt.x - 9) * k), Math.round((box.top + pt.y) * k), 1, 1).data; return { pt: [Math.round(pt.x), Math.round(pt.y)], rgb: [r, gg, bb] }; })
+          .filter((s: any) => Math.abs(s.rgb[0] - 0x0c) + Math.abs(s.rgb[1] - 0x64) + Math.abs(s.rgb[2] - 0x86) > 60);
+      }, png);
+      expect(bad, 'every cluster drawn with its circle (a stale GL restore drew counts without circles)').toEqual([]);
+    } },
   { name: 'map-near', path: '/map', ready: async (p) => {
       await mapReady(p);
       await p.getByTestId('near-me').click();
@@ -1537,6 +1592,18 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.waitForTimeout(10_000); // past BASEMAP_WAIT_MS (8 s) after the network style's load
       await expect(p.getByTestId('crash'), 'no crash screen').toHaveCount(0);
       await expect(p.getByTestId('map').locator('visible=true')).toBeVisible();
+    } },
+  // cloud_38 (the tester's Android 8, 16.11: after airplane mode a weak signal - the note back, ONLY the lavras on the map, no other house
+  // even when zoomed): the network style came, but its sprite never answers - MapLibre's images stay «not loaded» and every pin of ours waits
+  // for them. Our layers never wait on the network: the style is applied without a sprite that does not answer in time.
+  { name: 'map-weak-sprite-hangs', path: '/map', only: ['phone-light'], before: async (p) => {
+      await p.route('https://tiles.openfreemap.org/**', (r) => (/\/styles\//.test(r.request().url()) ? r.continue() : /sprite/.test(r.request().url()) ? undefined : r.abort())); },
+    ready: async (p) => {
+      await expect.poll(() => p.evaluate(() => !!(window as any).__inokMap?.getSource('monasteries')), { timeout: 30_000 }).toBe(true);
+      await expect.poll(() => p.evaluate(() => (window as any).__inokMap.getStyle().layers.length), { timeout: 30_000, message: 'the network style applied' }).toBeGreaterThan(20);
+      await expect.poll(() => p.evaluate(() => !!(window as any).__inokMap.style.imageManager.isLoaded()), { timeout: 20_000, message: 'our pictures usable (no image waits for the sprite)' }).toBe(true);
+      await p.evaluate(() => { const m = (window as any).__inokMap; m.jumpTo({ zoom: m.getZoom() + 1 }); });
+      await housesDrawn(p);
     } },
   { name: 'map-offline-weak', path: '/home', before: async (p) => {
       await p.route('https://tiles.openfreemap.org/**', (r) => (/\/styles\//.test(r.request().url()) ? undefined : r.abort())); },
@@ -2877,15 +2944,31 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await onShown(p, 'about-update').click();
       await expect.poll(() => p.evaluate(() => (window as any).__opened)).toEqual(['https://apps.apple.com/app/id6700000001']);
     } },
-  // A-120 (1): the social block on both «Ще» screens - every profile; 320 dp x font 200 % (the row may go one per row); the iOS shell
-  ...(['commission', 'about'] as const).flatMap((pg) => [
-    { name: `social-${pg}`, path: `/more/${pg}`, before: recordOpens, ready: (p: Page) => socialBlock(p, pg === 'commission', true) },
+  // A-120 (1): the social block on the «Ще» screens - every profile; 320 dp x font 200 % (the row may go one per row); the iOS shell.
+  // cloud_38 (A-126): «Контакти» too - the same component, above «Поділитися» (as on «Про комісію»)
+  ...(['commission', 'about', 'contacts'] as const).flatMap((pg) => [
+    { name: `social-${pg}`, path: `/more/${pg}`, before: recordOpens, ready: (p: Page) => socialBlock(p, pg !== 'about', true) },
     { name: `social-${pg}-font200`, path: `/more/${pg}`, width: 320, font: 200, only: ['phone-light', 'phone-dark'], before: recordOpens,
-      ready: (p: Page) => socialBlock(p, pg === 'commission', false) },
+      ready: (p: Page) => socialBlock(p, pg !== 'about', false) },
     { name: `social-${pg}-ios`, path: `/more/${pg}`, only: ['phone-light', 'phone-dark', 'tablet'], before: async (p: Page) => {
         await recordOpens(p); await p.addInitScript(() => { localStorage.setItem('inok.platform', 'ios'); }); },
-      ready: (p: Page) => socialBlock(p, pg === 'commission', true) },
+      ready: (p: Page) => socialBlock(p, pg !== 'about', true) },
   ]),
+  // cloud_38 (REVIEW cloud_37 NOTE 3, A-97): the tab bar at 320 dp x 200 % - every label WHOLE (no «Монаст…» / «Щ..»), one size for the
+  // five, inside its button; the name a screen reader says = the whole word; both themes; also the widest phone and the tablet as they are
+  ...([['tabbar-font200', 320, 200, ['phone-light', 'phone-dark']], ['tabbar-wide', undefined, undefined, ['phone-ru', 'tablet']]] as const).map(([name, width, font, only]) => (
+    { name, path: '/home', width, font, only: [...only], ready: async (p: Page) => {
+      await expect(onShown(p, 'calendar')).toBeVisible();
+      const m = await p.locator('ion-tab-bar').evaluate((bar) => Array.from(bar.querySelectorAll('ion-tab-button')).map((b) => {
+        const l = b.querySelector('ion-label')!; const r = document.createRange(); r.selectNodeContents(l); const t = r.getBoundingClientRect(); const bb = b.getBoundingClientRect();
+        return { word: l.textContent!.trim(), cut: l.scrollWidth > l.clientWidth + 0.5, inside: t.left >= bb.left - 0.5 && t.right <= bb.right + 0.5, size: getComputedStyle(l).fontSize, bw: Math.round(bb.width) }; }));
+      expect(m.filter((x) => x.cut || !x.inside), `labels cut ${JSON.stringify(m)}`).toEqual([]);
+      expect(new Set(m.map((x) => x.size)).size, `one size for the five ${JSON.stringify(m)}`).toBe(1);
+      expect(parseFloat(m[0].size), 'never below 9 px').toBeGreaterThanOrEqual(9);
+      // the name a screen reader says starts with the WHOLE word («Трансляції» + the live hint when a service is on)
+      for (const x of m) await expect(p.getByRole('tablist').getByRole('tab', { name: new RegExp(`^${x.word}( |$)`) })).toHaveCount(1);
+      expect(Math.min(...m.map((x) => x.bw)), 'every tab >= 48 dp wide').toBeGreaterThanOrEqual(48);
+    } })),
   // NOTE 5 (REVIEW cloud_36): the iPad 13" (1032 x 1376 pt) - tiles, calendar and the lists of «Головна» share ONE column edge (cloud_36: the
   // calendar ran edge to edge, the rows stopped at the 960-px column)
   { name: 'home-ipad13', path: '/home', width: 1032, tall: 1376, only: ['tablet'], ready: async (p: Page) => {
@@ -2897,6 +2980,21 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect([e.calL, e.calR], `the calendar on the tiles' edges ${JSON.stringify(e)}`).toEqual([e.tilesL, e.tilesR]);
       expect(Math.abs((e.listL + e.listR) / 2 - e.vw / 2), `the lists centred in the same column ${JSON.stringify(e)}`).toBeLessThanOrEqual(1);
       expect(e.listR - e.tilesR, `the list's edge = the tiles' row edge + its 12 px inset ${JSON.stringify(e)}`).toBe(12);
+    } },
+  // NOTE 8 (REVIEW cloud_37, the Play tablet10 dark home): ONE dark tone - the 960 column's lists are the page's tone, no lighter band
+  { name: 'home-wide-dark-one-tone', path: '/home', width: 1280, tall: 720, only: ['tablet'], ready: async (p: Page) => {
+      await p.emulateMedia({ colorScheme: 'dark' });
+      await expect(onShown(p, 'calendar')).toBeVisible();
+      await expect.poll(() => p.evaluate(() => document.documentElement.classList.contains('ion-palette-dark'))).toBe(true);
+      const t = await p.locator(SHOWN).evaluate((pg) => {
+        const bg = (e: Element) => getComputedStyle(e).backgroundColor;
+        const page = getComputedStyle(pg.querySelector('ion-content')!).getPropertyValue('--background').trim() || bg(pg.querySelector('ion-content')!);
+        const item = pg.querySelector('.home__list ion-item');
+        const itemBg = item ? getComputedStyle(item.shadowRoot!.querySelector('.item-native')!).backgroundColor : 'none';
+        return { list: bg(pg.querySelector('.home__list')!), item: itemBg, page: getComputedStyle(document.body).getPropertyValue('--ion-background-color').trim(), pageBg: page };
+      });
+      const rgb = (c: string) => c.startsWith('#') ? `rgb(${parseInt(c.slice(1, 3), 16)}, ${parseInt(c.slice(3, 5), 16)}, ${parseInt(c.slice(5, 7), 16)})` : c;
+      expect([t.list, t.item], `the lists in the page's tone ${JSON.stringify(t)}`).toEqual([rgb(t.page), rgb(t.page)]);
     } },
   { name: 'about-update-available', only: ['phone-light'], path: '/more/about', before: withPlay({ updateAvailability: 2, immediateUpdateAllowed: true }), ready: async (p) => {
       await onShown(p, 'about-update').click();

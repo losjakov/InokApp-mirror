@@ -103,7 +103,11 @@ for (const [device, cfg] of Object.entries(RING)) test.describe(`store ring ${de
         if (steps?.includes('do:showSelected')) {
           await expect(onTop('[data-testid="arow-1832"]')).toBeInViewport();
           expect(await check('articleTop'), `${lang} ${name}: the article's top beside the list (A-79 5)`).toBe('ok');
+          expect(await check('listTop'), `${lang} ${name}: the list starts on a whole row (NOTE 7)`).toBe('ok');
         }
+        if (steps?.includes('do:wholeRows')) expect(await check('rowsWhole'), `${lang} ${name}: no row cut by the tab bar (NOTE 9)`).toBe('ok');
+        if (name.includes('map')) expect(await check('mapview'), `${lang} ${name}: the view on Ukraine, the canvas sized (D16)`).toBe('ok');
+        expect(await check('crash'), `${lang} ${name}: never the crash screen (E11)`).toBe('none');
         if (name.includes('card')) { expect(await check('eye'), `${lang} card: the gold eye`).toBe('ok'); expect(await check('gallery'), `${lang} card: the gallery in the app`).toBe('in-app'); }
         if (name.includes('article')) expect(await check('stars'), `${lang} article: the stars' token`).toBe('ok');
         if (name.includes('publications')) expect(await check('kind'), `${lang} ${name}: «Статті» active`).toBe('publication');

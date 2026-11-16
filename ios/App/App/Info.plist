@@ -32,6 +32,10 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Застосунок питає місцезнаходження лише під час користування: щоб показати найближчі обителі й відстань до них. Місцезнаходження не залишає телефон.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Щоб показати найближчі обителі й відстань до них. Місцезнаходження не залишає телефон.</string>
 	<key>UIApplicationSceneManifest</key>

@@ -97,6 +97,43 @@ export const CHECKS = {
     const t = Array.from(document.querySelectorAll('[data-testid^="kind-tab-"].segment-button-checked')).find((e) => e.getClientRects().length > 0 && !e.closest('.ion-page-hidden'));
     return t ? t.dataset.testid.slice(9) : 'none';
   })()`,
+  /** cloud_38 (E11): the app's crash screen («Щось пішло не так», src/app/crash.tsx) is never a frame - 'none' | 'crash <code>' */
+  crash: `(() => { const e = document.querySelector('[data-testid="crash"]'); return e ? 'crash ' + ((e.innerText.match(/[A-Z]-[A-Za-z]+-[0-9a-f]+/) || ['?'])[0]) : 'none'; })()`,
+  /** cloud_38 (D16): the map's box in the SCREENSHOT's pixels ("x y w h" = CSS px x devicePixelRatio) - scripts/store_png.py reads it beside the
+   *  frame and refuses a canvas painted in part - 'none' when no map */
+  mapbox: `(() => { const m = window.__inokMap; if (!m) return 'none'; const r = m.getContainer().getBoundingClientRect(); const k = devicePixelRatio;
+    return [r.left, r.top, r.width, r.height].map((v) => Math.round(v * k)).join(' '); })()`,
+  /** cloud_38 (D16: «the view not on Ukraine»): the map's view holds Kyiv, its centre inside Ukraine's box, the canvas sized to its box - 'ok' | 'OFF …' */
+  mapview: `(() => {
+    const m = window.__inokMap; if (!m) return 'none';
+    const c = m.getCenter(), b = m.getContainer(), cv = m.getCanvas(), k = devicePixelRatio;
+    const inUa = c.lng >= 22 && c.lng <= 40.3 && c.lat >= 44.3 && c.lat <= 52.4;
+    const sized = Math.abs(cv.width - b.clientWidth * k) <= 2 && Math.abs(cv.height - b.clientHeight * k) <= 2;
+    const kyiv = m.getBounds().contains([30.52, 50.45]);
+    return inUa && sized && kyiv ? 'ok' : 'OFF centre ' + c.lng.toFixed(1) + ',' + c.lat.toFixed(1) + (kyiv ? '' : ' no Kyiv') + (sized ? '' : ' canvas ' + cv.width + 'x' + cv.height + ' box ' + b.clientWidth + 'x' + b.clientHeight + '@' + k);
+  })()`,
+  /** cloud_38 (REVIEW cloud_37 NOTE 7): the list beside an article starts on a WHOLE row (its first row in view is not cut by the tabs) - 'ok' | 'none' | 'CUT …' */
+  listTop: `(() => {
+    const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((p) => !p.classList.contains('ion-page-hidden')).pop();
+    const rows = Array.from(pg?.querySelectorAll('[data-testid^="arow-"]') ?? []).filter((r) => r.getClientRects().length > 0); if (!rows.length) return 'none';
+    const ct = rows[0].closest('ion-content'); const pin = ct.querySelector('.list-pin'); // the kind tabs / search stay pinned over the list
+    const top = Math.max(ct.getBoundingClientRect().top, pin ? pin.getBoundingClientRect().bottom : -1e9);
+    const first = rows.find((r) => r.getBoundingClientRect().bottom > top + 1);
+    const d = first ? Math.round(first.getBoundingClientRect().top - top) : 0;
+    return d >= -1 ? 'ok' : 'CUT the first row ' + -d + ' px under the top';
+  })()`,
+  /** cloud_38 (REVIEW cloud_37 NOTE 9): the frame ends on a WHOLE row - no row / heading / tile cut by the tab bar or the header - 'ok' | 'none' | 'CUT' */
+  rowsWhole: `(() => {
+    const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden')).pop();
+    const ct = pg?.querySelector('ion-content'); if (!ct) return 'none';
+    const tb = document.querySelector('ion-tab-bar')?.getBoundingClientRect(); const cr = ct.getBoundingClientRect();
+    const top = cr.top, bottom = Math.min(cr.bottom, tb && tb.height > 0 ? tb.top : innerHeight);
+    // the atoms of a frame: list rows, headings, the calendar, each tile's icon and caption (a tile's own top padding may go under the header)
+    const atoms = Array.from(pg.querySelectorAll('ion-item, .home__h, ion-list-header, .cal, .tile > ion-icon, .tile > span:not(.tile__dot)')).filter((e) => e.getClientRects().length > 0)
+      .map((e) => { const b = e.getBoundingClientRect(); return [b.top, b.bottom]; });
+    const cut = (sc) => atoms.some(([t, b]) => (t - sc < top - 1 && b - sc > top + 1) || (t - sc < bottom - 1 && b - sc > bottom + 1));
+    return cut(0) ? 'CUT at ' + Math.round(bottom) : 'ok';
+  })()`,
   /** A-122 (B3): «Зараз в ефірі» as it is at the minute of the frame - the number of broadcasts on «Головна» ('0' when none) */
   live: `(() => {
     const h = Array.from(document.querySelectorAll('[data-testid="home-live"]')).find((e) => e.getClientRects().length > 0 && !e.closest('.ion-page-hidden'));
@@ -124,6 +161,19 @@ export const ACTIONS = {
     m.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: pad, duration: 0 });
     return 'ok';
   })()`,
+  /** cloud_38 NOTE 9: the smallest scroll (0 ... 64 px) at which no row, heading or tile of the page is cut by the tab bar or the header */
+  wholeRows: `(async () => {
+    const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden')).pop();
+    const ct = pg?.querySelector('ion-content'); if (!ct) return 'none';
+    const tb = document.querySelector('ion-tab-bar')?.getBoundingClientRect(); const cr = ct.getBoundingClientRect();
+    const top = cr.top, bottom = Math.min(cr.bottom, tb && tb.height > 0 ? tb.top : innerHeight);
+    // the atoms of a frame: list rows, headings, the calendar, each tile's icon and caption (a tile's own top padding may go under the header)
+    const atoms = Array.from(pg.querySelectorAll('ion-item, .home__h, ion-list-header, .cal, .tile > ion-icon, .tile > span:not(.tile__dot)')).filter((e) => e.getClientRects().length > 0)
+      .map((e) => { const b = e.getBoundingClientRect(); return [b.top, b.bottom]; });
+    const cut = (sc) => atoms.some(([t, b]) => (t - sc < top - 1 && b - sc > top + 1) || (t - sc < bottom - 1 && b - sc > bottom + 1));
+    for (let sc = 0; sc <= 64; sc++) if (!cut(sc)) { if (sc) await ct.scrollByPoint(0, sc, 0); await new Promise((ok) => setTimeout(ok, 300)); return 'ok'; }
+    return 'none';
+  })()`,
   /** tablet frame 06: the selected article's row of the list in view (its centre), «Показати більше» until it is there (at most 15 pages) */
   showSelected: `(async () => {
     const id = new URLSearchParams(location.search).get('id'); if (!id) return 'none';
@@ -133,7 +183,20 @@ export const ACTIONS = {
       const rows = pages().map((p) => p.querySelector('[data-testid="arow-' + id + '"]')).filter(Boolean);
       rows.forEach((r) => r.scrollIntoView({ block: 'center' }));
       await new Promise((ok) => setTimeout(ok, 600));
-      if (rows.length && pages().every((p) => { const r = p.querySelector('[data-testid="arow-' + id + '"]'); return r && inView(r); })) return 'ok';
+      if (rows.length && pages().every((p) => { const r = p.querySelector('[data-testid="arow-' + id + '"]'); return r && inView(r); })) {
+        // NOTE 7 (REVIEW cloud_37): the list then starts on a WHOLE row - the row cut by the top edge is scrolled fully into view
+        for (const p of pages()) {
+          const all = Array.from(p.querySelectorAll('[data-testid^="arow-"]')).filter((r) => r.getClientRects().length > 0); if (!all.length) continue;
+          const ct = all[0].closest('ion-content'); const pin = ct.querySelector('.list-pin');
+          const top = Math.max(ct.getBoundingClientRect().top, pin ? pin.getBoundingClientRect().bottom : -1e9);
+          const first = all.find((r) => r.getBoundingClientRect().bottom > top + 1); const d = first ? first.getBoundingClientRect().top - top : 0;
+          // the scroller: a two-pane page's list pane (SplitContent), else the page's own content
+          const pane = all[0].closest('.split__pane');
+          if (d < -1) { if (pane) pane.scrollTop += d; else await ct.scrollByPoint(0, d, 0); }
+        }
+        await new Promise((ok) => setTimeout(ok, 400));
+        return pages().every((p) => { const r = p.querySelector('[data-testid="arow-' + id + '"]'); return r && inView(r); }) ? 'ok' : 'none';
+      }
       const more = pages().pop()?.querySelector('[data-testid="articles-more"]');
       if (!rows.length && more && !more.disabled && i % 3 === 0) { more.scrollIntoView({ block: 'end' }); more.click(); }
       await new Promise((ok) => setTimeout(ok, 400));
