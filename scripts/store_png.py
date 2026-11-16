@@ -4,12 +4,14 @@
 For every <dir>/<lang>/<set>/<NN>-<screen>.png: a shot taken taller than its set (a landscape set with a system navigation area at the
 bottom, emu_store.sh) is cut back to the set's exact size from the top; the alpha channel is dropped (24-bit RGB PNG: Play refuses
 alpha). Then every rule is checked and printed per file: exact 9:16 (phone) or 16:9 (tablets), short side >= 1080, RGB without alpha,
-<= 8 MB; and the counts 8 / 6 / 6 in each of uk / ru / en. The last line says PASS or FAIL. Needs Pillow (apt python3-pil).
+<= 8 MB; and the counts 8 / 7 / 7 in each of uk / ru / en (--appstore <dir>: iphone 1320 x 2868 x 8, ipad 2064 x 2752 x 7). The last line says PASS or FAIL. Needs Pillow (apt python3-pil).
 """
 import os
 import sys
 
-SETS = {'phone': (1080, 1920, 8), 'tablet7': (1920, 1080, 6), 'tablet10': (1920, 1080, 6)}
+# A-122 (1.0.11): phone 8, each tablet 7 (scripts/store_frames.txt); --appstore = the App Store set of the iOS simulator (ios_sim_tour.sh)
+SETS = {'phone': (1080, 1920, 8), 'tablet7': (1920, 1080, 7), 'tablet10': (1920, 1080, 7)}
+APPSTORE = {'iphone': (1320, 2868, 8), 'ipad': (2064, 2752, 7)}
 LANGS = ('uk', 'ru', 'en')
 MAX_BYTES = 8 * 1024 * 1024
 
@@ -34,10 +36,11 @@ def check(path, w, h):
     bad = []
     if im.size != (w, h):
         bad.append('size %dx%d' % im.size)
-    if im.size[0] * 16 != im.size[1] * 9 and im.size[0] * 9 != im.size[1] * 16:
-        bad.append('not 9:16 / 16:9')
-    if min(im.size) < 1080:
-        bad.append('short side < 1080')
+    if (w, h) not in [(a, b) for a, b, _ in APPSTORE.values()]:  # Play's rules; Apple's = the exact size alone
+        if im.size[0] * 16 != im.size[1] * 9 and im.size[0] * 9 != im.size[1] * 16:
+            bad.append('not 9:16 / 16:9')
+        if min(im.size) < 1080:
+            bad.append('short side < 1080')
     if im.mode != 'RGB' or 'transparency' in im.info:
         bad.append('mode %s (alpha)' % im.mode)
     if os.path.getsize(path) > MAX_BYTES:
@@ -45,10 +48,10 @@ def check(path, w, h):
     return bad
 
 
-def main(root):
+def main(root, sets=SETS):
     fails = 0
     for lang in LANGS:
-        for name, (w, h, n) in SETS.items():
+        for name, (w, h, n) in sets.items():
             d = os.path.join(root, lang, name)
             files = sorted(f for f in os.listdir(d) if f.endswith('.png')) if os.path.isdir(d) else []
             for f in files:
@@ -58,8 +61,9 @@ def main(root):
             if len(files) != n:
                 fails += 1
                 print('%s/%s: %d files, not %d - FAIL' % (lang, name, len(files), n))
-    print('store screenshots: %s (rules: exact 9:16 / 16:9, short side >= 1080, 24-bit PNG without alpha, <= 8 MB, 8 / 6 / 6 x uk ru en)'
-          % ('PASS' if not fails else 'FAIL (%d)' % fails))
+    rule = ('exact 9:16 / 16:9, short side >= 1080' if sets is SETS else 'exact iPhone 6.9" / iPad 13" size') + ', 24-bit PNG without alpha, <= 8 MB, ' \
+        + ' / '.join(str(n) for _, _, n in sets.values()) + ' x uk ru en'
+    print('store screenshots: %s (rules: %s)' % ('PASS' if not fails else 'FAIL (%d)' % fails, rule))
     return 0
 
 
@@ -82,4 +86,5 @@ def selftest():
 
 
 if __name__ == '__main__':
-    sys.exit(selftest() if sys.argv[1:] == ['--selftest'] else main(sys.argv[1]))
+    a = sys.argv[1:]
+    sys.exit(selftest() if a == ['--selftest'] else main(a[1], APPSTORE) if a[:1] == ['--appstore'] else main(a[0]))

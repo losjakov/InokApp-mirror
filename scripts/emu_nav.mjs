@@ -39,7 +39,15 @@ async function target() {
   throw new Error('no debuggable WebView page');
 }
 
+// cloud_37 (A-121): the iOS simulator has no DevTools socket a CI script can reach - INOK_NAV_RELAY names scripts/ios_relay.mjs, which hands
+// the SAME expression to the app's simulator bundle (src/app/simDriver.ts) and returns its value; every command below works unchanged
+const RELAY = process.env.INOK_NAV_RELAY;
 async function evaluate(expression) {
+  if (RELAY) {
+    const r = await fetch(`${RELAY}/eval`, { method: 'POST', body: expression, signal: AbortSignal.timeout(95_000) });
+    if (!r.ok) throw new Error(`relay ${r.status}: ${await r.text()}`);
+    return (await r.json()).value;
+  }
   const ws = new WebSocket(await target());
   await new Promise((ok, ko) => { ws.onopen = ok; ws.onerror = ko; });
   const res = await new Promise((ok) => {

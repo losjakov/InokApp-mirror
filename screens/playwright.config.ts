@@ -4,12 +4,13 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
   testMatch: /(screens|nav|store|engine|share|crash)\.spec\.ts/,
-  outputDir: '../test-results',
   timeout: 60_000,
   retries: 0,
   workers: 2,
   reporter: [['list']],
-  use: { baseURL: 'http://127.0.0.1:4173', screenshot: 'off', trace: 'off' },
+  // cloud_37 (A-121): PW_ENGINE=webkit runs the same screens on WebKit (the iPhone's engine); default Chromium (the Android WebView's)
+  use: { baseURL: 'http://127.0.0.1:4173', screenshot: 'off', trace: 'off', browserName: process.env.PW_ENGINE === 'webkit' ? 'webkit' : 'chromium' },
+  outputDir: process.env.PW_ENGINE === 'webkit' ? '../test-results-webkit' : '../test-results',
   webServer: {
     command: 'npm run build && npm run preview',
     url: 'http://127.0.0.1:4173',

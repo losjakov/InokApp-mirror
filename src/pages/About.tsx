@@ -3,6 +3,7 @@ import { Busy } from '@/components/Busy';
 import { cloudDownloadOutline, eyeOffOutline, shareSocialOutline, starOutline } from 'ionicons/icons';
 import { useRef, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
+import { SocialLinks } from '@/components/SocialLinks';
 import { APP_VERSION } from '@/app/version';
 import { openLink } from '@/native/intents';
 import { SITE_URL } from '@/data/api/client';
@@ -64,6 +65,7 @@ export function AboutPage() {
           )}
           <IonItem button detail onClick={() => openLink(SITE_URL, lang)}><IonLabel>{t('about.site')}</IonLabel></IonItem>
         </IonList>
+        <SocialLinks />
       </IonContent>
     </IonPage>
   );

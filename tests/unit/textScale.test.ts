@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { LARGE_TEXT, isLargeText } from '@/state/textScale';
+import { LARGE_TEXT, iosBodyPx, iosRootPercent, isLargeText } from '@/state/textScale';
 
 /** A-56: hyphenation ONLY at a large system text scale (>= 130 %: Android 8's largest step); the normal scale wraps between words as before (A-55). */
 describe('text scale (A-56)', () => {
@@ -18,3 +18,17 @@ describe('text scale (A-56)', () => {
     expect(sel.some((x) => x.endsWith('.mrow ion-label')) && sel.some((x) => x.endsWith('.aview__body'))).toBe(true);
   });
 });
+
+/** cloud_37 (A-121): iOS - the root size follows Dynamic Type (the system body font / 17 px), 80 ... 200 %; no other engine is touched */
+describe('iOS Dynamic Type', () => {
+  it('body px -> root %: Large 17 = 100, xSmall 14 = 82.4, AX1 28 = 164.7, AX3 40 and AX5 53 = the 200 % ceiling, tiny = 80', () => {
+    expect([17, 14, 28, 40, 53, 10, 0].map(iosRootPercent)).toEqual([100, 82.4, 164.7, 200, 200, 80, 100]);
+  });
+  it('an engine without -apple-system-body (Chromium: the web playing an iPhone): no body size, so the root is never set', () => {
+    let probed = false;
+    const doc = { defaultView: { CSS: { supports: (p: string, v: string) => p === 'font' && v === '-apple-system-body' && false } }, createElement: () => { probed = true; return {}; } };
+    expect(iosBodyPx(doc as unknown as Document)).toBe(0);
+    expect(probed).toBe(false);
+  });
+});
+

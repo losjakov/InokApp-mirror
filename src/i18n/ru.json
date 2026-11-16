@@ -317,5 +317,6 @@
   "photos.cleared": "Сохранённые фото удалены",
   "photos.mb": "МБ",
   "common.clear": "Очистить",
-  "about.not_app_store": "Установлено не из App Store — проверка обновлений недоступна"
+  "about.not_app_store": "Установлено не из App Store — проверка обновлений недоступна",
+  "social.title": "В социальных сетях"
 }

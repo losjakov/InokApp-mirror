@@ -91,7 +91,9 @@ export function CoverImage({ code, url, alt, className, version, small, keep, fu
   const report = scope?.report; // stable (useCallback): the effect does not re-run when the group's count changes
   useEffect(() => { report?.(key, waits); return () => report?.(key, false); }, [report, key, waits]);
   return (
-    <div ref={ref} className={className} style={ratio ? { aspectRatio: String(ratio) } : undefined}>
+    // A-122: the slot's state for the store frames' read-back (store_checks.mjs `photos`): no picture at all / waiting / loading / shown
+    <div ref={ref} className={className} style={ratio ? { aspectRatio: String(ratio) } : undefined}
+      data-photo={!url ? 'none' : res?.src ? 'shown' : wait ? 'wait' : 'loading'}>
       {res?.src ? (openable
         ? <button type="button" className="photo-open" onClick={() => (typeof openable === 'object' && 'open' in openable ? openable.open(res.src!)
             : setViewer(onePhoto(code, url!, res.src!, alt, openable === true ? null : openable.full)))}

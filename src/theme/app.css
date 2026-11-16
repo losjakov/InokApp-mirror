@@ -60,9 +60,17 @@ ion-button, ion-chip { text-transform: none; letter-spacing: normal; } /* D10 / 
   font-size: min(var(--inok-type-caption), calc(12px * var(--inok-chrome-max))); font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .tile ion-icon { font-size: min(1.6rem, calc(25.6px * var(--inok-chrome-max))); } /* the tiles are navigation: the chrome rule */
+/* A-120 (1): «У соціальних мережах» = the home tiles three in a row (SocialLinks); a caption that does not fit (tileRow) = one per row, never cut */
+.tiles--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px 16px 16px; }
+.tiles--3[data-wrap="1"] { grid-template-columns: minmax(0, 1fr); }
+.social__btn--telegram ion-icon { color: #229ed9; }
+.social__btn--facebook ion-icon { color: #1877f2; }
+.social__btn--instagram ion-icon { color: #e1306c; }
 .tile:active { opacity: 0.8; }
 .tile__dot { position: absolute; top: 6px; right: 8px; width: 9px; height: 9px; border-radius: 50%; background: var(--ion-color-live); }
-@media (min-width: 600px) { .tiles { max-width: 960px; margin: 0 auto; } .home__list { max-width: 960px; margin: 0 auto; } }
+/* NOTE 5 (REVIEW cloud_36, the iPad 13"): ONE 960-px column for the whole of «Головна» - tiles, the calendar and the lists end on the same edge */
+@media (min-width: 600px) { .tiles { max-width: 960px; margin: 0 auto; } .home__list.home__list { max-width: 960px; margin: 0 auto; } /* doubled: Ionic's runtime `.list-md { margin: 0 }` came later and won (the list sat at 0-960) */
+  .home .streams__cal { max-width: calc(960px - 24px); margin-inline: auto; } }
 .home__h { --color: var(--ion-color-primary); font-size: var(--inok-type-heading); font-weight: 600; min-height: 40px; padding-top: 8px; align-items: baseline; }
 .home__h ion-label { margin: 0; flex: 1 1 auto; }
 .home__all { font-size: var(--inok-type-secondary); font-weight: 500; color: var(--ion-color-primary); text-decoration: none; padding-inline-end: 16px; }

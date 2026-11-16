@@ -75,6 +75,18 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     expect(wf.match(/uses: \.\/\.github\/actions\/ios-setup/g)).toHaveLength(3);
     expect(wf).toMatch(/MARKETING_VERSION="\$V" CURRENT_PROJECT_VERSION="\$C"/);
   });
+  it('cloud_37: the remote hand (VITE_SIM_DRIVER) and localhost networking live in the simulator job ONLY - never in the archive / TestFlight', () => {
+    const jobs = wf.slice(wf.indexOf('\njobs:'));
+    const job = (n: string) => { const i = jobs.indexOf(`  ${n}:\n`); const j = jobs.slice(i + 3).search(/\n {2}[a-z-]+:\n/); return jobs.slice(i, j < 0 ? undefined : i + 3 + j); };
+    for (const k of ['VITE_SIM_DRIVER=1', 'NSAllowsLocalNetworking']) {
+      expect(job('simulator'), k).toContain(k);
+      for (const n of ['archive', 'testflight']) expect(job(n), `${n}: ${k}`).not.toContain(k);
+      expect(read('.github/actions/ios-setup/action.yml'), k).not.toContain(k);
+    }
+    expect(read('ios/App/App/Info.plist')).not.toContain('NSAllowsLocalNetworking');
+    expect(read('src/main.tsx')).toMatch(/if \(import\.meta\.env\.VITE_SIM_DRIVER === '1'\) void import\('\.\/app\/simDriver'\)/);
+    expect(job('simulator')).toMatch(/runtime: \[newest, oldest\]/);
+  });
   it('ios/ leaves for the mirror; a .p8 never does', () => {
     expect(read('scripts/mirror_paths.txt').split('\n')).toContain('ios/');
     expect(read('scripts/mirror_snapshot.py')).toMatch(/NEVER_SUFFIX = \([^)]*'\.p8'/);

@@ -1,0 +1,19 @@
+# store_frames.txt - THE line-up of the store screenshots of 1.0.11 (A-120 (4), A-122; one source, A-15): Google Play (scripts/emu_store.sh on
+# the Android emulator), the App Store (scripts/ios_sim_tour.sh on the iOS simulator) and the browser ring (screens/store.spec.ts) read it.
+# set|file|path|the element that proves it is drawn|steps before the shot (`;`-separated: a css click or `do:<action>` of store_checks.mjs; - none)
+# A file ending in «-dark» is shot in the DARK theme (switched in the app, read back), every other one light. $ART = the article (emu_store.sh).
+phone|01-home-dark|/home|[data-testid="home-near"]|-
+phone|02-home|/home|[data-testid="home-near"]|-
+phone|03-card|/monasteries/242|[data-testid="card"] [data-testid="views"]|-
+phone|04-eparchy|/more/eparchies/1|[data-testid="eparchy-title"]|-
+phone|05-map|/map|[data-testid="map"][data-ready="1"]|do:fitLavras
+phone|06-monasteries|/monasteries|[data-testid^="mrow-"]|-
+phone|07-publications|/articles|[data-testid^="arow-"]|[data-testid="kind-tab-publication"]
+phone|08-article|/articles?id=$ART|[data-testid="article"] .card__title|-
+tablet|01-home-dark|/home|[data-testid="home-near"]|-
+tablet|02-home|/home|[data-testid="home-near"]|-
+tablet|03-card|/monasteries/242|[data-testid="card"] [data-testid="views"]|-
+tablet|04-eparchy|/more/eparchies/1|[data-testid="eparchy-title"]|-
+tablet|05-map|/map|[data-testid="map"][data-ready="1"]|-
+tablet|06-monasteries|/monasteries/37|[data-testid^="mrow-"]|-
+tablet|07-publications-article|/articles?id=$ART|[data-testid="article"] .card__title|[data-testid="kind-tab-publication"];do:showSelected

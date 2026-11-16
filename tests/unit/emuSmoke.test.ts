@@ -21,6 +21,14 @@ describe('emulator smoke helpers', () => {
     expect(v('wifi')).toBe('proved');
     expect(v('eval: none')).toBe('not-proved(reason=none: the full file was allowed on this network)');
   });
+  it('NOTE 7: `ev` answers ONE line - «eval: none» with exit 1 is not followed by a second «none»; no answer at all = «none»', () => {
+    const ev = (stub: string) => bash(`set -euo pipefail; OUT=$(mktemp -d); ROOT=/x; node() { ${stub}; }\n${fn('ev')}\nev 'x'`);
+    expect(ev("echo 'eval: none'; return 1")).toBe('eval: none');
+    expect(ev("echo 'eval: wifi'")).toBe('eval: wifi');
+    expect(ev('return 1')).toBe('none');
+    expect(bash(`${fn('v110_verdict')}\nv110_verdict "$(OUT=$(mktemp -d); ROOT=/x; node() { echo 'eval: none'; return 1; }\n${fn('ev')}\nev 'x')"`))
+      .toBe('not-proved(reason=none: the full file was allowed on this network)');
+  });
   it('the database is copied by the retrying copy, never by a bare `adb exec-out cat > file`', () => {
     expect(fn('appcopy')).toMatch(/for i in 1 2 3/);
     expect(fn('appcopy')).toMatch(/adb reconnect offline/);

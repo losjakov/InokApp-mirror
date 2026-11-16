@@ -88,7 +88,7 @@ export function HomePage() {
   return (
     <IonPage>
       <PageHeader title={t('app.name')} end={refresh.button} />
-      <IonContent>
+      <IonContent className="home">
         {refresh.puller}
         <nav className="tiles" ref={tileRow} aria-label={t('app.short')} data-testid="tiles">
           {tiles.map((x) => (

@@ -40,6 +40,7 @@ GoogleService-Info.plist
 tmp/
 playwright-report/
 test-results/
+test-results-webkit/
 screens/out/
 .claude/worktrees/
 

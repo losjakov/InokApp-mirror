@@ -58,6 +58,50 @@ export const CHECKS = {
       || over.some((o) => p.l < o.right && p.r > o.left && p.t < o.bottom && p.b > o.top));
     return cut.length ? 'CUT ' + cut.map((p) => p.code).join(',') : 'ok';
   })()`,
+  /** A-122 (B3): nothing over the frame - no dialog / sheet, no toast, no update banner, no offline note - 'clear' | the names of what is shown */
+  overlays: `(() => {
+    const vis = (e) => e.getClientRects().length > 0 && !e.classList.contains('overlay-hidden') && !e.closest('.ion-page-hidden');
+    const hit = [];
+    if (Array.from(document.querySelectorAll('ion-alert, ion-modal, ion-action-sheet, ion-popover')).some(vis)) hit.push('dialog');
+    if (Array.from(document.querySelectorAll('ion-toast')).some(vis)) hit.push('toast');
+    for (const id of ['update-offer', 'update-restart', 'map-offline', 'soft-ask']) if (Array.from(document.querySelectorAll('[data-testid="' + id + '"]')).some(vis)) hit.push(id);
+    return hit.length ? hit.join(',') : 'clear';
+  })()`,
+  /** A-122 (B3): every picture slot IN VIEW of the page on top is a loaded picture (or the house's own «no picture» mark) - never «Фото
+   *  завантажиться…», never an empty slot still loading - 'ok' | 'WAIT n; EMPTY n; IMG n' */
+  photos: `(() => {
+    const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((p) => !p.classList.contains('ion-page-hidden'));
+    // in view = inside its own scrolling content's box (a row under the tab bar or the header is not in the frame)
+    const inView = (e) => { const r = e.getBoundingClientRect(); const c = (e.closest('ion-content') || document.documentElement).getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.bottom > Math.max(0, c.top) && r.top < Math.min(innerHeight, c.bottom) && r.right > 0 && r.left < innerWidth; };
+    const slots = pg.flatMap((p) => Array.from(p.querySelectorAll('.aview__cover, .card__cover, .chav__img, .eparchy__map, .mrow__cover, .body-pic'))).filter(inView);
+    let wait = 0, empty = 0, img = 0; const which = [];
+    const who = (s) => which.push((s.closest('[data-testid]')?.dataset.testid || s.className).slice(0, 24));
+    for (const s of slots) { // CoverImage's own word (data-photo): none = the item has no picture at all (its plain tile) - never a fault
+      const st = s.dataset.photo;
+      if (st === 'none') continue;
+      if (st === 'wait' || s.querySelector('[data-testid="photo-wait"]')) { wait++; who(s); continue; }
+      const im = s.querySelector('img');
+      if (im) { if (!im.complete || !im.naturalWidth) { img++; who(s); } continue; }
+      if (st === 'loading' || !s.children.length) { empty++; who(s); }
+    }
+    return wait + empty + img ? 'WAIT ' + wait + '; EMPTY ' + empty + '; IMG ' + img + ' (' + which.slice(0, 3).join(', ') + ')' : 'ok';
+  })()`,
+  /** A-122 (B3): card 242's «Фотогалерея» opens the app's own viewer (no «opens outside» sign) - 'in-app' | 'site' | 'none' */
+  gallery: `(() => {
+    const g = Array.from(document.querySelectorAll('[data-testid="card"] [data-testid="gallery"]')).find((e) => e.getClientRects().length > 0 && !e.closest('.ion-page-hidden'));
+    return !g ? 'none' : g.dataset.inApp === '1' && g.querySelectorAll('ion-icon').length === 1 ? 'in-app' : 'site';
+  })()`,
+  /** A-117 (2) / A-122: the kind tab of «Публікації» that is active on the page on top - 'publication' | 'all' | … | 'none' */
+  kind: `(() => {
+    const t = Array.from(document.querySelectorAll('[data-testid^="kind-tab-"].segment-button-checked')).find((e) => e.getClientRects().length > 0 && !e.closest('.ion-page-hidden'));
+    return t ? t.dataset.testid.slice(9) : 'none';
+  })()`,
+  /** A-122 (B3): «Зараз в ефірі» as it is at the minute of the frame - the number of broadcasts on «Головна» ('0' when none) */
+  live: `(() => {
+    const h = Array.from(document.querySelectorAll('[data-testid="home-live"]')).find((e) => e.getClientRects().length > 0 && !e.closest('.ion-page-hidden'));
+    const m = h && h.textContent.match(/\((\d+)\)/); return h ? (m ? m[1] : '0') : 'none';
+  })()`,
 };
 
 /** A-78 4: what a store frame DOES before its shot (scripts/emu_nav.mjs `do <name>`; the browser ring runs the same) - 'ok' | 'none' */

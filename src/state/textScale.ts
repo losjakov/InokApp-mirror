@@ -17,10 +17,38 @@ export function measureTextScale(doc: Document = document): number {
   return h > 0 ? h / 16 : 1;
 }
 
-/** Marks the document at start, after the page's styles have loaded, and whenever the window changes (rotation, split screen). */
-export function applyTextScale(win: Window = window): void {
-  const set = () => { win.document.documentElement.dataset.textLarge = isLargeText(measureTextScale(win.document)) ? '1' : '0'; };
+/**
+ * cloud_37 (A-121): iOS - WKWebView does NOT apply the system text size (Android's WebView does, as its text zoom). The system's body font
+ * (`-apple-system-body`: 17 px at the default «Large») follows Dynamic Type, so on iOS the root size = 100 % x body / 17, kept between 80 %
+ * and 200 % (Android 14's largest step: every layout of the app is proven up to it; Apple's accessibility sizes go higher).
+ */
+export const IOS_BODY_PX = 17;
+export const MAX_TEXT_SCALE = 2;
+export const iosRootPercent = (bodyPx: number): number =>
+  Math.round(Math.min(MAX_TEXT_SCALE, Math.max(0.8, bodyPx > 0 ? bodyPx / IOS_BODY_PX : 1)) * 1000) / 10;
+
+/** the size of the system's body font now (Dynamic Type), or 0 where the engine has no such font (every engine but WebKit) */
+export function iosBodyPx(doc: Document = document): number {
+  const css = doc.defaultView?.CSS;
+  if (!css?.supports?.('font', '-apple-system-body')) return 0;
+  const p = doc.createElement('span');
+  p.style.cssText = 'position:absolute;visibility:hidden;font:-apple-system-body';
+  doc.body.appendChild(p);
+  const px = parseFloat(doc.defaultView!.getComputedStyle(p).fontSize);
+  p.remove();
+  return px || 0;
+}
+
+/** Marks the document at start, after the page's styles have loaded, and whenever the window changes (rotation, split screen); on iOS
+ *  (`ios`) first sets the root size from Dynamic Type - again when the app comes back (the person changed it in Settings meanwhile). */
+export function applyTextScale(win: Window = window, ios = false): void {
+  const set = () => {
+    const html = win.document.documentElement;
+    if (ios && win.document.body) { const px = iosBodyPx(win.document); if (px) html.style.fontSize = `${iosRootPercent(px)}%`; }
+    html.dataset.textLarge = isLargeText(measureTextScale(win.document)) ? '1' : '0';
+  };
   set();
   win.addEventListener('load', set);
   win.addEventListener('resize', set);
+  if (ios) win.document.addEventListener('visibilitychange', () => { if (win.document.visibilityState === 'visible') set(); });
 }

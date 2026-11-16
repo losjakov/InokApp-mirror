@@ -41,7 +41,14 @@ const actionsRule = async (p: Page, n: number, fits?: boolean) => {
 /** PLAN 5: a mini-map drawn (its MapLibre part loaded lazily, the style and our layers in), scrolled into view, `n` houses set */
 /** A-117 (1): the CLUSTERED houses drawn (a cluster or a pin of the clustered source), not only the three lavras (own source) */
 const housesDrawn = (p: Page) => expect.poll(() => p.evaluate(() => (window as any).__inokMap.queryRenderedFeatures({ layers: ['points', 'clusters'] }).length),
-  { timeout: 15_000, message: 'clustered houses drawn' }).toBeGreaterThan(0);
+  { timeout: 15_000, message: 'clustered houses drawn' }).toBeGreaterThan(0).then(() => iconsReady(p));
+/** NOTE 2 (REVIEW cloud_36): every pin drawn carries its registered site icon (the plain green drop = `col` - the site's community, the
+ *  cyan arc = `_stavro`: the site's own marks, never a pin waiting for its picture) */
+const iconsReady = async (p: Page) => {
+  const missing = await p.evaluate(() => { const m = (window as any).__inokMap;
+    return m.queryRenderedFeatures({ layers: ['points', 'lavras'] }).map((f: any) => f.properties.icon).filter((i: string) => !i || !m.hasImage(i)); });
+  expect(missing, 'pins drawn without their icon').toEqual([]);
+};
 /** A-117 (2): the kind tab that is active (the segment's value + TalkBack's «selected») */
 const entryKind = async (p: Page, kind: string) => {
   await expect(onShown(p, `kind-tab-${kind}`)).toHaveClass(/segment-button-checked/);
@@ -429,6 +436,38 @@ const dwell = (gi: number, gn: number) => async (p: Page) => {
 const net = (n: { connected: boolean; metered: boolean; dataSaver: boolean }) => async (p: Page) => { await p.addInitScript((v) => localStorage.setItem('inok.net', v), JSON.stringify(n)); };
 /** A-37 screens: what the app hands to the YouTube app (the web build calls window.open) — recorded, nothing leaves */
 const recordOpens = async (p: Page) => { await p.addInitScript(() => { (window as any).__opened = []; window.open = ((u: string) => { (window as any).__opened.push(String(u)); return null; }) as typeof window.open; }); };
+/** A-120 (1): «У соціальних мережах» = the LAST of the content (on «Про комісію» right above the share strip): its level-2 heading, three LINKS
+ *  named by the network (TalkBack / VoiceOver «Telegram, посилання»), the logo hidden from the reader, each >= 48 x 48 and inside the
+ *  screen, the caption whole (never cut) - also at 320 dp x font 200 %; a tap opens THE address by openLink (`open`) */
+const SOCIAL = [['telegram', 'Telegram', 'https://t.me/inokinfo'], ['facebook', 'Facebook', 'https://www.facebook.com/inok.info'],
+  ['instagram', 'Instagram', 'https://www.instagram.com/inok.info/']] as const;
+const socialBlock = async (p: Page, commission: boolean, open: boolean) => {
+  const block = onShown(p, 'social');
+  await block.scrollIntoViewIfNeeded();
+  await expect(block.getByRole('heading', { level: 2 })).toHaveText(/^(У соціальних мережах|В социальных сетях|On social media)$/);
+  expect(await block.evaluate((b) => b.nextElementSibling?.getAttribute('data-testid') ?? 'none'), 'the block is the last of the content').toBe(commission ? 'share-footer' : 'none');
+  await expect(block.getByRole('link')).toHaveCount(3);
+  const vw = p.viewportSize()!.width;
+  for (const [id, name, url] of SOCIAL) {
+    const a = block.getByRole('link', { name, exact: true });
+    await expect(a).toHaveAttribute('data-testid', `social-${id}`);
+    await expect(a).toHaveAttribute('href', url);
+    await expect(a.locator('ion-icon')).toHaveAttribute('aria-hidden', 'true');
+    const m = await a.evaluate((e) => { const r = e.getBoundingClientRect(); const sp = e.querySelector('span')!; const rg = document.createRange(); rg.selectNodeContents(sp);
+      const t = rg.getBoundingClientRect(); return { w: r.width, h: r.height, l: r.left, r: r.right, tl: t.left, tr: t.right, lines: new Set(Array.from(rg.getClientRects()).map((x) => Math.round(x.top))).size }; });
+    expect(Math.min(m.w, m.h), `${name}: the touch target ${JSON.stringify(m)}`).toBeGreaterThanOrEqual(48);
+    expect(m.l >= 0 && m.r <= vw + 0.5, `${name}: inside the screen ${JSON.stringify(m)}`).toBe(true);
+    expect(m.tl >= m.l - 0.5 && m.tr <= m.r + 0.5 && m.lines === 1, `${name}: the caption whole inside its button ${JSON.stringify(m)}`).toBe(true);
+  }
+  const row = await onShown(p, 'social-row').evaluate((r) => ({ sw: r.scrollWidth, cw: r.clientWidth, wrap: (r as HTMLElement).dataset.wrap }));
+  expect(row.sw, `no sideways overflow ${JSON.stringify(row)}`).toBeLessThanOrEqual(row.cw + 1);
+  if (open) {
+    for (const [, name, url] of SOCIAL) {
+      await block.getByRole('link', { name, exact: true }).click();
+      await expect.poll(() => p.evaluate(() => (window as any).__opened.at(-1))).toBe(url);
+    }
+  }
+};
 const opened = async (p: Page, testId: string): Promise<string> => {
   await expect(p.getByTestId('tab-live').first()).toBeAttached(); // the first live-status has arrived (A-37 decides from it)
   await p.getByTestId(testId).locator('visible=true').first().click();
@@ -2783,6 +2822,27 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
     ready: async (p) => {
       await onShown(p, 'about-update').click();
       await expect.poll(() => p.evaluate(() => (window as any).__opened)).toEqual(['https://apps.apple.com/app/id6700000001']);
+    } },
+  // A-120 (1): the social block on both «Ще» screens - every profile; 320 dp x font 200 % (the row may go one per row); the iOS shell
+  ...(['commission', 'about'] as const).flatMap((pg) => [
+    { name: `social-${pg}`, path: `/more/${pg}`, before: recordOpens, ready: (p: Page) => socialBlock(p, pg === 'commission', true) },
+    { name: `social-${pg}-font200`, path: `/more/${pg}`, width: 320, font: 200, only: ['phone-light', 'phone-dark'], before: recordOpens,
+      ready: (p: Page) => socialBlock(p, pg === 'commission', false) },
+    { name: `social-${pg}-ios`, path: `/more/${pg}`, only: ['phone-light', 'phone-dark', 'tablet'], before: async (p: Page) => {
+        await recordOpens(p); await p.addInitScript(() => { localStorage.setItem('inok.platform', 'ios'); }); },
+      ready: (p: Page) => socialBlock(p, pg === 'commission', true) },
+  ]),
+  // NOTE 5 (REVIEW cloud_36): the iPad 13" (1032 x 1376 pt) - tiles, calendar and the lists of «Головна» share ONE column edge (cloud_36: the
+  // calendar ran edge to edge, the rows stopped at the 960-px column)
+  { name: 'home-ipad13', path: '/home', width: 1032, tall: 1376, only: ['tablet'], ready: async (p: Page) => {
+      await expect(onShown(p, 'calendar')).toBeVisible(); await expect(onShown(p, 'home-new')).toBeVisible();
+      const e = await p.locator(SHOWN).evaluate((pg) => { const r = (s: string) => pg.querySelector(s)!.getBoundingClientRect();
+        const tiles = Array.from(pg.querySelectorAll('.tiles .tile')).map((t) => t.getBoundingClientRect());
+        return { tilesL: Math.round(tiles[0].left), tilesR: Math.round(tiles[tiles.length - 1].right), calL: Math.round(r('.cal').left), calR: Math.round(r('.cal').right),
+          listL: Math.round(r('.home__list').left), listR: Math.round(r('.home__list').right), vw: innerWidth }; });
+      expect([e.calL, e.calR], `the calendar on the tiles' edges ${JSON.stringify(e)}`).toEqual([e.tilesL, e.tilesR]);
+      expect(Math.abs((e.listL + e.listR) / 2 - e.vw / 2), `the lists centred in the same column ${JSON.stringify(e)}`).toBeLessThanOrEqual(1);
+      expect(e.listR - e.tilesR, `the list's edge = the tiles' row edge + its 12 px inset ${JSON.stringify(e)}`).toBe(12);
     } },
   { name: 'about-update-available', only: ['phone-light'], path: '/more/about', before: withPlay({ updateAvailability: 2, immediateUpdateAllowed: true }), ready: async (p) => {
       await onShown(p, 'about-update').click();

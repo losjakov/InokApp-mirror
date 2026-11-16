@@ -317,5 +317,6 @@
   "photos.cleared": "Saved photos deleted",
   "photos.mb": "MB",
   "common.clear": "Clear",
-  "about.not_app_store": "Not installed from the App Store — the update check is unavailable"
+  "about.not_app_store": "Not installed from the App Store — the update check is unavailable",
+  "social.title": "On social media"
 }

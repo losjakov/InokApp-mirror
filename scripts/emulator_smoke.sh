@@ -72,6 +72,9 @@ appcopy() {
 }
 # cloud_36 (REVIEW cloud_35 NOTE 2 / E2): `ev` answers «eval: <value>» - the v110 verdict reads the VALUE (1.0.10 compared the whole line with
 # «wifi» and printed «not-proved» over correct numbers)
+# NOTE 7 (REVIEW cloud_36): ONE line per eval - emu_nav prints «eval: none» AND exits 1 on «none»; 1.0.11 then echoed a second «none»
+# (v110 read «none\nnone»). Nothing printed (node failed before its answer) = «none».
+ev() { local o; o=$(node "$ROOT/scripts/emu_nav.mjs" eval "$1" 2>>"$OUT/nav.txt") || true; printf '%s\n' "${o:-none}" | head -n 1; }
 v110_verdict() { case "${1#eval: }" in wifi|saver|manual) echo proved;; *) echo "not-proved(reason=${1#eval: }: the full file was allowed on this network)";; esac; }
 adb shell dumpsys webviewupdate | tee "$OUT/webview.txt" | head -n 5
 # line looks like: Current WebView package (name, version): (com.google.android.webview, 58.0.3029.125)
@@ -346,7 +349,6 @@ if [ "$WV" -ge "$FLOOR" ]; then
   tab more; nav click '[data-testid="incognito-toggle"]'; sleep 2
   # cloud_30 (1.0.6, A-96 W-4 / A-97): the new screens on the device, read back + shot, NOT gating (the browser ring gates them):
   # the live 1714's gallery -> the viewer «1 / 5» -> system Back closes it; the search header asks the live R-44; the sort sheet opens
-  ev() { node "$ROOT/scripts/emu_nav.mjs" eval "$1" 2>>"$OUT/nav.txt" || echo none; }
   nav go '/articles?id=1714'; sleep 8
   nav wait '[data-testid="gallery-grid"] [data-testid="photo-open"]'; nav click '[data-testid="gallery-grid"] [data-testid="photo-open"]'; sleep 6
   G1=$(ev "(document.querySelector('[data-testid=viewer-count]')||{}).textContent||'none'"); G2=$(ev "(document.querySelector('[data-testid=viewer-img]')||{}).dataset?.full||'none'")
@@ -418,7 +420,7 @@ if [ "$WV" -ge "$FLOOR" ]; then
   # A-76 App Links (API 31+: `pm set-app-links`): an article / card link opens that screen in the app, another path leaves the router (scripts/emu_links.sh)
   LINKS=n/a; case "$API" in 26*) ;; *) bash "$ROOT/scripts/emu_links.sh" "$OUT" || true; LINKS="$(tail -1 "$OUT/links.txt" 2>/dev/null | sed 's/^links //' || true)";; esac
   # cloud_13 item 3: the Play screenshots from the live export, once, on the required image (scripts/emu_store.sh)
-  STORE=n/a; case "$API" in 34-default*) bash "$ROOT/scripts/emu_store.sh" "$OUT" || true; STORE="$(grep -E '^store screenshots: [A-Z]+|^(missing|maps|dialogs|language|unit words|status bar|colours|lavras)|^launcher label|STOPPED' "$OUT/store/sizes.txt" 2>/dev/null | sed 's/ (rules:.*//' | tr '\n' ';' || true)";; esac
+  STORE=n/a; case "$API" in 34-default*) bash "$ROOT/scripts/emu_store.sh" "$OUT" || true; STORE="$(grep -E '^store screenshots: [A-Z]+|^(missing|maps|pictures|anything|gallery|«Публікації»|language|unit words|status bar|colours|lavras|article top|on air)|^launcher label|STOPPED' "$OUT/store/sizes.txt" 2>/dev/null | sed 's/ (rules:.*//' | tr '\n' ';' || true)";; esac
   native_paths; edge_shots; a11y_dumps; r8_scan; notify_proof
   echo "FULL webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY]" | tee "$OUT/result.txt"
 else
