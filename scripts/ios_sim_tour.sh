@@ -55,6 +55,7 @@ num = lambda t: [float(x) for x in re.findall(r"\d+(?:\.\d+)?", t["name"])]  # i
 t = max(pref or ts, key=num); print(t["identifier"] + "|" + t["name"])' "$RTID" "$1"; }
 
 A3="$OUT/a3.txt"
+OFFER14="not met"   # the A2 offer as spot 14 meets it
 a3() { echo "$TAG | iOS $RTV | $1 | $2 | $3" | tee -a "$A3"; }
 # cloud_38 (A8: «blank screenshots on iOS 26.5 while the DOM checks passed»): every shot is read by its pixels (scripts/store_png.py --paint);
 # a BLANK one is taken again after 3 s and both verdicts are written to blank.txt - the cause is measured, never guessed
@@ -226,12 +227,15 @@ a3_walk() {
   guard_crash spot14
   # 14 A1 (A-124: «оцінки й лайки не ставляться» on iOS): a star and a like on article 1833 (it has comments) - the server's own answer read back
   nav go "/articles?id=1833"; node "$NAVJS" wait '[data-testid="article"] [data-testid="rating"]' >> "$OUT/nav.txt" 2>&1; sleep 4
-  # ios run 1: the A2 offer («Повідомляти про нові публікації?») comes over the first opened article (as on Android) - «Ні, дякую» first
+  # ios run 1: the A2 offer («Повідомляти про нові публікації?») comes over the first opened article (as on Android) - read (the A2 evidence)
+  # and answered «Ні, дякую» before the star
+  OFFER14=$(ev "(() => { const a = Array.from(document.querySelectorAll('ion-alert.soft-ask--articles')).find((e) => !e.classList.contains('overlay-hidden')); return a ? 'offer: ' + a.querySelector('.alert-title')?.textContent + ' / ' + Array.from(a.querySelectorAll('.alert-button')).map((b) => b.textContent.trim()).join(' | ') : 'no offer'; })()")
+  shotof "$OUT/a3-push-offer__$TAG.png" 'ion-alert.soft-ask--articles' > /dev/null
   ev "(() => { const b = Array.from(document.querySelectorAll('ion-alert.soft-ask:not(.overlay-hidden) .alert-button')).pop(); b && b.click(); return 'ok'; })()" > /dev/null; sleep 2
   local r0 r1 rt v0 v1 vs
   r0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]')||{}).disabled ? 'cast before' : 'open'")
   ev "window.__inokLastCast = null, 'ok'" > /dev/null
-  nav click '[data-testid="article"] [data-testid="star-5"]'; sleep 8
+  nav click '[data-testid="article"] [data-testid="star-5"]'; sleep 3
   r1=$(ev "(() => { const s = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]'); return (s && s.dataset.lit === '1' ? 'lit' : 'not lit') + '; server ' + (window.__inokLastCast || 'ok'); })()")
   rt=$(ev "(Array.from(document.querySelectorAll('ion-toast')).map((t) => t.message).filter(Boolean).pop()) || 'no toast'")
   shot "$OUT/a3-rating__$TAG.png"
@@ -246,13 +250,9 @@ a3_walk() {
   case "$v0|$v1" in "n|y; server ok") a3 "comment like (A1)" PASS "mine $v0 -> $v1"; nav click '[data-testid^="vote-up-"]'; sleep 4;;  # withdrawn: the desired state «none»
     *) a3 "comment like (A1)" FAIL "mine $v0 -> $v1; «${vs}»";; esac
   guard_crash spot15
-  # 15 A2: the soft offer of «Публікації» after the first opened article (as on Android) - our dialog, never the system's prompt first
-  ev "(async () => { const P = Capacitor.Plugins.Preferences; const v = (await P.get({ key: 'settings' })).value; const s = Object.assign(v ? JSON.parse(v) : {}, { asked: [] });
-    await P.set({ key: 'settings', value: JSON.stringify(s) }); return 'ok'; })()" > /dev/null
-  launch; nav go "/articles?id=1832"; sleep 6
-  v=$(ev "(() => { const a = Array.from(document.querySelectorAll('ion-alert.soft-ask--articles')).find((e) => !e.classList.contains('overlay-hidden')); return a ? 'offer: ' + a.querySelector('.alert-title')?.textContent + ' / ' + Array.from(a.querySelectorAll('.alert-button')).map((b) => b.textContent.trim()).join(' | ') : 'no offer'; })()")
-  shotof "$OUT/a3-push-offer__$TAG.png" 'ion-alert.soft-ask--articles' > /dev/null
-  case "$v" in offer:*) a3 "notifications offer (A2)" PASS "$v";; *) a3 "notifications offer (A2)" FAIL "$v";; esac
+  # 15 A2: the soft offer (read in spot 14) and «Ще → Сповіщення»
+  v="$OFFER14"   # spot 14 met the offer over the first opened article - THE moment Android asks (a re-ask after a reset is not the rule)
+  case "$v" in offer:*) a3 "notifications offer (A2)" PASS "$v (over the first opened article, as on Android)";; *) a3 "notifications offer (A2)" FAIL "$v";; esac
   ev "(() => { const b = Array.from(document.querySelectorAll('ion-alert.soft-ask--articles .alert-button')).pop(); b && b.click(); return 'ok'; })()" > /dev/null; sleep 2   # «Ні, дякую»
   nav go /more/notifications; sleep 3
   v=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=push-status]')||{}).textContent || 'none'")
@@ -266,6 +266,8 @@ a3_walk() {
     contacts:/more/contacts eparchies:/more/eparchies eparchy:/more/eparchies/1 about:/more/about; do
     name="${sc%%:*}"; path="${sc#*:}"; guard_crash "a8-$name"
     nav go "$path"; sleep 5; [ "$name" = map ] && node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
+    # an A2 offer left open (a modal over every screen until answered - ios run 2's sheet) is answered «Ні, дякую» before the frame
+    ev "(() => { Array.from(document.querySelectorAll('ion-alert.soft-ask:not(.overlay-hidden)')).forEach((a) => Array.from(a.querySelectorAll('.alert-button')).pop()?.click()); return 'ok'; })()" > /dev/null; sleep 2
     v=$(ev "(() => { const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden')).pop(); if (!pg) return 'no page';
       const t = Array.from(pg.querySelectorAll('[data-testid=page-title], ion-title')).find((e) => e.getClientRects().length > 0); const ov = document.documentElement.scrollWidth > innerWidth + 1;
       return (document.querySelector('[data-testid=crash]') ? 'CRASH' : 'ok') + ' title «' + ((t && t.textContent) || '').trim().slice(0, 40) + '» ' + (ov ? 'SIDEWAYS' : 'fits') + ' ' + location.pathname + location.search; })()")

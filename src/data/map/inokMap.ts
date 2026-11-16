@@ -250,7 +250,14 @@ export class InokMap {
     // cloud_38: a lost GL context = not drawn (the shots never trust a stale `data-drawn`); MapLibre restores the map itself. (A re-applied
     // style on restore - tried for D16 - looped «lost / restored» on the iOS 16.4 simulator, ios run 1: removed, JOURNAL D11)
     map.on('webglcontextlost', () => { console.info('InokMap: GL context lost'); this.setDrawn('0'); });
-    map.on('webglcontextrestored', () => { console.info('InokMap: GL context restored'); if (!this.removed) map.triggerRepaint(); });
+    // ios run 2 (16.4 simulator): MapLibre's restore rebuilds the style from its snapshot without a style.load - our layers (dropped with the
+    // old style) are added again here when missing (the D15 guard had made the pending addLayers give up on the replaced style)
+    map.on('webglcontextrestored', () => {
+      console.info('InokMap: GL context restored');
+      if (this.removed) return;
+      if (!map.getSource(SRC) && styleOf(map)?._loaded) void this.addLayers();
+      map.triggerRepaint();
+    });
     // the slow tiles came after all (none failed): the note leaves
     map.on('idle', () => { if (this.tilesLost && this.basemap && this.tileErrors === 0) { this.tilesLost = false; o.onBasemap?.(); } });
     // D61: `data-drawn` = the map's own «drawn» signal for shots and tests (never a timer): '1' on MapLibre's `idle` (no camera movement,
