@@ -1496,40 +1496,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       answer!(); // style B arrives: its own style.load brings the houses back
       await housesDrawn(p);
     } },
-  // cloud_38 D16 (the nine Play `05-map` frames of 1.0.11: the base map in a corner, the rest white, `data-drawn` 1): the map page hidden
-  // in the tab stack, the screen's size AND density changed (the emulator's `wm size` / `wm density`) and the GL context lost and restored
-  // meanwhile; back on the map every cluster must be drawn whole (its circle's colour under its centre, read from the screenshot) and the
-  // canvas sized to the box. CDP (Chromium) only: WebKit has no device-metrics override.
-  { name: 'map-gl-restored-after-resize', path: '/map', only: ['phone-light'], ready: async (p) => {
-      if (p.context().browser()?.browserType().name() !== 'chromium') return;
-      const cdp = await p.context().newCDPSession(p);
-      const set = (width: number, height: number, deviceScaleFactor: number) => cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: true });
-      await set(360, 640, 3); await p.reload(); await mapReady(p);
-      const fresh = await p.evaluate(() => (window as any).__inokMap.getZoom()); // the app's own fit of every house at the target size
-      await set(411, 800, 2.625); await p.reload(); await mapReady(p);
-      await p.locator('ion-tab-button[tab=monasteries]').click(); await expect(p.getByTestId('map')).toBeHidden();
-      await p.evaluate(() => { const w = window as any; w.__lc = w.__inokMap.getCanvas().getContext('webgl2').getExtension('WEBGL_lose_context'); w.__lc.loseContext(); });
-      await set(360, 640, 3); await p.waitForTimeout(800);
-      await p.evaluate(() => (window as any).__lc.restoreContext()); await p.waitForTimeout(800);
-      await p.locator('ion-tab-button[tab=map]').click(); await mapReady(p);
-      const size = await p.evaluate(() => { const m = (window as any).__inokMap; const c = m.getCanvas(); const b = m.getContainer();
-        return { canvas: [c.width, c.height], want: [Math.round(b.clientWidth * devicePixelRatio), Math.round(b.clientHeight * devicePixelRatio)] }; });
-      expect(size.canvas, 'the canvas sized to its box').toEqual(size.want);
-      const view = await p.evaluate(() => { const m = (window as any).__inokMap; return { zoom: m.getZoom(), kyiv: m.getBounds().contains([30.52, 50.45]) }; });
-      console.log('D16 view', JSON.stringify({ fresh, ...view }));
-      expect(view.kyiv && Math.abs(view.zoom - fresh) < 0.35, `the view = the fit of a fresh start (zoom ${view.zoom.toFixed(2)} vs ${fresh.toFixed(2)})`).toBe(true);
-      const png = (await p.screenshot()).toString('base64');
-      const bad = await p.evaluate(async (b64) => {
-        const m = (window as any).__inokMap; const box = m.getContainer().getBoundingClientRect();
-        const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
-        const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d')!; g.drawImage(img, 0, 0);
-        const k = img.width / innerWidth;
-        return m.queryRenderedFeatures({ layers: ['clusters'] }).map((f: any) => m.project(f.geometry.coordinates)).filter((pt: any) => pt.x > 30 && pt.y > 30 && pt.x < box.width - 30 && pt.y < box.height - 30)
-          .map((pt: any) => { const [r, gg, bb] = g.getImageData(Math.round((box.left + pt.x - 9) * k), Math.round((box.top + pt.y) * k), 1, 1).data; return { pt: [Math.round(pt.x), Math.round(pt.y)], rgb: [r, gg, bb] }; })
-          .filter((s: any) => Math.abs(s.rgb[0] - 0x0c) + Math.abs(s.rgb[1] - 0x64) + Math.abs(s.rgb[2] - 0x86) > 60);
-      }, png);
-      expect(bad, 'every cluster drawn with its circle (a stale GL restore drew counts without circles)').toEqual([]);
-    } },
+  // cloud_38 D16: no browser test - Chromium cannot reproduce it (JOURNAL cloud_38 D2); a CDP + GL-loss test raced the slow CI runner twice
+  // (E6) and was removed. D16's proof = the Play run's fresh process per size + the pixel refusal (unit storeFrames, the emulator's frames).
   { name: 'map-near', path: '/map', ready: async (p) => {
       await mapReady(p);
       await p.getByTestId('near-me').click();
