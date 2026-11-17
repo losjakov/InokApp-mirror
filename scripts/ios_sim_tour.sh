@@ -126,6 +126,15 @@ guard_crash() {
 a3_walk() {
   local v
   guard_crash spot1
+  # 0 cloud_40 (A1, red on the 1.0.13 code): the app's LOCAL plugins (the App target's AppAttest + FcmTopics, registered by the app's own
+  # bridge InokBridgeViewController) must ANSWER. A simulator's App Attest answers {"supported":false}; a rejection «UNIMPLEMENTED» = the
+  # plugin is not in the bridge (the root view controller is not the app's own) - App Attest and the FCM topics are then dead on every iPhone
+  v=$(ev "(async () => { const r = []; for (const [n, m] of [['AppAttest', 'isSupported'], ['FcmTopics', 'consumedArticles']]) {
+    try { const x = await Capacitor.Plugins[n][m](); r.push(n + '=' + JSON.stringify(x === undefined ? 'resolved' : x)); }
+    catch (e) { r.push(n + '=REJECT ' + ((e && e.code) || '') + ' ' + String((e && e.message) || e).slice(0, 60)); } } return r.join('; '); })()")
+  case "$v" in 'AppAttest={"supported":'*'; FcmTopics='*) case "$v" in *UNIMPLEMENTED*|*'not implemented'*) a3 "local plugins answer (A1)" FAIL "$v";;
+      *) a3 "local plugins answer (A1)" PASS "$v";; esac;;
+    *) a3 "local plugins answer (A1)" FAIL "${v:-no answer}";; esac
   # 1 the bars and the safe areas: the header under the status bar / Dynamic Island, the tab bar on the bottom edge, its buttons above the home indicator
   nav go /home; node "$NAVJS" wait '[data-testid="home-near"]' >> "$OUT/nav.txt" 2>&1
   v=$(ev "(() => { const p = document.createElement('div'); p.style.cssText = 'position:fixed;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)'; document.body.append(p);
