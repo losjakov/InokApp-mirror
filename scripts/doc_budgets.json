@@ -14,8 +14,8 @@
     "max_bytes": 12000
   },
   "ref/REF_app_api_contract.md": {
-    "max_bytes": 44000,
-    "note": "CD 01.11.2026: raised to 24000; CD S263 02.11.2026: 28000 (R-27 next); D71 cloud_19: 32000 - one contract byte-equal in two repos (InokSite budget row mirrors this); InokSite C29 13.11.2026: 36000 (R-44 / R-45); InokSite C34 14.11.2026: 40000 (R-49); InokSite C37 16.11.2026: 44000 (R-53 / R-52)"
+    "max_bytes": 48000,
+    "note": "CD 01.11.2026: raised to 24000; CD S263 02.11.2026: 28000 (R-27 next); D71 cloud_19: 32000 - one contract byte-equal in two repos (InokSite budget row mirrors this); InokSite C29 13.11.2026: 36000 (R-44 / R-45); InokSite C34 14.11.2026: 40000 (R-49); InokSite C37 16.11.2026: 44000 (R-53 / R-52); InokSite C39 17.11.2026: 48000 (R-57 / R-58)"
   },
   "ref/REF_app_architecture.md": {
     "max_bytes": 14000
