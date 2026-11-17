@@ -142,13 +142,17 @@ a3_walk() {
   v=$(ev "(async () => { const r = []; for (const [n, m] of [['AppAttest', 'isSupported'], ['FcmTopics', 'consumedArticles']]) {
     try { const x = await Capacitor.Plugins[n][m](); r.push(n + '=' + JSON.stringify(x === undefined ? 'resolved' : x)); }
     catch (e) { r.push(n + '=REJECT ' + ((e && e.code) || '') + ' ' + String((e && e.message) || e).slice(0, 60)); } } return r.join('; '); })()")
-  case "$v" in 'AppAttest={"supported":'*'; FcmTopics='*) case "$v" in *UNIMPLEMENTED*|*'not implemented'*) a3 "local plugins answer (A1)" FAIL "$v";;
-      *) a3 "local plugins answer (A1)" PASS "$v";; esac;;
+  # release ios run of cloud_40: the plugin's answer is a Swift dictionary - its KEY ORDER is random per launch ({"os":…,"supported":false}
+  # failed a pattern that wanted «supported» first) -> the answer is read by its keys, never by their order
+  case "$v" in *UNIMPLEMENTED*|*'not implemented'*|*REJECT*) a3 "local plugins answer (A1)" FAIL "$v";;
+    'AppAttest={'*'"supported":'*'; FcmTopics='*) a3 "local plugins answer (A1)" PASS "$v";;
     *) a3 "local plugins answer (A1)" FAIL "${v:-no answer}";; esac
   # 0b cloud_40 (A1 g): «Про застосунок» - «Перевірка Apple: …» on a simulator = «not supported by this device» (Apple's own answer), never
   # «the call failed» (= the plugin not in the bridge); «Скопіювати подробиці» shows the text (no key id / install id in it)
   nav go /more/about; sleep 3
-  nav click '[data-testid="attest-copy"]'; sleep 2
+  # release ios run 1 of cloud_40: one tap lost while the page entered («no details») - tapped again until the copied text shows (<= 3)
+  local t; for t in 1 2 3; do nav click '[data-testid="attest-copy"]'; sleep 2
+    [ "$(ev "document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=attest-details]') ? 'yes' : 'no'")" = yes ] && break; done
   v=$(ev "(() => { const c = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=attest-check]'); const d = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=attest-details]');
     return (c ? c.dataset.state : 'none') + ' | ' + (d ? d.textContent.replace(/\\n/g, ' / ') : 'no details'); })()")
   shot "$OUT/a3-attest-check__$TAG.png"

@@ -47,5 +47,20 @@
   "ref/REF_app_release.md": {
     "max_bytes": 8000,
     "note": "A-62 versions and releases (cloud_21)"
+  },
+  ".claude/commands/start_session.md": {
+    "max_bytes": 4000
+  },
+  ".claude/commands/final_session.md": {
+    "max_bytes": 4000
+  },
+  ".claude/commands/release.md": {
+    "max_bytes": 4000
+  },
+  ".claude/commands/screens.md": {
+    "max_bytes": 4000
+  },
+  ".claude/commands/build_android.md": {
+    "max_bytes": 4000
   }
 }
