@@ -52,3 +52,31 @@ describe('store frame read-backs (scripts/store_checks.mjs, scripts/store_lib.sh
     expect(set).toMatch(/wm size[\s\S]*am force-stop \$PKG[\s\S]*am start -n \$PKG\/\.MainActivity/);
   });
 });
+
+// cloud_40 (NOTE 3 of REVIEW cloud_39, E14): the Android WebView's tablet home frames failed `do wholeRows` with a bare 'none', asked ONCE
+describe('store frame actions on a device: asked again like the browser ring, and every refusal says why', () => {
+  it('emu_nav `do` asks up to 6 times (3 s apart) while the action answers none; the browser ring polls the same action', () => {
+    const nav = readFileSync(new URL('../../scripts/emu_nav.mjs', import.meta.url), 'utf8');
+    expect(nav).toMatch(/for \(let i = 0; i < 6; i\+\+\) \{\s*r = String\(await evaluate\(ACTIONS\[arg\]\)\);/);
+    expect(nav).toMatch(/if \(r === 'ok' \|\| !r\.startsWith\('none'\)\) break;/);
+    expect(readFileSync(new URL('../../screens/store.spec.ts', import.meta.url), 'utf8')).toMatch(/expect\.poll\(\(\) => act\(step\.slice\(3\)/);
+  });
+  it('wholeRows: the page measured = the one rowsWhole reads (the LAST shown), each none carries its reason', async () => {
+    // @ts-expect-error - plain .mjs
+    const { ACTIONS } = await import('../../scripts/store_checks.mjs');
+    const src: string = ACTIONS.wholeRows;
+    expect(src).toMatch(/const pg = shown\(\)\.pop\(\);/);
+    expect(CHECKS.rowsWhole).toMatch(/filter\(\(x\) => !x\.classList\.contains\('ion-page-hidden'\)\)\.pop\(\)/);
+    expect(src.match(/'none: /g)?.length).toBe(3);
+    expect(src).not.toMatch(/return 'none';/);
+  });
+});
+
+// cloud_40 (A-129, C1): the App Store frames 04 / 05 = the browser frame + the device's marks cut from a real simulator frame; a join that is
+// not clean (a seam, app content under a band, a wrong size) is REFUSED - the frame then stays out of the set and is named
+describe.skipIf(!hasPil)('App Store join (scripts/appstore_join.py)', () => {
+  it('joins a clean pair and refuses a seam, covered content and a wrong size', () => {
+    const PYJ = new URL('../../scripts/appstore_join.py', import.meta.url).pathname;
+    expect(execFileSync('python3', ['-I', PYJ, '--self-test'], { encoding: 'utf8' }).trim()).toMatch(/^appstore_join self-test: PASS/);
+  });
+});

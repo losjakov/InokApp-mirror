@@ -4,6 +4,7 @@ import { cloudDownloadOutline, eyeOffOutline, shareSocialOutline, starOutline } 
 import { useRef, useState } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { SocialLinks } from '@/components/SocialLinks';
+import { AttestCheck } from '@/components/AttestCheck';
 import { APP_VERSION } from '@/app/version';
 import { openLink } from '@/native/intents';
 import { SITE_URL } from '@/data/api/client';
@@ -48,6 +49,7 @@ export function AboutPage() {
             <IonNote slot="end" data-testid="app-version">{APP_VERSION}</IonNote>
             {settings.ownDevice && <IonIcon slot="end" icon={eyeOffOutline} className="own-device" aria-label={t('views.own_device')} data-testid="own-device" />}
           </IonItem>
+          {isIos() && <AttestCheck />}{/* cloud_40 (A1 g): App Attest of THIS iPhone / iPad, under the version */}
           {/* iOS 1.0.11: the App Store listing is not public yet - share / rate follow it (REF_ios_state); the Play link is never offered on an iPhone */}
           {storeLinksShown(config) && !isIos() && <>
             <IonItem button detail={false} onClick={() => void shareApp(t('app.name'), t('about.share_text'), config)} data-testid="about-share">

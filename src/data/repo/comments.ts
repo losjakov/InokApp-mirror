@@ -1,5 +1,5 @@
 import type { Db } from '@/data/db/types';
-import type { Article, Comment, Comments, L10n, VoteValue, Votes } from '@/data/api/types';
+import type { AppConfig, Article, Comment, Comments, L10n, VoteValue, Votes } from '@/data/api/types';
 import { keepCounts, type Counts } from './articles';
 import { dataSource } from '@/data/source';
 import { cacheGet, cacheSet } from './cache';
@@ -26,6 +26,7 @@ export const parseComments = (j: Comments): Comments => ({
   ...(rulesUrls(j.rules_url) ? { rules_url: rulesUrls(j.rules_url) } : {}),
   total: j.total ?? j.items?.length ?? 0,
   items: (j.items ?? []).map((c) => ({ ...withVotes(c), replies: (c.replies ?? []).map(withVotes) })),
+  ...(j.next !== undefined ? { next: typeof j.next === 'string' && j.next ? j.next : null } : {}), // R-55: the next page's cursor
 });
 
 /** R-32 (T-1335): `rules_url` {uk,ru,en} - only https addresses survive; none = no link (the rules text still shows). */
@@ -39,7 +40,9 @@ function rulesUrls(v: unknown): L10n | null {
 const key = (id: number) => `comments:${id}`;
 /** What one read gives the article screen: the comments (live, else the last answer; null = never read) and the item's own
  *  numbers from a LIVE answer only (R-29) - offline the article keeps what it had. */
-export interface CommentsRead { comments: Comments | null; counts: Counts | null }
+export interface CommentsRead { comments: Comments | null; counts: Counts | null;
+  /** cloud_40 (A-125 for comments): no answer AND nothing kept - what failed (the block says why, with «Повторити») */
+  failure?: unknown }
 /** R-29 (D52): the numbers a live answer carries; `rating: null` = no rating yet (the server says so), absent = not sent. */
 export const answerCounts = (c: Comments): Counts | null => {
   const n: Counts = {};
@@ -56,15 +59,35 @@ export const withCounts = (a: Article, r: CommentsRead): Article => (r.counts ? 
  */
 export async function loadComments(db: Db, id: number): Promise<CommentsRead> {
   try {
-    const c = parseComments(await dataSource().comments(id, await installId(db)));
+    // R-55 (A-130 3): with the site's flag (the KEPT config - read here, so a config arriving later never re-reads the shown block under
+    // the finger) the FIRST five by score (the kept copy = that page; «Показати більше» asks the rest online)
+    const ranked = (await cacheGet<AppConfig>(db, 'config'))?.value?.features?.comments_ranked === true;
+    const install = await installId(db);
+    const c = parseComments(await (ranked ? dataSource().comments(id, install, { since: null }) : dataSource().comments(id, install)));
     await cacheSet(db, key(id), c);
     const counts = answerCounts(c);
     if (counts) await keepCounts(db, id, counts);
     return { comments: c, counts };
-  } catch {
-    return { comments: (await cacheGet<Comments>(db, key(id)))?.value ?? null, counts: null };
+  } catch (e) {
+    const kept = (await cacheGet<Comments>(db, key(id)))?.value ?? null;
+    return { comments: kept, counts: null, ...(kept ? {} : { failure: e }) };
   }
 }
+
+/**
+ * R-55: the next five by score after `shown` (its `next`). The server computes the order at each request, so a page may repeat a comment
+ * already shown: the shown ids stay where they are and only NEW ones are added (the list never jumps under the finger). Throws offline /
+ * unanswered - the block says why with «Повторити» (A-125).
+ */
+export async function moreComments(db: Db, id: number, shown: Comments): Promise<Comments> {
+  if (!shown.next) return shown;
+  const page = parseComments(await dataSource().comments(id, await installId(db), { since: shown.next }));
+  return mergeComments(shown, page);
+}
+export const mergeComments = (shown: Comments, page: Comments): Comments => {
+  const have = new Set(shown.items.map((c) => c.id));
+  return { ...shown, items: [...shown.items, ...page.items.filter((c) => !have.has(c.id))], next: page.next ?? null, total: page.total ?? shown.total };
+};
 
 /** The site's rule (ruling 161): the pressed toggle again = withdraw, the other one = change of mind. */
 export const desiredVote = (mine: Votes['mine'], pressed: 1 | -1): VoteValue => (mine === pressed ? 'none' : pressed === 1 ? 'like' : 'dislike');

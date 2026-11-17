@@ -414,12 +414,16 @@ ion-tab-button { position: relative; }
 /* the full-screen viewer: black in both themes (a picture, not a page) */
 .viewer { --width: 100%; --height: 100%; --border-radius: 0; --background: #000; }
 .viewer__box { position: relative; height: 100%; display: flex; flex-direction: column; background: #000; }
-.viewer__scroll { flex: 1; overflow: auto; display: flex; align-items: center; touch-action: none; } /* A-96 W-4: at 1x the viewer's own swipes */
+.viewer__scroll { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; touch-action: none; } /* A-96 W-4: at 1x the viewer's own swipes */
 .viewer__scroll--zoomed { touch-action: pan-x pan-y; } /* zoomed: the picture pans natively */
 .viewer__scroll img { display: block; margin: auto; max-width: none; height: auto; }
 .viewer__frame { width: 100%; margin: auto; background: #111; } /* R-49: the one copy on its way / waiting (A-112: the block under it) - the photo's shape */
 .viewer [tabindex='-1']:focus { outline: none; } /* the picture takes the focus after the block's tap (TalkBack draws its own) */
-.viewer__caption { margin: 0; padding: 8px 16px calc(12px + var(--inok-safe-bottom)); color: #ddd; font-size: var(--inok-type-caption); }
+.viewer__caption { margin: 0; padding: 8px 16px 4px; color: #ddd; font-size: var(--inok-type-caption); }
+.viewer__safe { flex: none; height: calc(8px + var(--inok-safe-bottom)); } /* cloud_40: the box's last strip = the home indicator's / nav bar's room */
+/* cloud_40 (R-56): the two small links under the picture and its caption, in the flow (never over the photo, outside the swipe area), 48 dp */
+.viewer__links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 8px; padding: 0 calc(8px + var(--inok-safe-right)) 0 calc(8px + var(--inok-safe-left, 0px)); }
+.viewer__link { --color: #ddd; --padding-start: 8px; --padding-end: 10px; min-height: 48px; height: auto; margin: 0; font-size: var(--inok-type-secondary); text-transform: none; white-space: normal; }
 .viewer__close { position: absolute; top: calc(4px + var(--inok-safe-top)); right: calc(4px + var(--inok-safe-right)); --color: #fff; --background: rgba(0,0,0,.45); --border-radius: 50%;
   width: 48px; height: 48px; }
 .viewer__nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; --color: #fff; --background: rgba(0,0,0,.45); --border-radius: 50%; margin: 0; }
@@ -542,3 +546,14 @@ ion-searchbar .searchbar-clear-button { min-width: 24px; }
 .net-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 0 16px 8px; }
 .net-notice__text { margin: 0; flex: 1 1 200px; font-size: var(--inok-type-secondary); line-height: var(--inok-line); color: var(--ion-text-color); }
 .net-notice ion-button { min-height: 48px; margin: 0; }
+/* cloud_40 (A1 g): «Перевірка Apple» - the copied text readable and wrapped under «Скопіювати подробиці» */
+.attest-check__details { white-space: pre-wrap; word-break: break-word; font-size: var(--inok-type-caption); margin: 4px 0 8px; user-select: text; -webkit-user-select: text; color: var(--ion-text-color); }
+/* cloud_40 (A-130 1, R-54): «Читайте також» / «Дивіться також» - a compact bulleted list: a bold dot, «title — subtitle» in ONE font, the
+   app's link colour; each line a 48 dp target that wraps (200 % text: the lines never touch - the gap + the 48 dp minimum) */
+.read-also { margin: 8px 0 4px; }
+.read-also__list { list-style: none; margin: 0 16px; padding: 0; }
+.read-also__list li { position: relative; padding-inline-start: 22px; }
+.read-also__list li::before { content: '•'; position: absolute; inset-inline-start: 2px; top: 10px; font-weight: 900; font-size: calc(var(--inok-type-body) * 1.35); line-height: 1; color: var(--ion-color-primary); }
+.read-also__link { display: block; box-sizing: border-box; min-height: 48px; padding: 10px 0; color: var(--ion-color-primary); text-decoration: none; font-size: var(--inok-type-body, 1rem); line-height: 1.35; }
+.read-also__link:active { opacity: 0.6; }
+.read-also--rows ion-list { padding-top: 0; }

@@ -62,10 +62,12 @@ describe('the transition table (header arrow = system Back)', () => {
     ['home «Поруч» → card', ['/monasteries/37'], '/home'],
     ['push tap → article (navigated from home)', ['/articles?id=2869'], '/home'],
     ['«Ще» → Контакти', ['/more', '/more/contacts'], '/more'],
-    ['photo placeholder → «Ще» photo setting', ['/monasteries/37', '/more?photos=1'], '/monasteries/37'],
     ['tab bar list → tab bar map', ['/monasteries', '/map'], '/home'],
   ])('%s', (_name, urls, expected) => {
     expect(from(...(urls as string[])).back()).toBe(expected);
+  });
+  it('photo placeholder → «Ще» photo setting: «Ще» opened FROM the card (OPENED_FROM) - Back = the card (cloud_40 A2: the intent in memory)', () => {
+    expect(from('/monasteries/37').push('/more', true).back()).toBe('/monasteries/37');
   });
   it('a map opened for an eparchy keeps its way back when its scope chip is cleared (replace in place)', () => {
     const h = from('/more/eparchies/5', '/map?eparchy=5').replace('/map', OPENED_FROM.opened);
@@ -93,7 +95,7 @@ describe('the bottom tabs (A-27)', () => {
     expect(tabOf('/mapx')).toBeUndefined();
   });
   // the owner's path and every cross jump: wherever the app stands, each of the 5 buttons goes to its top screen
-  const places = ['/home', '/more/eparchies/5', '/map?eparchy=5', '/monasteries/37', '/map?code=37', '/articles?id=2869', '/more/contacts', '/more?photos=1', '/monasteries', '/more'];
+  const places = ['/home', '/more/eparchies/5', '/map?eparchy=5', '/monasteries/37', '/map?code=37', '/articles?id=2869', '/more/contacts', '/monasteries', '/more'];
   it.each(places)('from %s each tab button = its top screen (or scroll up on it)', (url) => {
     const [path, q] = url.split('?'); const search = q ? `?${q}` : '';
     for (const t of tabs) {

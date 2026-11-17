@@ -612,6 +612,26 @@ const countGallery = async (p: Page) => {
 const gallery = (p: Page) => galleryReqs.get(p)!;
 /** A-112: Wi-Fi off = mobile data (metered); the setting stays the default «Тільки Wi-Fi» */
 const MOBILE = { connected: true, metered: true, dataSaver: false };
+/** cloud_40 (A2): the chooser is reached only by its offer (a one-shot intent, never an address) - the card's placeholder link, mobile data */
+const viaOffer = { path: '/monasteries/242', before: net(MOBILE) };
+/** cloud_40 (R-56): the card's gallery on Wi-Fi (the full files allowed: no offer in the viewer) */
+const openCardViewer = async (p: Page) => {
+  const g = onShown(p, 'card').getByTestId('gallery');
+  await expect(g).toHaveAttribute('data-in-app', '1', { timeout: 15_000 });
+  await g.click();
+  await expect(p.getByTestId('viewer-count')).toContainText('1 / 40');
+};
+/** cloud_40 (R-55): the ranked comments follow the KEPT config (never a re-read under the finger) - 2868 is reached from 2869's «Читайте також»,
+ *  i.e. after the app has kept the site's config, as on every start but the very first */
+const viaReadAlso = async (p: Page, id: number) => {
+  await onShown(p, 'read-also').getByTestId(`read-also-${id}`).click();
+  await expect(p).toHaveURL(new RegExp(`id=${id}$`));
+};
+const openChooser = async (p: Page) => {
+  await expect(p.locator('[data-testid="photo-wait"][data-why]').first()).toHaveAttribute('data-why', 'wifi');
+  await onShown(p, 'card').getByTestId('photo-settings').first().click();
+  await expect(p).toHaveURL(/\/more$/);
+};
 /** the card's cover loads first (the way into the gallery), THEN Wi-Fi goes off, THEN «Фотогалерея» */
 const openCardGallery = async (p: Page) => {
   const card = onShown(p, 'card');
@@ -805,7 +825,9 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // «Новина»), «Нове на сайті» by the date of placing (sort=created), «Популярне за тиждень» by the week's views (sort=views_week); under them
   // the social block (the fourth place of SocialLinks), the «checked / refresh» line LAST. The fixture's orders: created 2869, 2868 | 1892 |
   // 2871; views_week 2869, 2738 | 1892 | 2871 (fixtures/views.json `__week`). Red on 1.0.12 (three rows, one block, no social block).
-  { name: 'home-blocks', path: '/home', tall: 2400, ready: async (p) => {
+  // NOTE 1 of REVIEW cloud_39: the phone frames (2400) ended on the social block - the «Перевірено…» line IS drawn on a phone (it is the
+  // home's last row, under the social block); the frame is now tall enough to hold it and the check below says it is IN the frame
+  { name: 'home-blocks', path: '/home', tall: 2650, ready: async (p) => {
       await expect(onShown(p, 'home-popular')).toBeVisible({ timeout: 15_000 });
       await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
       expect(await homeBlocks(p)).toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [2869, 2738, 1892, 2871] });
@@ -815,6 +837,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       const order = await p.evaluate(() => ['home-new', 'home-popular', 'social', 'home-fresh'].map((id) => document.querySelector(`.ion-page:not(.ion-page-hidden) [data-testid="${id}"]`))
         .every((e, i, a) => !!e && (i === 0 || !!(a[i - 1]!.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING))));
       expect(order, 'new -> popular -> social -> the «checked» line last').toBe(true);
+      await expect(onShown(p, 'home-checked')).toBeInViewport({ ratio: 1 }); // NOTE 1: whole, in the frame
       await expect(onShown(p, 'social-row').locator('a')).toHaveCount(3);
       // A-95: the four «Усі» are told apart by the screen reader - each named by its list, the visible word first (label in name)
       const all = (await words(p, ['home.all']))[0];
@@ -1170,7 +1193,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await chromeText(p);
     } })),
   // D60 at the largest font: the short hint, the three choices and both buttons stay inside the screen (the choice is the dialog's job)
-  { name: 'font200-more-photos', path: '/more?photos=1', font: 200, only: ['phone-light', 'phone-dark'], ready: async (p: Page) => {
+  { name: 'font200-more-photos', ...viaOffer, font: 200, only: ['phone-light', 'phone-dark'], ready: async (p: Page) => {
+      await openChooser(p);
       await expect(p.locator('ion-alert.inok-dialog')).toBeVisible();
       await expect(p.locator('ion-alert .alert-radio-button')).toHaveCount(3);
       const out = await p.evaluate(() => { const vh = innerHeight; const els = [...document.querySelectorAll('ion-alert .alert-wrapper, ion-alert .alert-button')];
@@ -2763,7 +2787,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await openArticleGallery(p);
       await p.locator('ion-modal.viewer [data-testid="photo-settings"]').click();
       await viewerGone(p);
-      await expect(p).toHaveURL(/\/more\?photos=1$/);
+      await expect(p).toHaveURL(/\/more$/); // cloud_40 (A2): the intent is not in the address
       await expect(p.locator('ion-alert')).toBeVisible();
       await expect(p.locator('ion-alert .alert-radio-button[aria-checked="true"]')).toContainText(/Тільки Wi-Fi/);
     } },
@@ -2936,7 +2960,28 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.getByTestId('photo-load').first().click(); // a manual tap always works (the cover's)
       await picturesLoaded(p, '.aview__cover img', 1);
     } },
-  { name: 'more-photos', path: '/more?photos=1', ready: async (p) => {
+  // cloud_40 (A2, both platforms): the choice opened from an offer opens ONCE for that entry - never again by Back from an inner item of «Ще»
+  // (1.0.13: the intent lived in the URL `/more?photos=1`, so Back to it opened the sheet again)
+  { name: 'photo-sheet-once', only: ['phone-light', 'phone-dark', 'tablet'], ...viaOffer, ready: async (p) => {
+      await openChooser(p);
+      const sheet = p.locator('ion-alert.inok-dialog:not(.overlay-hidden)');
+      await expect(sheet).toBeVisible();
+      await sheet.locator('.alert-button-role-cancel').click();
+      await expect(sheet).toHaveCount(0);
+      await onShown(p, 'more-language').click();
+      await expect(p).toHaveURL(/\/more\/language$/);
+      await expect(onShown(p, 'back')).toBeVisible(); await p.waitForTimeout(500); // the page transition over
+      await onShown(p, 'back').click();
+      await expect(p).toHaveURL(/\/more$/);
+      await expect(onShown(p, 'more-list')).toBeVisible();
+      await p.waitForTimeout(1200); // 1.0.13 opened it 300 ms after the page showed
+      await expect(sheet, 'the sheet opened again by Back').toHaveCount(0);
+      await p.goBack(); await expect(p).toHaveURL(/\/monasteries\/242$/); await p.goForward(); await expect(p).toHaveURL(/\/more$/); // the system Back + forward
+      await p.waitForTimeout(1200);
+      await expect(sheet, 'the sheet opened again by the history').toHaveCount(0);
+    } },
+  { name: 'more-photos', ...viaOffer, ready: async (p) => {
+      await openChooser(p);
       // the placeholder's link opens the choice at once; the default is «Тільки Wi-Fi»
       await expect(p.locator('ion-alert')).toBeVisible();
       await expect(p.locator('ion-alert .alert-radio-button[aria-checked="true"]')).toContainText(/Тільки Wi-Fi|Только Wi-Fi|Wi-Fi only/);
@@ -3146,6 +3191,205 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('about-rate')).toHaveCount(0);
       await onShown(p, 'about-update').click();
       await expect(onShown(p, 'about-update-note')).toHaveText(/Встановлено не з App Store|Установлено не из App Store|Not installed from the App Store/);
+    } },
+  // cloud_40 (A1 g): «Перевірка Apple» under the version (iOS only): the state in words + «Скопіювати подробиці» shows the copied text;
+  // a rejected call (1.0.13's «not implemented») = «помилка виклику», never «not supported»; no key id / install id in the text
+  ...([['about-attest', 'unsupported', ['phone-light', 'phone-dark', 'tablet']], ['about-attest-failed', 'failed', ['phone-light']]] as const).map(([name, st, only]) => ({
+    name, only: [...only], path: '/more/about', before: async (p: Page) => {
+      await p.addInitScript((v) => { localStorage.setItem('inok.platform', 'ios'); localStorage.setItem('inok.attest', v); }, st); },
+    ready: async (p: Page) => {
+      await expect(onShown(p, 'attest-check')).toHaveAttribute('data-state', st);
+      await expect(onShown(p, 'attest-state')).toHaveText(st === 'failed' ? 'Перевірка Apple: помилка виклику, повториться з наступною оцінкою' : 'Перевірка Apple: цей пристрій не підтримує');
+      await onShown(p, 'attest-copy').click();
+      const d = onShown(p, 'attest-details');
+      await expect(d).toContainText(st === 'failed' ? 'App Attest: call failed: UNIMPLEMENTED' : 'App Attest: isSupported = false');
+      await expect(d).toContainText(/Inok 1\.0\.\d+, iOS/);
+      expect(await d.textContent()).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-/); // no uuid (the install id) in it
+      const btn = await onShown(p, 'attest-copy').boundingBox(); expect(btn!.height).toBeGreaterThanOrEqual(48);
+    } })),
+  // cloud_40 (A-130 1, R-54): «Читайте також» / «Дивіться також» - after the stars, before the comments; three bulleted lines «title — subtitle»
+  // in the link colour, each a 48 dp target; a tap opens the item in the app. News: after «Поділитися», four rows of the news list.
+  { name: 'read-also-article', only: ['phone-light', 'phone-dark', 'tablet'], path: '/articles?id=2869', ready: async (p: Page) => {
+      const b = onShown(p, 'read-also');
+      await expect(b).toHaveAttribute('data-kind', 'publication');
+      await expect(b.locator('h2.inok-heading')).toHaveText('Читайте також');
+      const links = b.locator('.read-also__link');
+      await expect(links).toHaveCount(3);
+      const m = await links.evaluateAll((ls) => ls.map((l) => { const r = l.getBoundingClientRect(); const cs = getComputedStyle(l);
+        return { h: r.height, color: cs.color, size: cs.fontSize, img: l.querySelectorAll('img').length, text: l.textContent ?? '' }; }));
+      const primary = await p.evaluate(() => { const e = document.createElement('span'); e.style.color = 'var(--ion-color-primary)'; document.body.append(e); const c = getComputedStyle(e).color; e.remove(); return c; });
+      for (const x of m) { expect(x.h).toBeGreaterThanOrEqual(48); expect(x.color).toBe(primary); expect(x.img).toBe(0); }
+      expect(new Set(m.map((x) => x.size)).size, 'one font').toBe(1);
+      expect(m.every((x) => / — /.test(x.text)), 'title — subtitle').toBe(true);
+      const order = await p.evaluate(() => { const pg = document.querySelector('ion-tabs ion-router-outlet > .ion-page:not(.ion-page-hidden)')!;
+        const y = (sel: string) => pg.querySelector(sel)!.getBoundingClientRect().top; return [y('[data-testid=rating]'), y('[data-testid=read-also]'), y('[data-testid=comments]')]; });
+      expect(order[0]).toBeLessThan(order[1]); expect(order[1]).toBeLessThan(order[2]);
+      await b.scrollIntoViewIfNeeded();
+    } },
+  { name: 'read-also-video', only: ['phone-light'], path: '/articles?id=1892', ready: async (p: Page) => {
+      await expect(onShown(p, 'read-also').locator('h2.inok-heading')).toHaveText('Дивіться також');
+      const first = onShown(p, 'read-also').locator('.read-also__link').first();
+      const id = (await first.getAttribute('data-testid'))!.replace('read-also-', '');
+      await first.click();
+      await expect(p).toHaveURL(new RegExp(`/articles\\?id=${id}$`)); // opens IN the app
+      await expect(onShown(p, 'article')).toBeVisible();
+    } },
+  { name: 'read-also-news', only: ['phone-light', 'phone-dark', 'tablet'], path: '/articles?id=2871', ready: async (p: Page) => {
+      const b = onShown(p, 'read-also');
+      await expect(b.locator('h2.inok-heading')).toHaveText('Читайте також');
+      await expect(b.locator('[data-testid^="arow-"]')).toHaveCount(4);
+      await expect(b.locator('[data-testid^="arow-"][data-kind="news"]')).toHaveCount(4);
+      const [share, also] = await p.evaluate(() => { const pg = document.querySelector('ion-tabs ion-router-outlet > .ion-page:not(.ion-page-hidden)')!;
+        return ['[data-testid=share-footer]', '[data-testid=read-also]'].map((q) => pg.querySelector(q)!.getBoundingClientRect().top); });
+      expect(also, 'after «Поділитися»').toBeGreaterThan(share);
+      await b.scrollIntoViewIfNeeded();
+    } },
+  { name: 'read-also-font200', only: ['phone-light', 'phone-dark'], path: '/articles?id=2869', width: 320, font: 200, ready: async (p: Page) => {
+      const b = onShown(p, 'read-also'); await expect(b.locator('.read-also__link')).toHaveCount(3);
+      await b.scrollIntoViewIfNeeded();
+      const rs = await b.locator('.read-also__link').evaluateAll((ls) => ls.map((l) => { const r = l.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, h: r.height, fits: l.scrollWidth <= l.clientWidth + 1 }; }));
+      for (let i = 1; i < rs.length; i++) expect(rs[i].top, 'the lines never touch').toBeGreaterThanOrEqual(rs[i - 1].bottom);
+      expect(rs.every((r) => r.h >= 48 && r.fits)).toBe(true);
+    } },
+  // A-130: without a network, with the flag off or the request failing / never answering - NO block, nothing said, no empty space; the
+  // article's own text never waits for it
+  { name: 'read-also-offline', only: ['phone-light'], path: '/articles?id=2869', before: async (p: Page) => {
+      await net({ connected: false, metered: false, dataSaver: false })(p);
+      await p.route(/\/fixtures\/articles\.json\?related=/, (r) => { (p as any).__asked = true; return r.fulfill({ json: {} }); }); },
+    ready: async (p: Page) => {
+      await expect(onShown(p, 'article').locator('.aview__body, .aview__lead').first()).toBeVisible();
+      await expect(onShown(p, 'comments')).toBeVisible(); await p.waitForTimeout(1500);
+      await expect(p.getByTestId('read-also')).toHaveCount(0);
+      expect((p as any).__asked, 'no request offline').toBeUndefined();
+    } },
+  { name: 'read-also-held', only: ['phone-light'], path: '/articles?id=2869', before: async (p: Page) => {
+      await p.route(/\/fixtures\/articles\.json\?related=/, () => new Promise(() => undefined)); }, // the site never answers
+    ready: async (p: Page) => {
+      await expect(onShown(p, 'article').locator('.aview__body, .aview__lead').first()).toBeVisible(); // the text is not held
+      await expect(onShown(p, 'rating')).toBeVisible(); await expect(onShown(p, 'comments')).toBeVisible();
+      await expect(p.getByTestId('read-also')).toHaveCount(0);
+    } },
+  { name: 'read-also-error', only: ['phone-light'], path: '/articles?id=2871', before: async (p: Page) => {
+      await p.route(/\/fixtures\/articles\.json\?related=/, (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"busy"}' })); },
+    ready: async (p: Page) => {
+      await expect(onShown(p, 'share-footer')).toBeVisible(); await p.waitForTimeout(1500);
+      await expect(p.getByTestId('read-also')).toHaveCount(0);
+      await expect(p.locator('ion-toast')).toHaveCount(0); // nothing said
+    } },
+  { name: 'read-also-off', only: ['phone-light'], path: '/articles?id=2869', before: async (p: Page) => {
+      await p.addInitScript(() => { (window as any).__inokConfig = { features: { comments_write: false, embedded_player: false, articles_query: true, articles_sort_v2: true, monastery_photos: true } }; }); },
+    ready: async (p: Page) => {
+      await expect(onShown(p, 'comments')).toBeVisible(); await p.waitForTimeout(1500);
+      await expect(p.getByTestId('read-also')).toHaveCount(0);
+    } },
+  // cloud_40 (A-130 2 + amendment, R-56): the viewer's two small links - a MONASTERY: «Додати фото» (its page + the add-photo anchor) and
+  // «Правовласникам»; a PUBLICATION: «Правовласникам» only; in the flow under the picture / caption (never over them), 48 dp, the in-app tab
+  ...([['viewer-links-card', '/monasteries/242'], ['viewer-links-article', '/articles?id=1714']] as const).map(([name, path]) => ({
+    name, path, only: ['phone-light', 'phone-dark', 'tablet'], before: async (p: Page) => { await net({ connected: true, metered: false, dataSaver: false })(p); await recordOpens(p); },
+    ready: async (p: Page) => {
+      const card = name === 'viewer-links-card';
+      if (card) await openCardViewer(p);
+      else { const g = onShown(p, 'article').getByTestId('gallery-grid'); await g.scrollIntoViewIfNeeded(); await g.locator('[data-testid="photo-open"]').first().click(); }
+      const links = p.locator('ion-modal.viewer [data-testid="viewer-links"]');
+      await expect(links).toBeVisible();
+      await expect(links.getByTestId('viewer-add-photo')).toHaveCount(card ? 1 : 0);
+      await expect(links.getByTestId('viewer-rights')).toHaveText(/Правовласникам/);
+      await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
+      await expect.poll(() => p.evaluate(() => Math.round(document.querySelector('ion-modal.viewer .viewer__box')!.getBoundingClientRect().top)), 'the viewer\'s entry over').toBe(0);
+      const m = await p.evaluate(() => { const r = (q: string) => document.querySelector(`ion-modal.viewer ${q}`)?.getBoundingClientRect() ?? null;
+        const img = r('[data-testid="viewer-img"]')!; const cap = r('.viewer__caption'); const ls = r('[data-testid="viewer-links"]')!;
+        const bs = [...document.querySelectorAll('ion-modal.viewer .viewer__link')].map((b) => b.getBoundingClientRect());
+        return { imgBottom: Math.min(img.bottom, r('.viewer__scroll')!.bottom), capBottom: cap ? cap.bottom : 0, top: ls.top, bottom: ls.bottom, vh: innerHeight, hs: bs.map((b) => b.height), ws: bs.map((b) => b.width) }; });
+      expect(m.top, 'under the picture').toBeGreaterThanOrEqual(m.imgBottom - 1);
+      expect(m.top, 'under the caption').toBeGreaterThanOrEqual(m.capBottom - 1);
+      expect(m.bottom).toBeLessThanOrEqual(m.vh);
+      for (const h of m.hs) expect(h).toBeGreaterThanOrEqual(48);
+      for (const w of m.ws) expect(w).toBeGreaterThanOrEqual(48);
+      await links.getByTestId('viewer-rights').click();
+      if (card) await links.getByTestId('viewer-add-photo').click();
+      await expect.poll(() => p.evaluate(() => (window as any).__opened)).toEqual(card
+        ? ['https://inok.info/about/rightsholders/', 'https://inok.info/monasteries/242/#skm-cta-photo']
+        : ['https://inok.info/about/rightsholders/']);
+      await expect(p.locator('ion-modal.viewer [data-testid="viewer-img"]')).toBeVisible(); // the viewer stays
+    } })),
+  { name: 'viewer-links-ru', only: ['phone-ru'], path: '/monasteries/242', before: async (p: Page) => { await net({ connected: true, metered: false, dataSaver: false })(p); await recordOpens(p); },
+    ready: async (p: Page) => {
+      await openCardViewer(p);
+      const links = p.locator('ion-modal.viewer [data-testid="viewer-links"]');
+      await links.getByTestId('viewer-add-photo').click(); await links.getByTestId('viewer-rights').click();
+      await expect.poll(() => p.evaluate(() => (window as any).__opened)).toEqual(['https://inok.info/monasteries/242/?lang=ru#skm-cta-photo', 'https://inok.info/about/rightsholders/?lang=ru']);
+    } },
+  { name: 'viewer-links-font200', only: ['phone-light', 'phone-dark'], path: '/monasteries/242', width: 320, font: 200, before: net({ connected: true, metered: false, dataSaver: false }), ready: async (p: Page) => {
+      await openCardViewer(p);
+      await expect.poll(() => p.evaluate(() => Math.round(document.querySelector('ion-modal.viewer .viewer__box')!.getBoundingClientRect().top))).toBe(0);
+      const bs = await p.locator('ion-modal.viewer .viewer__link').evaluateAll((es) => es.map((e) => { const r = e.getBoundingClientRect(); return { b: r.bottom, h: r.height, r: r.right, cut: (e.shadowRoot?.querySelector('.button-native') as HTMLElement | null)?.scrollWidth ?? 0 }; }));
+      expect(bs).toHaveLength(2);
+      for (const x of bs) { expect(x.b).toBeLessThanOrEqual(780); expect(x.r).toBeLessThanOrEqual(320); expect(x.h).toBeGreaterThanOrEqual(48); }
+    } },
+  // no buttons beside the standard «load over mobile data?» offer, none without a network (they go when it goes), none without the flag
+  { name: 'viewer-links-offer', only: ['phone-light'], path: '/articles?id=1714', before: net(MOBILE), ready: async (p: Page) => {
+      await openArticleGallery(p);
+      await expect(viewerBlock(p)).toBeVisible();
+      await expect(p.locator('ion-modal.viewer [data-testid="viewer-links"]')).toHaveCount(0);
+    } },
+  { name: 'viewer-links-offline', only: ['phone-light'], path: '/monasteries/242', before: net({ connected: true, metered: false, dataSaver: false }), ready: async (p: Page) => {
+      await openCardViewer(p);
+      await expect(p.locator('ion-modal.viewer [data-testid="viewer-links"]')).toBeVisible();
+      await p.evaluate(() => { localStorage.setItem('inok.net', JSON.stringify({ connected: false, metered: false, dataSaver: false })); dispatchEvent(new Event('offline')); });
+      await expect(p.locator('ion-modal.viewer [data-testid="viewer-links"]')).toHaveCount(0);
+    } },
+  { name: 'viewer-links-off', only: ['phone-light'], path: '/monasteries/242', before: async (p: Page) => { await net({ connected: true, metered: false, dataSaver: false })(p);
+      await p.addInitScript(() => { (window as any).__inokConfig = { features: { comments_write: false, embedded_player: false, articles_query: true, articles_sort_v2: true, monastery_photos: true } }; }); },
+    ready: async (p: Page) => {
+      await openCardViewer(p);
+      await expect(p.locator('ion-modal.viewer [data-testid="viewer-links"]')).toHaveCount(0);
+    } },
+  // cloud_40 (A-130 3, R-55): comments by likes minus dislikes (a tie: the newer first) - the first FIVE + THE «Показати більше» (two more,
+  // then no button); offline the A-125 line + «Повторити» in place; the own vote never moves the list; without the flag = the 1.0.13 list
+  { name: 'comments-ranked', only: ['phone-light', 'phone-dark', 'tablet'], path: '/articles?id=2869', ready: async (p: Page) => {
+      await viaReadAlso(p, 2868);
+      const block = onShown(p, 'comments');
+      const order = () => block.locator('.comment:not(.comment--reply)').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')));
+      await expect.poll(order).toEqual(['comment-9105', 'comment-9106', 'comment-9102', 'comment-9101', 'comment-9104']);
+      await expect(block.locator('h2.inok-heading')).toHaveText('Коментарі · 8');
+      const more = block.getByTestId('comments-more');
+      await expect(more).toHaveText('Показати більше');
+      await block.getByTestId('vote-up-9106').click(); // the own vote: counts only, never the order
+      await p.waitForTimeout(800);
+      expect(await order()).toEqual(['comment-9105', 'comment-9106', 'comment-9102', 'comment-9101', 'comment-9104']);
+      await more.click();
+      await expect.poll(order).toEqual(['comment-9105', 'comment-9106', 'comment-9102', 'comment-9101', 'comment-9104', 'comment-9103', 'comment-9107']);
+      await expect(block.getByTestId('comments-more')).toHaveCount(0); // the end
+      await block.getByTestId('comment-9104').scrollIntoViewIfNeeded();
+    } },
+  ...(['comments-more-offline', 'comments-more-retry'] as const).map((name) => ({ name, only: name === 'comments-more-offline' ? ['phone-light', 'phone-dark', 'tablet'] : ['phone-light'],
+    path: '/articles?id=2869', ready: async (p: Page) => {
+      await viaReadAlso(p, 2868);
+      const block = onShown(p, 'comments');
+      await expect(block.getByTestId('comments-more')).toBeVisible();
+      await p.route(/\/fixtures\/comments\.json\?sort=score&since=5/, (r) => r.abort('internetdisconnected'));
+      await p.evaluate(() => localStorage.setItem('inok.net', JSON.stringify({ connected: false, metered: false, dataSaver: false })));
+      await block.getByTestId('comments-more').click();
+      const n = block.getByTestId('comments-more-net');
+      await expect(n).toHaveAttribute('data-failure', 'offline');
+      await expect(n).toContainText(/Немає з.єднання з інтернетом/);
+      await expect(block.getByTestId('comments-more-net-retry')).toHaveText(/Повторити/i);
+      await expect(block.locator('.comment:not(.comment--reply)')).toHaveCount(5); // what was shown stays
+      await n.scrollIntoViewIfNeeded();
+      if (name === 'comments-more-offline') return; // the frame: the line + «Повторити» under «Показати більше»
+      await p.unroute(/\/fixtures\/comments\.json\?sort=score&since=5/);
+      await p.evaluate(() => localStorage.removeItem('inok.net'));
+      await block.getByTestId('comments-more-net-retry').click();
+      await expect(block.locator('.comment:not(.comment--reply)')).toHaveCount(7);
+      await expect(n).toHaveAttribute('data-failure', '');
+    } })),
+  { name: 'comments-ranked-off', only: ['phone-light'], path: '/articles?id=2868', before: async (p: Page) => {
+      await p.addInitScript(() => { (window as any).__inokConfig = { features: { comments_write: false, embedded_player: false, articles_query: true, articles_sort_v2: true, monastery_photos: true } }; }); },
+    ready: async (p: Page) => {
+      const block = onShown(p, 'comments');
+      await expect.poll(() => block.locator('.comment:not(.comment--reply)').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid'))))
+        .toEqual(['comment-9107', 'comment-9104', 'comment-9105', 'comment-9106', 'comment-9102', 'comment-9103', 'comment-9101']);
+      await expect(block.getByTestId('comments-more')).toHaveCount(0);
     } },
   { name: 'about-ios-update', only: ['phone-light'], path: '/more/about', before: async (p) => {
       await recordOpens(p);

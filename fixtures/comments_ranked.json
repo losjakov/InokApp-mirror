@@ -1,0 +1,118 @@
+{
+ "2868": {
+  "items": [
+   {
+    "id": 9107,
+    "author": "Читач Е",
+    "text": "Тестовий коментар Е: лайків 0, дизлайків 1.",
+    "at": "2026-11-06T10:00:00Z",
+    "votes": {
+     "likes": 0,
+     "dislikes": 1,
+     "mine": 0
+    },
+    "replies": []
+   },
+   {
+    "id": 9104,
+    "author": "Читач Г",
+    "text": "Тестовий коментар Г: лайків 0, дизлайків 0.",
+    "at": "2026-11-05T10:00:00Z",
+    "votes": {
+     "likes": 0,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": []
+   },
+   {
+    "id": 9105,
+    "author": "Читач Ґ",
+    "text": "Тестовий коментар Ґ: лайків 5, дизлайків 0.",
+    "at": "2026-11-04T10:00:00Z",
+    "votes": {
+     "likes": 5,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": [
+     {
+      "id": 9108,
+      "author": "Читач Є",
+      "text": "Відповідь на коментар Д.",
+      "at": "2026-11-04T12:00:00Z",
+      "votes": {
+       "likes": 0,
+       "dislikes": 0,
+       "mine": 0
+      }
+     }
+    ]
+   },
+   {
+    "id": 9106,
+    "author": "Читач Д",
+    "text": "Тестовий коментар Д: лайків 2, дизлайків 0.",
+    "at": "2026-11-03T10:00:00Z",
+    "votes": {
+     "likes": 2,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": []
+   },
+   {
+    "id": 9102,
+    "author": "Читач Б",
+    "text": "Тестовий коментар Б: лайків 2, дизлайків 0.",
+    "at": "2026-11-03T10:00:00Z",
+    "votes": {
+     "likes": 2,
+     "dislikes": 0,
+     "mine": 0
+    },
+    "replies": []
+   },
+   {
+    "id": 9103,
+    "author": "Читач В",
+    "text": "Тестовий коментар В: лайків 1, дизлайків 1.",
+    "at": "2026-11-02T10:00:00Z",
+    "votes": {
+     "likes": 1,
+     "dislikes": 1,
+     "mine": 0
+    },
+    "replies": []
+   },
+   {
+    "id": 9101,
+    "author": "Читач А",
+    "text": "Тестовий коментар А: лайків 3, дизлайків 1.",
+    "at": "2026-11-01T10:00:00Z",
+    "votes": {
+     "likes": 3,
+     "dislikes": 1,
+     "mine": 0
+    },
+    "replies": []
+   }
+  ],
+  "total": 8,
+  "rating": {
+   "value": 4.5,
+   "count": 2
+  },
+  "comments_count": 8,
+  "rules": {
+   "uk": "Пишіть доброзичливо, по суті та з повагою до інших читачів. Посилання на сторонні сайти не допускаються. Коментар з'явиться після перевірки адміністратором.",
+   "ru": "Пишите доброжелательно, по существу и с уважением к другим читателям. Ссылки на сторонние сайты не допускаются. Комментарий появится после проверки администратором.",
+   "en": "Please be kind, stay on topic and respect other readers. Links to other websites are not allowed. Your comment will appear after an administrator has reviewed it."
+  },
+  "rules_url": {
+   "uk": "https://inok.info/about/comment-rules/",
+   "ru": "https://inok.info/about/comment-rules/?lang=ru",
+   "en": "https://inok.info/about/comment-rules/?lang=en"
+  }
+ }
+}

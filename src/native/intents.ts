@@ -83,3 +83,17 @@ export async function shareUrl(title: string, url: string, text?: string): Promi
   }
   await navigator.clipboard?.writeText(url);
 }
+
+/** cloud_40: copy a text (the diagnostics) - the async clipboard first, the old `execCommand('copy')` of a selected field second (an
+ *  engine that refuses the first in its own scheme); false = neither took it (the caller shows the text on the screen anyway). */
+export async function copyText(text: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* refused / absent */ }
+  try {
+    const f = document.createElement('textarea');
+    f.value = text; f.setAttribute('readonly', ''); f.style.position = 'fixed'; f.style.opacity = '0';
+    document.body.appendChild(f); f.select();
+    const ok = document.execCommand('copy');
+    f.remove();
+    return ok;
+  } catch { return false; }
+}

@@ -1,11 +1,12 @@
-import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonToggle } from '@ionic/react';
+import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonToggle, useIonViewDidEnter } from '@ionic/react';
 import { Busy } from '@/components/Busy';
 import { SavedPhotos } from '@/components/SavedPhotos';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
+import { takePhotoChooser } from '@/state/photoChooser';
 import { PHOTO_MODES, type PhotoMode } from '@/data/photos/policy';
 import { THEMES, type Theme } from '@/state/settings';
 import { callOutline, contrastOutline, mapOutline, imagesOutline, heartOutline, homeOutline, informationCircleOutline, languageOutline, notificationsOutline, peopleOutline, refreshOutline, starOutline, eyeOffOutline } from 'ionicons/icons';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { useDataRefresh } from '@/components/Refresh';
 import { checkedLabel } from '@/data/refresh';
@@ -19,10 +20,10 @@ export function MorePage() {
   // A-52: the last check under «Оновити дані», the directory's own date (D9: «Дані від 31.10.2026 19:36») under it in small text
   const dataDate = exportVersion ? new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(exportVersion)) : null;
   const navigate = useNavigate();
-  // A-20: a photo placeholder links here (`/more?photos=1`): the choice opens at once
+  // A-20: a photo placeholder links here: the choice opens at once - cloud_40 (A2): ONCE per that entry (a one-shot intent consumed here,
+  // never in the URL), so Back from an inner item of «Ще» never opens it again
   const photosSel = useRef<HTMLIonSelectElement>(null);
-  const { search } = useLocation();
-  useEffect(() => { if (new URLSearchParams(search).get('photos')) window.setTimeout(() => void photosSel.current?.open(), 300); }, [search]);
+  useIonViewDidEnter(() => { if (takePhotoChooser()) window.setTimeout(() => void photosSel.current?.open(), 300); });
   const rows = [
     { k: 'eparchies', icon: mapOutline, to: EPARCHIES_PATH }, // A-22: «Єпархії УПЦ» first, «Головна» second
     { k: 'home', icon: homeOutline, to: '/home' }, // the owner's word 01.11: an explicit way home besides the toolbar icon

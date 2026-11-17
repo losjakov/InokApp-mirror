@@ -42,7 +42,9 @@ public class AppAttestPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func isSupported(_ call: CAPPluginCall) {
-        call.resolve(["supported": service.isSupported])
+        // cloud_40 (A1): + the iOS version for the «Перевірка Apple» diagnostics (Safari's user agent freezes it); nothing that identifies
+        let v = ProcessInfo.processInfo.operatingSystemVersion // Foundation: safe off the main thread (UIDevice is main-actor)
+        call.resolve(["supported": service.isSupported, "os": "\(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"])
     }
 
     @objc func generateKey(_ call: CAPPluginCall) {

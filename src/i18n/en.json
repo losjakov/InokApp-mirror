@@ -324,5 +324,17 @@
   "net.server": "The inok.info server answered with an error. Try again later.",
   "net.retry": "Retry",
   "net.later": "No internet connection. The change is saved and will apply once the network is back.",
-  "cast.ios": "Ratings and votes are not accepted from this iPhone or iPad: the device cannot confirm to the site that they come from the genuine app."
+  "cast.ios": "Ratings and votes are not accepted from this iPhone or iPad: the device cannot confirm to the site that they come from the genuine app.",
+  "about.attest": "Apple check: {state}",
+  "about.attest_checking": "checking…",
+  "about.attest_working": "working",
+  "about.attest_ready": "ready, the key comes with the first rating",
+  "about.attest_unsupported": "not supported by this device",
+  "about.attest_failed": "the call failed, retried with the next rating",
+  "about.attest_off": "off on the site",
+  "about.attest_copy": "Copy the details",
+  "articles.read_also": "Read also",
+  "articles.watch_also": "Watch also",
+  "viewer.add_photo": "Add a photo",
+  "viewer.rights": "For rights holders"
 }

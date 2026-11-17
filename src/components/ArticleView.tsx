@@ -20,6 +20,7 @@ import { CommentsBlock } from './CommentsBlock';
 import { openOnSite, siteUrl } from '@/native/intents';
 import { VideoButton } from './VideoButton';
 import { ShareFooter } from './ShareFooter';
+import { ReadAlso } from './ReadAlso';
 import { SoftAsk } from './SoftAsk';
 import { ScrollArrows } from './ScrollArrows';
 import { Spoken } from './Spoken';
@@ -37,6 +38,7 @@ export function ArticleView({ id }: { id: number }) {
   const [a, setA] = useState<Article | null | undefined>(undefined);
   const [mine, setMine] = useState<number | null>(null);
   const [comments, setComments] = useState<Comments | null>(null);
+  const [commentsFail, setCommentsFail] = useState<unknown>(null);
   const [fail, setFail] = useState<NetFailure | null>(null);
   const [attempt, setAttempt] = useState(0);
   const toast = useToast();
@@ -48,7 +50,7 @@ export function ArticleView({ id }: { id: number }) {
     let read: CommentsRead | null = null; // R-29: the comments answer's numbers are fresher than any copy of the item (2 min vs 5)
     const show = (x: Article) => setA((cur) => { const n = read ? withCounts(x, read) : x; return cur && JSON.stringify(cur) === JSON.stringify(n) ? cur : n; });
     // D52: always asked (a feed's «0» may be stale); a live answer also brings the item's rating and comments_count (R-29)
-    const comments = (x: Article) => { if (x.kind !== 'news') loadComments(db, id).then((r) => { if (on) { read = r; setComments(r.comments); setA(fresh(r)); } }); };
+    const comments = (x: Article) => { if (x.kind !== 'news') loadComments(db, id).then((r) => { if (on) { read = r; setComments(r.comments); setCommentsFail(r.failure ?? null); setA(fresh(r)); } }); };
     (async () => {
       const x = await getArticle(db, id, lang);
       const m = await myRating(db, id);
@@ -110,10 +112,12 @@ export function ArticleView({ id }: { id: number }) {
             return <Spoken className="aview__avg" say={t('a11y.rating', { v, n: a.rating.count })}>{v} ({a.rating.count})</Spoken>; })()}
         </section>
       )}
-      {a.kind !== 'news' && <CommentsBlock key={comments ? 'read' : 'none'} a={a} initial={comments} onRead={(r) => setA(fresh(r))} />}
+      {a.kind !== 'news' && <ReadAlso a={a} />}{/* A-130 (1): after the stars, before the comments */}
+      {a.kind !== 'news' && <CommentsBlock key={comments ? 'read' : commentsFail ? 'failed' : 'none'} a={a} initial={comments} failure={commentsFail} onRead={(r) => setA(fresh(r))} />}
       <div className="card__site"><ExternalLinkRow lead={globeOutline} url={siteUrl(a.site_url, lang)} title={t('card.open_site')} testId="open-site" /></div>
     </article>
     <ShareFooter title={a.title} url={siteUrl(a.site_url, lang)} />
+    {a.kind === 'news' && <ReadAlso a={a} />}{/* A-130 (1): a news item's «Читайте також» after «Поділитися» */}
     <SoftAsk kind="articles" />
     <ScrollArrows root={root} />
     </PhotoScope>

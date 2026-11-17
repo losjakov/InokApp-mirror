@@ -20,7 +20,9 @@ T="${RUNNER_TEMP:-$(mktemp -d)}"; K="$T/mirror_key"; KH="$T/mirror_known_hosts"
 trap 'rm -f "$K"' EXIT
 (umask 077; printf '%s\n' "$MIRROR_DEPLOY_KEY" > "$K")
 # github.com's SSH host keys from GitHub's own API over HTTPS (survives a key rotation; never `StrictHostKeyChecking=no`)
-bash "$ROOT/scripts/ci_step.sh" "github ssh host keys" net -- curl -fsS --retry 3 -o "$T/gh_meta.json" https://api.github.com/meta
+# cloud_40 (mirror run 47): the anonymous call answered 403 (the shared runner IP's rate limit) - the job's own token, never printed
+AUTH=(); [ -n "${GH_META_TOKEN:-}" ] && AUTH=(-H "Authorization: Bearer ${GH_META_TOKEN}")
+bash "$ROOT/scripts/ci_step.sh" "github ssh host keys" net -- curl -fsS --retry 3 --retry-all-errors "${AUTH[@]}" -o "$T/gh_meta.json" https://api.github.com/meta
 python3 -I -c 'import json,sys; print("\n".join("github.com " + k for k in json.load(open(sys.argv[1]))["ssh_keys"]))' "$T/gh_meta.json" > "$KH"
 export GIT_SSH_COMMAND="ssh -i $K -o IdentitiesOnly=yes -o UserKnownHostsFile=$KH -o StrictHostKeyChecking=yes -o BatchMode=yes"
 ARGS=(); [ -z "${EMULATOR_MATRIX:-}" ] || ARGS=(--emulator-matrix "$EMULATOR_MATRIX")

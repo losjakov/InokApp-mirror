@@ -79,7 +79,7 @@ export const OPENED_FROM = { opened: true } as const;
  * one (react-router's first entry has the key `default`); `opened` = the location carries `OPENED_FROM`.
  * - «Головна»: the app folds (system Back; the header shows no arrow there).
  * - a DETAIL = a nested path (`/monasteries/37`, `/more/…`) or a tab root opened FOR something (`?id=`, `?code=`, `?eparchy=`,
- *   `?photos=`, or `opened`): Back = the previous screen; opened first (push tap, deep link) = its parent.
+ *   or `opened` - e.g. «Ще» opened by a photo offer, cloud_40 A2): Back = the previous screen; opened first (push tap, deep link) = its parent.
  * - a plain tab root (reached by the tab bar or a home tile): «Головна» (cloud_06, the platform's start destination).
  */
 export function backAction(pathname: string, search: string, inApp: boolean, opened = false): BackAction {

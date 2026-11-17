@@ -1,4 +1,6 @@
 import { IonButton, IonIcon } from '@ionic/react';
+import { askPhotoChooser } from '@/state/photoChooser';
+import { OPENED_FROM } from '@/app/nav';
 import { cloudDownloadOutline, cloudOfflineOutline, imageOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -55,7 +57,7 @@ export function PhotoWait({ r, full, onLoad, viewer, onLeave }: { r: PhotoWaitRe
           <IonIcon slot="start" icon={cloudDownloadOutline} aria-hidden="true" />{t(r.metered ? 'photos.load_mobile' : 'photos.load')}
         </IonButton>
       )}
-      <button type="button" className="photo-wait__link" onClick={() => { onLeave?.(); navigate('/more?photos=1'); }} data-testid="photo-settings">{t('photos.title')}</button>
+      <button type="button" className="photo-wait__link" onClick={() => { onLeave?.(); askPhotoChooser(); navigate('/more', { state: OPENED_FROM }); }} data-testid="photo-settings">{t('photos.title')}</button>
     </div>
   );
 }

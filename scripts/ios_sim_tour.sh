@@ -21,10 +21,17 @@ S="$OUT"; ART=${STORE_ARTICLE:-1832}
 # cloud_38 (E5, ios run 2: the App Store frames of iOS 26.5 showed the real clock): the status bar override is re-applied before EVERY frame
 # cloud_39 (ios run 1 of the session, iOS 26.5 / Xcode 26.6): `--time 10:00` is refused («Invalid, non-ISO date/time string») and the REAL
 # clock showed in the App Store frames (E5 again) - an ISO time first, the short form only where an older simctl wants it; ONE override
+# cloud_40 (NOTE 4 of REVIEW cloud_39): the forms are tried in order and the one Xcode 26.6 TOOK is written (statusbar.txt) with simctl's own
+# read-back (`status_bar list`) - the REPORT says which, measured; none taken = the real clock, said so (one clock for the set either way)
 sb_override() {
-  local a=(--dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100)
-  xcrun simctl status_bar "$U" override --time 2026-11-16T10:00:00+00:00 "${a[@]}" 2>>"$OUT/nav.txt" \
-    || xcrun simctl status_bar "$U" override --time 10:00 "${a[@]}" 2>>"$OUT/nav.txt" || true
+  local a=(--dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100) t
+  for t in 2026-11-16T10:00:00Z 2026-11-16T10:00:00+00:00 "Mon Nov 16 10:00:00 UTC 2026" 10:00; do
+    if xcrun simctl status_bar "$U" override --time "$t" "${a[@]}" 2>>"$OUT/nav.txt"; then
+      [ -s "$OUT/statusbar.txt" ] || { echo "time form taken: ${t}"; xcrun simctl status_bar "$U" list 2>&1 | head -5; } >> "$OUT/statusbar.txt"; return 0
+    fi
+  done
+  [ -s "$OUT/statusbar.txt" ] || echo "time form taken: NONE (the real clock)" >> "$OUT/statusbar.txt"
+  xcrun simctl status_bar "$U" override "${a[@]}" 2>>"$OUT/nav.txt" || true
 }
 # ios run 1 (cloud_39): a snackbar lives 2.5 s and one remote-hand call can take longer - every toast shown is RECORDED in the page from
 # before the tap (testid|message, every 100 ms) and read back after it; never a poll from outside
@@ -135,6 +142,14 @@ a3_walk() {
   case "$v" in 'AppAttest={"supported":'*'; FcmTopics='*) case "$v" in *UNIMPLEMENTED*|*'not implemented'*) a3 "local plugins answer (A1)" FAIL "$v";;
       *) a3 "local plugins answer (A1)" PASS "$v";; esac;;
     *) a3 "local plugins answer (A1)" FAIL "${v:-no answer}";; esac
+  # 0b cloud_40 (A1 g): «Про застосунок» - «Перевірка Apple: …» on a simulator = «not supported by this device» (Apple's own answer), never
+  # «the call failed» (= the plugin not in the bridge); «Скопіювати подробиці» shows the text (no key id / install id in it)
+  nav go /more/about; sleep 3
+  nav click '[data-testid="attest-copy"]'; sleep 2
+  v=$(ev "(() => { const c = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=attest-check]'); const d = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=attest-details]');
+    return (c ? c.dataset.state : 'none') + ' | ' + (d ? d.textContent.replace(/\\n/g, ' / ') : 'no details'); })()")
+  shot "$OUT/a3-attest-check__$TAG.png"
+  case "$v" in 'unsupported | Inok '*'App Attest: isSupported = false'*) a3 "«Перевірка Apple» line (A1)" PASS "$v";; *) a3 "«Перевірка Apple» line (A1)" FAIL "${v:-no answer}";; esac
   # 1 the bars and the safe areas: the header under the status bar / Dynamic Island, the tab bar on the bottom edge, its buttons above the home indicator
   nav go /home; node "$NAVJS" wait '[data-testid="home-near"]' >> "$OUT/nav.txt" 2>&1
   v=$(ev "(() => { const p = document.createElement('div'); p.style.cssText = 'position:fixed;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)'; document.body.append(p);
@@ -333,6 +348,12 @@ appstore() { # set(phone|tablet) dir-name
     const s = Object.assign(v ? JSON.parse(v) : {}, { theme: 'light', photos: 'any', asked: ['articles', 'streams'], ownDevice: true });
     await P.set({ key: 'settings', value: JSON.stringify(s) }); return 'ok'; })()" > /dev/null
   launch
+  # cloud_40 (A-129, C1): THE device's own layout numbers for the browser frames 04 / 05 - the safe-area insets (env), the root text size
+  # (WKWebView follows -apple-system-body), the CSS viewport and the scale; the join (scripts/appstore_join.py) cuts the marks at THESE edges
+  mkdir -p "$OUT/appstore"
+  ev "(() => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+    document.body.append(d); const c = getComputedStyle(d); const r = { top: parseFloat(c.paddingTop), right: parseFloat(c.paddingRight), bottom: parseFloat(c.paddingBottom), left: parseFloat(c.paddingLeft),
+    rootPx: parseFloat(getComputedStyle(document.documentElement).fontSize), w: innerWidth, h: innerHeight, dpr: devicePixelRatio }; d.remove(); return JSON.stringify(r); })()" > "$OUT/appstore/insets-$2.json"
   for lang in uk ru en; do
     set_lang "$lang"; units_ok "$lang" || return 1
     # A-127: the App Store set goes WITHOUT 04-eparchy / 05-map - a GPU-less runner's simulator cannot draw a WebGL map (ios run 1, D12);

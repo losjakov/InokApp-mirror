@@ -8,7 +8,9 @@ import { getMeta } from '@/data/db/schema';
 import type { Db } from '@/data/db/types';
 import { _setIntegrityProvider, castFailure, installId, sendCast } from '@/data/repo/cast';
 import { castLine, lineDigest, requestHash } from '@/data/repo/castLine';
-import { _setAttestDevice, _setWait, AttestError, type AttestDevice } from '@/data/repo/attest';
+import { _setAttestDevice, _setWait, AttestError, attestActive, attestDiagnostics, registerKey, type AttestDevice } from '@/data/repo/attest';
+import { _setProbeAsk, appAttestProbe, appAttestSupported } from '@/native/appAttest';
+import { cacheSet } from '@/data/repo/cache';
 import { playIntegrityToken } from '@/native/integrity';
 import { rateArticle, parseArticles } from '@/data/repo/articles';
 import { reportComment, voteComment, NO_VOTES } from '@/data/repo/comments';
@@ -263,5 +265,50 @@ describe('A-127 / R-53: iOS casts by Apple App Attest (the native part a stand-i
     expect(new Set(defs).size).toBe(defs.length);
     const ent = readFileSync('ios/App/App/App.entitlements', 'utf8');
     expect(ent).toMatch(/<key>com\.apple\.developer\.devicecheck\.appattest-environment<\/key>\s*<string>production<\/string>/);
+  });
+});
+
+describe('cloud_40 (A1): Apple\'s answer has THREE outcomes; a failed call is never kept as «not supported»; the diagnostics carry no secret', () => {
+  afterEach(() => { _setProbeAsk(null); _setAttestDevice(null); vi.unstubAllGlobals(); });
+
+  it('supported / unsupported are kept for the run; a REJECTED call (1.0.13: «not implemented») is asked again at the next cast', async () => {
+    const { db } = await freshDb();
+    await cacheSet(db, 'config', { features: { app_attest: true } });
+    let calls = 0; let answer: 'reject' | boolean = 'reject';
+    _setProbeAsk(async () => { calls++; if (answer === 'reject') throw Object.assign(new Error('"AppAttest" plugin is not implemented on ios'), { code: 'UNIMPLEMENTED' }); return { supported: answer }; });
+    expect(await appAttestProbe()).toEqual({ state: 'failed', error: 'UNIMPLEMENTED "AppAttest" plugin is not implemented on ios' });
+    expect(await attestActive(db)).toBe(false); // the next cast asks again (1.0.13 kept false for the whole run)
+    expect(calls).toBe(2);
+    answer = true;
+    expect(await attestActive(db)).toBe(true);
+    expect(await attestActive(db)).toBe(true);
+    expect(calls).toBe(3); // Apple's own answer is kept
+    _setProbeAsk(async () => { calls++; return { supported: false }; });
+    expect(await appAttestSupported()).toBe(false);
+    expect(await appAttestSupported()).toBe(false);
+    expect(calls).toBe(4);
+  });
+
+  it('the diagnostics: state + text (iOS version, Apple\'s answer, the flag, the key, the last refusal) - never the key id / install id / assertion', async () => {
+    const { db } = await freshDb();
+    const install = await installId(db);
+    _setProbeAsk(async () => ({ supported: true, os: '27.0.1' }));
+    expect((await attestDiagnostics(db, '1.0.14')).state).toBe('off'); // no config kept yet
+    await cacheSet(db, 'config', { features: { app_attest: true } });
+    expect((await attestDiagnostics(db, '1.0.14')).state).toBe('ready');
+    const dev = fakeDevice(); _setAttestDevice({ ...dev, active: async () => true });
+    server(db);
+    await registerKey(db, install, true);
+    (globalThis as { __inokLastCast?: string }).__inokLastCast = '403 integrity_required';
+    const d = await attestDiagnostics(db, '1.0.14');
+    expect(d.state).toBe('working');
+    expect(d.details).toBe(['Inok 1.0.14, iOS 27.0.1', 'App Attest: isSupported = true', 'config features.app_attest: true',
+      'key: kept, registered', 'last refused cast: 403 integrity_required', 'state: working'].join('\n'));
+    for (const secret of [install, 'k1', CH, 'att-k1']) expect(d.details, secret).not.toContain(secret);
+    _setProbeAsk(async () => { throw Object.assign(new Error('boom'), { code: 'UNIMPLEMENTED' }); });
+    const f = await attestDiagnostics(db, '1.0.14');
+    expect(f.state).toBe('failed');
+    expect(f.details).toContain('App Attest: call failed: UNIMPLEMENTED boom');
+    (globalThis as { __inokLastCast?: string | null }).__inokLastCast = null;
   });
 });

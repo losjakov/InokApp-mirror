@@ -8,7 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { DirectionsSheet } from '@/components/DirectionsSheet';
 import { CoverImage, LoadAllPhotos, PhotoScope } from '@/components/CoverImage';
-import { onePhoto, PhotoViewer, viewerPhotos, type ViewerSet } from '@/components/PhotoViewer';
+import { onePhoto, PhotoViewer, ViewerPlace, viewerPhotos, type ViewerSet } from '@/components/PhotoViewer';
 import { cardGallery, galleryInApp } from '@/data/photos/gallery';
 import { HtmlLite } from '@/components/HtmlLite';
 import { Collapsible } from '@/components/Collapsible';
@@ -125,6 +125,7 @@ function Detail({ code }: { code: number }) {
   const history = shownLang ? r[`history_${shownLang}`] : null;
   const sources: { n: number; title?: string; publication?: string; year?: string; url?: string }[] = JSON.parse(row.history_sources_json || '[]');
   const pageUrl = siteUrl(row.site_url, lang);
+  const place = { addPhoto: row.site_url }; // R-56: the card's OWN page (export §2) - «Додати фото» opens it in the app's language
   const langName = (l: Lang) => t(`language.${l}`);
   const hasGeo = row.lat != null && row.lon != null;
   const gps = hasGeo ? `${row.lat}, ${row.lon}` : '';
@@ -159,6 +160,7 @@ function Detail({ code }: { code: number }) {
   ];
 
   return (
+    <ViewerPlace.Provider value={place}>{/* cloud_40 (R-56): this card's viewers offer «Додати фото» on its page */}
     <PhotoScope>
     <article data-testid="card" ref={root} className="arrows-host">
       <div className="card__cover-wrap">
@@ -255,5 +257,6 @@ function Detail({ code }: { code: number }) {
     </article>
     <ScrollArrows root={root} />
     </PhotoScope>
+    </ViewerPlace.Provider>
   );
 }

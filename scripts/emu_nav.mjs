@@ -95,8 +95,15 @@ else if (cmd === 'check') {
   console.log(String(await evaluate(CHECKS[arg])));
 }
 else if (cmd === 'do') {
-  const r = String(await evaluate(ACTIONS[arg]));
-  console.log(`do ${arg}: ${r}`);
+  // cloud_40 (NOTE 3 of REVIEW cloud_39): an action answers 'none[: why]' when the page is not ready for it yet - the browser ring asks again
+  // (expect.poll, 30 s); the emulator / simulator asked ONCE (cloud_39 E14: every tablet home frame failed). The same here: up to 6 asks, 3 s apart
+  let r = '';
+  for (let i = 0; i < 6; i++) {
+    r = String(await evaluate(ACTIONS[arg]));
+    console.log(`do ${arg}: ${r}${i ? ` (ask ${i + 1})` : ''}`);
+    if (r === 'ok' || !r.startsWith('none')) break;
+    await new Promise((ok) => setTimeout(ok, 3000));
+  }
   if (r !== 'ok') process.exit(1);
 }
 else if (cmd === 'eval') {

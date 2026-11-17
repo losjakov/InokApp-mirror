@@ -3,7 +3,7 @@ import type { AppConfig } from '@/data/api/types';
 import { getMeta, setMeta } from '@/data/db/schema';
 import { ApiError } from '@/data/api/client';
 import { dataSource } from '@/data/source';
-import { appAttestNative, appAttestSupported, attestCode, type AppAttestNative } from '@/native/appAttest';
+import { appAttestNative, appAttestProbe, appAttestSupported, attestCode, type AppAttestNative } from '@/native/appAttest';
 import { cacheGet } from './cache';
 import { installId, lineDigest, sha256, toBase64, type CastParts } from './castLine';
 
@@ -138,4 +138,31 @@ export async function attestedCast<B extends object, T>(db: Db, line: (install: 
       throw e2;
     }
   }
+}
+
+/**
+ * cloud_40 (A1 g): what the person SEES of App Attest on a real iPhone («Про застосунок», under the version): one state + a text to copy
+ * and send. It carries the iOS version, Apple's answer (or the call's error), the config flag, whether a key is kept / registered and the
+ * last refused cast - NEVER the key id, the install id, a challenge, an assertion or an attestation (unit appAttest pins it).
+ */
+export type AttestState = 'working' | 'ready' | 'unsupported' | 'failed' | 'off';
+export async function attestDiagnostics(db: Db, appVersion: string): Promise<{ state: AttestState; details: string }> {
+  const p = await appAttestProbe(); // a failed call is asked again here (never kept)
+  const cfg = (await cacheGet<AppConfig>(db, 'config'))?.value;
+  const flag = cfg ? String(cfg.features?.app_attest ?? 'absent') : 'no config kept';
+  const k = await readKey(db);
+  const key = !k?.key ? 'none' : k.registered ? 'kept, registered' : 'kept, not registered';
+  const refusal = (globalThis as { __inokLastCast?: string | null }).__inokLastCast ?? 'none in this run';
+  const state: AttestState = p.state === 'failed' ? 'failed' : p.state !== 'supported' ? 'unsupported'
+    : cfg?.features?.app_attest !== true ? 'off' : k?.registered ? 'working' : 'ready';
+  const apple = p.state === 'failed' ? `call failed: ${p.error}` : p.state === 'none' ? 'not an iOS app' : `isSupported = ${p.state === 'supported'}`;
+  const details = [
+    `Inok ${appVersion}, iOS ${('os' in p && p.os) || 'unknown'}`,
+    `App Attest: ${apple}`,
+    `config features.app_attest: ${flag}`,
+    `key: ${key}`,
+    `last refused cast: ${refusal}`,
+    `state: ${state}`,
+  ].join('\n');
+  return { state, details };
 }

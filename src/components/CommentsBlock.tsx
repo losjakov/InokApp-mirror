@@ -2,7 +2,10 @@ import { IonIcon, useIonAlert } from '@ionic/react';
 import { chatbubbleOutline, eyeOffOutline, flagOutline, thumbsUp, thumbsUpOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import type { Article, Comment, Comments, Votes } from '@/data/api/types';
-import { hiddenComments, hideComment, loadComments, type CommentsRead, NO_VOTES, reportComment, voteBar, votesClosed } from '@/data/repo/comments';
+import { hiddenComments, hideComment, loadComments, moreComments, type CommentsRead, NO_VOTES, reportComment, voteBar, votesClosed } from '@/data/repo/comments';
+import { netFailure, type NetFailure } from '@/data/netFailure';
+import { NetNotice } from './NetNotice';
+import { MoreButton } from './MoreButton';
 import { castMessage, type CastFailure } from '@/data/repo/cast';
 import { SiteFormButton, useOnline } from './SiteFormButton';
 import { openLink, openOnSite } from '@/native/intents';
@@ -19,10 +22,25 @@ export const COMMENT_FORM = 'skm-comment-add';
  * D68: the dialog says one own sentence) and «Приховати» (this phone only, SQLite, undo in place); the site's rules above «Додати коментар».
  * News has none (the caller draws no block).
  */
-export function CommentsBlock({ a, initial, onRead }: { a: Article; initial: Comments | null; onRead: (r: CommentsRead) => void }) {
+export function CommentsBlock({ a, initial, failure, onRead }: { a: Article; initial: Comments | null; failure?: unknown; onRead: (r: CommentsRead) => void }) {
   const { db, t, lang } = useApp();
   const [comments, setComments] = useState<Comments | null>(initial);
   const net = useOnline();
+  // cloud_40 (A-130 3 + A-125): the read that brought nothing (no answer, nothing kept) and «Показати більше» that failed - said in place
+  const [readFail, setReadFail] = useState<NetFailure | null>(null);
+  const [moreFail, setMoreFail] = useState<NetFailure | null>(null);
+  const [moreBusy, setMoreBusy] = useState(false);
+  useEffect(() => { let on = true; if (failure && !initial) void netFailure(failure).then((f) => on && setReadFail(f)); return () => { on = false; }; }, [failure, initial]);
+  const reread = async () => {
+    setReadFail(null);
+    const r = await loadComments(db, a.id);
+    if (r.comments) { setComments(r.comments); onRead(r); } else if (r.failure) setReadFail(await netFailure(r.failure));
+  };
+  const more = async () => {
+    if (!comments) return;
+    setMoreBusy(true); setMoreFail(null);
+    try { setComments(await moreComments(db, a.id, comments)); } catch (e) { setMoreFail(await netFailure(e)); } finally { setMoreBusy(false); }
+  };
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [closed, setClosed] = useState(votesClosed()); // learnt once (503 vote_closed): every toggle of the block goes quiet
@@ -53,6 +71,7 @@ export function CommentsBlock({ a, initial, onRead }: { a: Article; initial: Com
     <section className="aview__comments" data-testid="comments">
       <h2 className="inok-heading">{t('articles.comments')}{items.length > 0 && ` · ${comments!.total}`}</h2>
       {comments && items.length === 0 && <p className="comment__none">{t('comments.none')}</p>}
+      {!comments && <NetNotice failure={readFail} onRetry={() => void reread()} testId="comments-net" />}
       {items.map((c) => (
         <div key={c.id} className="comment" data-testid={`comment-${c.id}`}>
           <CommentBody c={c} {...own} />
@@ -63,6 +82,9 @@ export function CommentsBlock({ a, initial, onRead }: { a: Article; initial: Com
           ))}
         </div>
       ))}
+      {/* R-55 (A-130 3): the next five by score - THE «Показати більше»; offline / no answer = the A-125 line + «Повторити» in place */}
+      {comments?.next && <MoreButton label={t('articles.more')} busy={moreBusy} onClick={() => void more()} testId="comments-more" />}
+      {comments && <NetNotice failure={moreFail} onRetry={() => void more()} testId="comments-more-net" />}
       <p className="comment__note" role="status" data-testid="vote-status">{status ?? ''}</p>
       {/* A-49 (R-32): the site's own rules before its form; a link only when the site has a rules page */}
       {rules && (

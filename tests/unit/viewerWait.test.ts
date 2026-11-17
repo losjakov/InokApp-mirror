@@ -101,6 +101,7 @@ describe('A-112: the viewer obeys «Автозавантаження фото» 
     // no new words: the viewer and the block speak only the keys that existed before A-112 (photos.* of A-20, gallery.* of A-96, «Закрити»)
     const used = (f: string) => [...readFileSync(join(src, f), 'utf8').matchAll(/\bt\(\s*[`'](photos\.reason_|[\w.]+)/g)].map((m) => m[1]);
     expect([...new Set([...used('components/PhotoWait.tsx'), ...used('components/PhotoViewer.tsx')])].sort())
-      .toEqual(['common.close', 'gallery.next', 'gallery.photo', 'gallery.prev', 'photos.reason_', 'photos.title'].sort());
+      // cloud_40 (A-130 2, R-56): + the viewer's two links, new words by the owner's ruling
+      .toEqual(['common.close', 'gallery.next', 'gallery.photo', 'gallery.prev', 'photos.reason_', 'photos.title', 'viewer.add_photo', 'viewer.rights'].sort());
   });
 });

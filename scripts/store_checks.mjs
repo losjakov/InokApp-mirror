@@ -161,15 +161,17 @@ export const ACTIONS = {
     m.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: pad, duration: 0 });
     return 'ok';
   })()`,
-  /** cloud_38 NOTE 9: the smallest scroll (0 ... 200 px - cloud_39: the A-128 home's article rows are taller than 64 px) at which no row, heading or tile of the page is cut by the tab bar or the header */
+  /** cloud_38 NOTE 9: the smallest scroll (cloud_40: within the page's whole room) at which no row, heading or tile of the page is cut by the tab bar or the header */
   wholeRows: `(async () => {
     const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
-    // cloud_39: during a page transition TWO pages are shown - the leaving one measured and scrolled is the wrong page; wait for one (<= 4 s)
+    // cloud_39: during a page transition TWO pages are shown - wait for one (<= 4 s). cloud_40 (NOTE 3 of REVIEW cloud_39, E14): the Android
+    // WebView's tablet home answered 'none' on every frame with no reason - a page that never leaves the «shown» set must not stop the
+    // frame: then the page measured is the one the check reads (rowsWhole: the LAST shown), and every 'none' now says WHY
     const shown = () => Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden'));
     for (let i = 0; i < 20 && shown().length > 1; i++) await wait(200);
-    if (shown().length !== 1) return 'none';
-    const pg = shown()[0];
-    const ct = pg?.querySelector('ion-content'); if (!ct) return 'none';
+    const pages = shown().length;
+    const pg = shown().pop();
+    const ct = pg?.querySelector('ion-content'); if (!ct) return 'none: no page (' + pages + ' shown)';
     // the atoms of a frame: list rows, headings, the calendar, each tile's icon and caption (a tile's own top padding may go under the header)
     const atomsNow = () => Array.from(pg.querySelectorAll('ion-item, .home__h, ion-list-header, .cal, .tile > ion-icon, .tile > span:not(.tile__dot)')).filter((e) => e.getClientRects().length > 0)
       .map((e) => { const b = e.getBoundingClientRect(); return [b.top, b.bottom]; }); // exact: rowsWhole reads the same unrounded boxes
@@ -181,8 +183,17 @@ export const ACTIONS = {
     const tb = document.querySelector('ion-tab-bar')?.getBoundingClientRect(); const cr = ct.getBoundingClientRect();
     const top = cr.top, bottom = Math.min(cr.bottom, tb && tb.height > 0 ? tb.top : innerHeight);
     const cut = (at, sc) => at.some(([t, b]) => (t - sc < top - 1 && b - sc > top + 1) || (t - sc < bottom - 1 && b - sc > bottom + 1));
-    for (let sc = 0; sc <= 200; sc++) if (!cut(atoms, sc)) { if (sc) await ct.scrollByPoint(0, sc, 0); await wait(300); return cut(atomsNow(), 0) ? 'none' : 'ok'; }
-    return 'none';
+    const el = await ct.getScrollElement();
+    const room = el.scrollHeight - el.clientHeight - el.scrollTop; // how far the page CAN still scroll down
+    // cloud_40 (ios run 1, the iPad App Store home frames: «CUT at 1299» x6): both edges clean at once happens only where a heading's air
+    // meets each edge - 0 ... 200 px often holds no such pair (it depends on the live rows); the SMALLEST clean scroll in the page's whole room
+    for (let sc = 0; sc <= Math.max(0, room); sc++) if (!cut(atoms, sc)) {
+      const from = el.scrollTop;
+      if (sc) { await ct.scrollByPoint(0, sc, 0); await wait(300); if (Math.abs(el.scrollTop - from - sc) > 1) el.scrollTop = from + sc; } // cloud_40: a WebView that ignored the call
+      await wait(300);
+      return cut(atomsNow(), 0) ? 'none: still cut after a scroll of ' + sc + ' (moved ' + Math.round(el.scrollTop - from) + ', ' + pages + ' shown)' : 'ok';
+    }
+    return 'none: no clean scroll within ' + Math.round(room) + ' px (' + pages + ' shown, ' + atoms.length + ' atoms, edges ' + Math.round(top) + '/' + Math.round(bottom) + ')';
   })()`,
   /** tablet frame 06: the selected article's row of the list in view (its centre), «Показати більше» until it is there (at most 15 pages) */
   showSelected: `(async () => {

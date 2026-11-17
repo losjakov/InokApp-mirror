@@ -1,6 +1,8 @@
 import { IonButton, IonIcon, IonModal } from '@ionic/react';
-import { chevronBackOutline, chevronForwardOutline, closeOutline } from 'ionicons/icons';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { addCircleOutline, chevronBackOutline, chevronForwardOutline, closeOutline, documentTextOutline } from 'ionicons/icons';
+import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { openOnSite } from '@/native/intents';
+import { useOnline } from './SiteFormButton';
 import type { PhotoOpts } from '@/native/covers';
 import type { GalleryItem } from '@/data/photos/gallery';
 import { useApp } from '@/state/AppContext';
@@ -25,6 +27,34 @@ export interface ViewerSet { photos: ViewerPhoto[]; at: number }
  *  SET (`consent` = the set object it was given in), so every picture of this set loads as it is paged to (the current one only, no
  *  neighbour ahead) until the viewer closes; a new opening is a new set object = asked again. */
 export const fullAsk = (consent: ViewerSet | null, set: ViewerSet | null): PhotoOpts => ({ manual: !!set && consent === set });
+
+/**
+ * cloud_40 (A-130 2 + amendment 06:39, R-56): WHERE the viewer is opened. A monastery's card provides its own site page (`addPhoto`): its
+ * viewer offers «Додати фото» (that page in the app's language + `config.photo_add_hash` = the site's add-photo window at once) beside
+ * «Правовласникам»; every other viewer (a publication, an eparchy) - «Правовласникам» only.
+ */
+export const ViewerPlace = createContext<{ addPhoto?: string }>({});
+
+/** The two small links under the picture (R-56): only with the site's flag, a network, and while no «load over mobile data?» offer is shown. */
+function ViewerLinks() {
+  const { t, lang, config } = useApp();
+  const place = useContext(ViewerPlace);
+  const net = useOnline();
+  const rights = config?.rights_url;
+  const hash = config?.photo_add_hash;
+  if (config?.features?.photo_links !== true || !net || !rights) return null;
+  return (
+    <div className="viewer__links" data-testid="viewer-links">
+      {place.addPhoto && hash && (
+        <IonButton fill="clear" size="small" className="viewer__link" onClick={() => void openOnSite(place.addPhoto!, lang, hash)} data-testid="viewer-add-photo">
+          <IonIcon slot="start" icon={addCircleOutline} aria-hidden="true" />{t('viewer.add_photo')}
+        </IonButton>)}
+      <IonButton fill="clear" size="small" className="viewer__link" onClick={() => void openOnSite(rights, lang)} data-testid="viewer-rights">
+        <IonIcon slot="start" icon={documentTextOutline} aria-hidden="true" />{t('viewer.rights')}
+      </IonButton>
+    </div>
+  );
+}
 
 const MAX_ZOOM = 4;
 const SWIPE_PX = 60; // a page turn: a horizontal move longer than this and longer than the vertical one
@@ -119,6 +149,8 @@ export function PhotoViewer({ set, onClose }: { set: ViewerSet | null; onClose: 
           {/* owner 15.11.2026 (on the shot): the block always stands UNDER the picture, as in a publication's gallery - never squeezed into the frame */}
           {wait && <PhotoWait r={wait} full viewer onLoad={load} onLeave={close} />}
           {photo.alt && <p className="viewer__caption">{photo.alt}</p>}
+          {!wait && <ViewerLinks />}{/* R-56: never beside the standard «load over mobile data?» offer */}
+          <div className="viewer__safe" aria-hidden="true" />
           {n > 1 && <>
             <div className="viewer__count" aria-live="polite" data-testid="viewer-count">
               <span aria-hidden="true">{i + 1} / {n}</span><span className="sr-only">{t('gallery.photo', { n: i + 1, total: n })}</span>

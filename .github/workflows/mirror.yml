@@ -57,6 +57,7 @@ jobs:
           MIRROR_DEPLOY_KEY: ${{ secrets.MIRROR_DEPLOY_KEY }}
           MIRROR_REPO: ${{ vars.MIRROR_REPO }}
           EMULATOR_MATRIX: ${{ inputs.emulator_matrix }}
+          GH_META_TOKEN: ${{ github.token }} # cloud_40: api.github.com/meta answered 403 to the shared runner's anonymous call (rate limit)
         run: bash scripts/mirror_push.sh "$RUNNER_TEMP/snapshot"
       - name: Remove the key file (second layer; mirror_push.sh removes it on exit)
         if: always()

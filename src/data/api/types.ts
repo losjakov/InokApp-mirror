@@ -121,11 +121,18 @@ export interface AppConfig {
   features: { comments_write: boolean; embedded_player: boolean; store_links?: boolean; /** R-44: the server takes `q` / `sort` (A-97 buttons) */ articles_query?: boolean;
     /** R-48 (A-101): the server takes `sort=views_week|rating` (the sheet's two new orders) */ articles_sort_v2?: boolean;
     /** R-49 (A-109): the server answers `monasteries/<code>/photos` - the card's gallery opens in the app's viewer; absent = 1.0.7's `gallery_url` */ monastery_photos?: boolean;
-    /** R-53 (A-127): the server takes iOS casts with an App Attest assertion; absent = every iOS cast answers 403 `integrity_required` */ app_attest?: boolean };
+    /** R-53 (A-127): the server takes iOS casts with an App Attest assertion; absent = every iOS cast answers 403 `integrity_required` */ app_attest?: boolean;
+    /** R-54 (A-130): `GET articles/<id>/related` is answered («Читайте також» / «Дивіться також»); absent = no block */ articles_related?: boolean;
+    /** R-55 (A-130): `GET articles/<id>/comments` takes `sort=score&limit&since`; absent = the 1.0.13 list */ comments_ranked?: boolean;
+    /** R-56 (A-130): the photo viewer's two links are live (`rights_url`, `photo_add_hash`); absent = no buttons */ photo_links?: boolean };
   donate_url: string;
   privacy_url: string;
   /** R-41: the Play listing's address; absent = the one built from the package id (src/native/play.ts) */
   store_url?: string | null;
+  /** R-56: the site's rights-holders page (uk form; ru / en by the app's language rule, as `donate_url`) - «Правовласникам» in every viewer */
+  rights_url?: string | null;
+  /** R-56: the anchor that opens a card page's add-photo window («Додати фото», a MONASTERY's viewer only) */
+  photo_add_hash?: string | null;
 }
 
 /** R-49: one picture file of a card's gallery - https, the file's own size */
@@ -176,7 +183,8 @@ export interface Votes { likes: number; dislikes: number; mine: -1 | 0 | 1 }
 export interface Comment { id: number; author: string; text: string; at: string; votes?: Votes; replies?: Omit<Comment, 'replies'>[] }
 /** R-29: the item's own `rating` and `comments_count` beside the comments - the same values the feed item carries, fresh */
 /** R-32 (A-49): `rules` = the site's own comment rules (plain text, shown before the form and by «Report»); `rules_url` = its rules page per language (T-1335) */
-export interface Comments { items: Comment[]; total: number; rating?: Rating | null; comments_count?: number; rules?: L10n | null; rules_url?: L10n | null }
+/** R-55: with `sort=score` the answer pages (`next` = the cursor of the next 5 top-level comments; null = the end) */
+export interface Comments { items: Comment[]; total: number; rating?: Rating | null; comments_count?: number; rules?: L10n | null; rules_url?: L10n | null; next?: string | null }
 /** R-32 `POST articles/<id>/comments/<cid>/report` → 202 (the same for a new report, a repeat and a blocked key) */
 export interface ReportAnswer { ok: boolean }
 /** `POST articles/<id>/rating` → 200 or 409 `already` (both carry the rating and the install's own value). */

@@ -127,8 +127,10 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     expect(tourB1).toMatch(/a3 "App Attest cast \(A1\)" NOT-PROVABLE/);
     // ios run 1 of cloud_39: ONE status bar override with an ISO time (Xcode 26.6 refuses «10:00» - the real clock was in the frames);
     // the tour step under `set +e` (a missing blank.txt ended a green App Store set red); a sparse page (99 %) is not a blank one
-    expect(tourB1.match(/simctl status_bar "\$U" override/g)).toHaveLength(2);
-    expect(tourB1).toMatch(/--time 2026-11-16T10:00:00\+00:00 "\$\{a\[@\]\}"[^\n]*\\\n\s*\|\| xcrun simctl status_bar "\$U" override --time 10:00/);
+    // cloud_40 (NOTE 4): the time forms tried in order, the one simctl TOOK written with its read-back (statusbar.txt); none = said so
+    expect(tourB1).toMatch(/for t in 2026-11-16T10:00:00Z 2026-11-16T10:00:00\+00:00 "Mon Nov 16 10:00:00 UTC 2026" 10:00; do/);
+    expect(tourB1).toMatch(/time form taken: \$\{t\}/);
+    expect(tourB1).toMatch(/time form taken: NONE \(the real clock\)/);
     expect(read('.github/actions/ios-sim-run/action.yml')).toMatch(/run: \|\n\s+set \+e/);
     expect(tourB1).toMatch(/case "\$p" in "BLANK \(100%"\*\) ;; BLANK\*\) p="ok \(sparse/);
     // the WebGL map screen and the eparchy's way back over its map: OUT, never FAIL; the list's way back stays in the lock; toasts recorded in the page
@@ -141,6 +143,17 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     const tour = read('scripts/ios_sim_tour.sh');
     expect(tour).toMatch(/if grep -q '\| FAIL \|' "\$A3" 2>\/dev\/null; then [^\n]*RC=1; fi/);
     expect(tour).toMatch(/grep -q 'store screenshots: PASS' "\$OUT\/sizes.txt" \|\| RC=1/);
+  });
+  it('cloud_40 (A1): the ROOT view controller is the app\'s own bridge - else AppAttest + FcmTopics are never registered', () => {
+    // Capacitor 8.5 (UIScene): «the delegate creates the window and root view controller in code; Main.storyboard no longer provides them» -
+    // 1.0.12 / 1.0.13 made Capacitor's own CAPBridgeViewController there: isSupported() rejected «not implemented», App Attest stayed off
+    const scene = read('ios/App/App/SceneDelegate.swift');
+    expect(scene).toMatch(/window\?\.rootViewController = InokBridgeViewController\(\)/);
+    for (const f of ['SceneDelegate.swift', 'AppDelegate.swift', 'InokBridgeViewController.swift']) expect(read(`ios/App/App/${f}`), f).not.toMatch(/CAPBridgeViewController\(\)/);
+    const bridge = read('ios/App/App/InokBridgeViewController.swift');
+    for (const p of ['FcmTopicsPlugin', 'AppAttestPlugin']) expect(bridge, p).toContain(`registerPluginInstance(${p}())`);
+    // the ring proves it on the simulator: the spot «local plugins answer» (a rejection UNIMPLEMENTED = FAIL)
+    expect(read('scripts/ios_sim_tour.sh')).toMatch(/a3 "local plugins answer \(A1\)" FAIL/);
   });
   it('cloud_38 (A2): FCM on iOS - Firebase Messaging, the FcmTopics twin registered by the app\'s bridge, the APNs token handed over', () => {
     const pbx = read('ios/App/App.xcodeproj/project.pbxproj');

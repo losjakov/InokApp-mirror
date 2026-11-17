@@ -1,6 +1,6 @@
 import { ApiError, apiBytes, apiJson, readJson, type FetchOptions } from './api/client';
 import { decodeExport, manifestFile } from './api/exportLoader';
-import type { AppConfig, Article, ArticlesPage, Comments, Directory, LiveStatus, Manifest, MonasteryPhotos, RatingAnswer, ReportAnswer, ViewsAnswer, VoteAnswer, VoteValue } from './api/types';
+import type { AppConfig, Article, ArticlesPage, Comment, Comments, Directory, LiveStatus, Manifest, MonasteryPhotos, RatingAnswer, ReportAnswer, ViewsAnswer, VoteAnswer, VoteValue } from './api/types';
 import type { Lang } from '@/i18n';
 import { isNative } from '@/native/platform';
 import { sortArticles, type ArticleSort } from '@/data/repo/articleOrder';
@@ -22,8 +22,9 @@ export type DataSource = {
   articles(lang: Lang, since?: string | null, f?: ArticleFilter, signal?: AbortSignal): Promise<ArticlesPage>;
   /** R-35 (A-51): ONE item by id in that language - the feed's own bytes; 404 = not shown */
   article(id: number, lang: Lang): Promise<Article>;
-  /** R-27: with the install id the answer carries this install's vote on every comment and reply */
-  comments(id: number, installId: string): Promise<Comments>;
+  /** R-27: with the install id the answer carries this install's vote on every comment and reply; R-55 `ranked`: by likes minus
+   *  dislikes (a tie: the newer first), 5 top-level comments a page from `since` (null = the first page) */
+  comments(id: number, installId: string, ranked?: { since: string | null }): Promise<Comments>;
   rate(id: number, body: { value: number } & CastBody): Promise<RatingAnswer>;
   /** R-27: a comment's like / dislike — the DESIRED state (`none` withdraws) */
   vote(id: number, cid: number, body: { value: VoteValue } & CastBody): Promise<VoteAnswer>;
@@ -39,6 +40,8 @@ export type DataSource = {
   attestKey(body: { platform: 'ios'; install_id: string; key_id: string; attestation: string; challenge: string }): Promise<ReportAnswer>;
   /** R-49 (A-109): a card's gallery, asked on a tap only (online); 404 = unknown / inactive card */
   monasteryPhotos(code: number): Promise<MonasteryPhotos>;
+  /** R-54 (A-130): «Читайте також» / «Дивіться також» - items of the opened item's kind (3; news 4 of the last 30 days), the feed's bytes */
+  related(id: number, lang: Lang): Promise<{ items: Article[] }>;
 };
 
 export type ArticleKind = 'publication' | 'video' | 'news';
@@ -88,7 +91,7 @@ const live: DataSource = {
   liveStatus: () => apiJson<LiveStatus>('live-status'),
   articles: (lang, since, f, signal) => apiJson<ArticlesPage>(articlesQuery(lang, since, f), signal ? { signal } : undefined),
   article: (id, lang) => apiJson<Article>(`articles/${id}?lang=${lang}`),
-  comments: (id, install) => apiJson<Comments>(`articles/${id}/comments?install_id=${encodeURIComponent(install)}`),
+  comments: (id, install, ranked) => apiJson<Comments>(`articles/${id}/comments?install_id=${encodeURIComponent(install)}${ranked ? rankedQuery(ranked.since) : ''}`),
   vote: (id, cid, body) => apiJson<VoteAnswer>(`articles/${id}/comments/${cid}/vote`, post(body)),
   report: (id, cid, body) => apiJson<ReportAnswer>(`articles/${id}/comments/${cid}/report`, post(body)),
   views: (path) => apiJson<ViewsAnswer>(path),
@@ -96,6 +99,7 @@ const live: DataSource = {
   attestChallenge: (body) => apiJson<{ challenge: string; expires_in: number }>('app-attest/challenge', post(body)),
   attestKey: (body) => apiJson<ReportAnswer>('app-attest/key', post(body)),
   monasteryPhotos: (code) => apiJson<MonasteryPhotos>(`monasteries/${code}/photos`),
+  related: (id, lang) => apiJson<{ items: Article[] }>(`articles/${id}/related?lang=${lang}`),
   async rate(id, body) {
     try {
       return await apiJson<RatingAnswer>(`articles/${id}/rating`, post(body));
@@ -110,6 +114,12 @@ const live: DataSource = {
 export const ARTICLES_PAGE = 30;
 /** R-17: a card's block shows 5 rows and pages by 5 («Показати більше»), as the card page. */
 export const RELATED_PAGE = 5;
+/** R-55 (A-130 3): the first FIVE comments by score, then pages of five («Показати більше»). */
+export const COMMENTS_PAGE = 5;
+const rankedQuery = (since: string | null): string => `&sort=score&limit=${COMMENTS_PAGE}${since ? `&since=${encodeURIComponent(since)}` : ''}`;
+/** R-55: THE order (the server's; the fixtures play it): likes minus dislikes, highest first; equal -> the newer first, then the higher id. */
+export const scoreOrder = (a: Comment, b: Comment): number =>
+  ((b.votes?.likes ?? 0) - (b.votes?.dislikes ?? 0)) - ((a.votes?.likes ?? 0) - (a.votes?.dislikes ?? 0)) || b.at.localeCompare(a.at) || b.id - a.id;
 
 const fx = async <T>(name: string): Promise<T> => {
   const r = await fetch(`/fixtures/${name}`);
@@ -129,9 +139,10 @@ const fixtures: DataSource = {
     map_style_url: 'https://tiles.openfreemap.org/styles/liberty',
     export_poll_hours: 24,
     live_poll_seconds: 120,
-    features: { comments_write: false, embedded_player: false, articles_query: true, articles_sort_v2: true, monastery_photos: true }, // R-44: live 13.11.2026; R-48 + R-49: 14.11
+    features: { comments_write: false, embedded_player: false, articles_query: true, articles_sort_v2: true, monastery_photos: true, articles_related: true, comments_ranked: true, photo_links: true }, // R-44: live 13.11.2026; R-48 + R-49: 14.11; R-54 ... R-56: 17.11
     donate_url: 'https://inok.info/donate/',
     privacy_url: 'https://inok.info/app/privacy/',
+    rights_url: 'https://inok.info/about/rightsholders/', photo_add_hash: 'skm-cta-photo', // R-56 (contract §3, 17.11.2026)
     ...(globalThis as { __inokConfig?: object }).__inokConfig, // a screen's stand-in for the site's answer (R-41's switch)
   }),
   liveStatus: () => fx<LiveStatus>('live-status.json'),
@@ -161,11 +172,18 @@ const fixtures: DataSource = {
     if (!a) throw new ApiError(404, 'not_found');
     return a;
   },
-  // fixtures/comments.json: live answers (with `?install_id=`) keyed by the item's id; news has none (the API answers 404)
-  async comments(id) {
-    const c = (await fx<Record<string, Comments>>('comments.json'))[String(id)];
+  // fixtures/comments.json: live answers (with `?install_id=`) keyed by the item's id; news has none (the API answers 404).
+  // fixtures/comments_ranked.json (cloud_40, R-55): 7 MADE-UP comments of 2868 with equal sums (no live publication has more than five) -
+  // ranked, the cursor = the offset (the server's is opaque); `comments.json?sort=score&since=` lets a screen refuse / hold a page
+  async comments(id, _install, ranked) {
+    const all = { ...(await fx<Record<string, Comments>>('comments.json')), ...(await fx<Record<string, Comments>>('comments_ranked.json')) };
+    const c = all[String(id)];
+    if (ranked) await fx<unknown>(`comments.json?sort=score&since=${ranked.since ?? ''}`);
     if (!c) throw new ApiError(404, 'not_found');
-    return c;
+    if (!ranked) return c;
+    const from = Number(ranked.since ?? 0);
+    const items = [...c.items].sort(scoreOrder);
+    return { ...c, items: items.slice(from, from + COMMENTS_PAGE), next: from + COMMENTS_PAGE < items.length ? String(from + COMMENTS_PAGE) : null };
   },
   // the cast goes over the network as the live one does (`?rate=` lets a screen refuse it - D73's message on an article); the answer is local
   rate: async (id, body) => { await fx<unknown>(`articles.json?rate=${id}`); return { rating: { value: body.value, count: 1 }, mine: body.value }; },
@@ -189,6 +207,19 @@ const fixtures: DataSource = {
     const a = (await fx<Record<string, MonasteryPhotos>>(`monastery_photos.json?code=${code}`))[String(code)];
     if (!a) throw new ApiError(404, 'not_found');
     return a;
+  },
+  // R-54: drawn from the fixtures' own items (the feed, the video sample, the R-39 pair, 1714, the R-47 pair) - the opened item's kind, never
+  // itself, 3 (news 4), in the lists' order (the live set is a seeded shuffle per hour); `articles.json?related=<id>` lets a screen refuse /
+  // hold / empty the request
+  async related(id, lang) {
+    await fx<unknown>(`articles.json?related=${id}`);
+    const byLang = ['articles_links.json', 'article_gallery.json', 'articles_video_r47.json'].map((f) => fx<Record<string, ArticlesPage>>(f).then((x) => x?.[lang] ?? { items: [], next: null }));
+    const pool = (await Promise.all([fx<ArticlesPage>('articles.json'), fx<ArticlesPage>('articles_video.json'), ...byLang])).flatMap((p) => p.items);
+    const self = pool.find((a) => a.id === id);
+    if (!self) throw new ApiError(404, 'not_found');
+    const seen = new Set<number>([id]);
+    const items = pool.filter((a) => a.kind === self.kind && !seen.has(a.id) && seen.add(a.id));
+    return { items: items.slice(0, self.kind === 'news' ? 4 : 3) };
   },
 };
 
