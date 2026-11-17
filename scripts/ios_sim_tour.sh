@@ -25,6 +25,9 @@ S="$OUT"; ART=${STORE_ARTICLE:-1832}
 # read-back (`status_bar list`) - the REPORT says which, measured; none taken = the real clock, said so (one clock for the set either way)
 sb_override() {
   local a=(--dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode notSupported --batteryState charged --batteryLevel 100) t
+  # ios run 2 of cloud_40: Xcode 26.6 refused all four («Invalid, non-ISO date/time string» / «Invalid argument») - once NONE is written,
+  # the forms are not tried again before every frame (the rest of the override still is)
+  grep -q 'NONE' "$OUT/statusbar.txt" 2>/dev/null && { xcrun simctl status_bar "$U" override "${a[@]}" 2>>"$OUT/nav.txt" || true; return 0; }
   for t in 2026-11-16T10:00:00Z 2026-11-16T10:00:00+00:00 "Mon Nov 16 10:00:00 UTC 2026" 10:00; do
     if xcrun simctl status_bar "$U" override --time "$t" "${a[@]}" 2>>"$OUT/nav.txt"; then
       [ -s "$OUT/statusbar.txt" ] || { echo "time form taken: ${t}"; xcrun simctl status_bar "$U" list 2>&1 | head -5; } >> "$OUT/statusbar.txt"; return 0
@@ -328,7 +331,9 @@ a3_walk() {
     local ok8=no; case "$v|$p" in "ok title «"*"» fits "*"|ok"*) ok8=yes;; esac
     # A-127: a screen WITH a WebGL map (the map; the eparchy's and «Контакти»'s mini-maps) whose page stopped answering or painting is outside
     # the lock (ios run 2 of cloud_39: «Контакти» on the iPad 26.5 - no answer, white); its DOM checks count whenever the page answers
-    local gl8=no; case "$name" in map) gl8=yes;; eparchy|contacts) [ -z "$v" ] && gl8=yes;; esac
+    # ios run 2 of cloud_40 (iOS 16.4 iPhone, the eparchy): «no page» with a 100 % white picture = the same GPU-less stop (the page in its
+    # transition never painted); any other answer of these screens still counts
+    local gl8=no; case "$name" in map) gl8=yes;; eparchy|contacts) case "$v|$p" in "|"*|"no page|BLANK (100%"*) gl8=yes;; esac;; esac
     if [ "$gl8" = yes ] && [ "$ok8" = no ]; then
       a3 "screen $name (A8)" OUT "${v:-no answer from the page}; pixels $p - a WebGL map on this screen (A-127: outside the lock)"; else
     case "$v|$p|$AFTER_GL" in "ok title «"*"» fits "*"|ok"*) a3 "screen $name (A8)" PASS "$v; pixels $p";;

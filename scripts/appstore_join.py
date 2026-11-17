@@ -9,8 +9,10 @@ A frame is written ONLY when the join is clean, measured:
      their pixels within 6 of the simulator band's own background), so the marks cover nothing of the app;
   3. the seam rows (4 rows on each side of each cut) of the browser and of the simulator frame agree: mean |diff| <= 3 and >= 99 % of the
      pixels within 12 - the header / tab bar continue across the seam in one colour.
-Usage: appstore_join.py <insets.json> <browser.png> <simulator.png> <out.png>   -> prints «JOINED …» (exit 0) or «REFUSED …» (exit 1)
+Usage: appstore_join.py <insets.json> <browser.png> <simulator.png> <out.png> [--top-only]   -> «JOINED …» (exit 0) / «REFUSED …» (exit 1)
        appstore_join.py --self-test
+--top-only (ios run 2 of cloud_40: Xcode 26.6's simctl takes NO time form - each frame carried its own minute): the status bar band of ONE
+real frame onto every frame of that device's set = ONE clock for the whole set; the same measured checks, the bottom left as it is.
 """
 import json
 import sys
@@ -49,7 +51,7 @@ def seam(a, b):
     return sum(diffs) / max(1, len(diffs)), sum(1 for d in diffs if d <= 12) / max(1, len(diffs))
 
 
-def join(insets, browser, sim):
+def join(insets, browser, sim, top_only=False):
     """-> (image or None, the measured line)"""
     b = browser.convert('RGB')
     s = sim.convert('RGB')
@@ -61,18 +63,25 @@ def join(insets, browser, sim):
     if top < 1 or bottom < 1:
         return None, f'no band (top {top}, bottom {bottom} px)'
     out = []
-    for name, y0, y1, s0, s1 in (('top', 0, top, top, top + SEAM), ('bottom', h - bottom, h, h - bottom - SEAM, h - bottom)):
+    edges = (('top', 0, top, top, top + SEAM), ('bottom', h - bottom, h, h - bottom - SEAM, h - bottom))
+    for name, y0, y1, s0, s1 in edges[:1] if top_only else edges:
         band_bg = background(rows(s, y0, y1))
-        covered = share_near(rows(b, y0, y1), band_bg, 6)
-        if covered < 0.99:
-            return None, f'{name} band of the browser frame is not the app background only ({covered:.1%} of {band_bg})'
+        if top_only:  # the target is a real frame too: its band = a status bar on the SAME background (another minute only)
+            own = background(rows(b, y0, y1))
+            if not near(own, band_bg, 6):
+                return None, f'{name} band background differs ({own} / {band_bg})'
+        else:
+            covered = share_near(rows(b, y0, y1), band_bg, 6)
+            if covered < 0.99:
+                return None, f'{name} band of the browser frame is not the app background only ({covered:.1%} of {band_bg})'
         mean, ok = seam(rows(b, s0, s1), rows(s, s0, s1))
         if mean > 3 or ok < 0.99:
             return None, f'{name} seam differs (mean {mean:.2f}, within 12: {ok:.1%})'
         out.append(f'{name} {y1 - y0} px, background {band_bg}, seam mean {mean:.2f} / {ok:.1%}')
     res = b.copy()
     res.paste(s.crop((0, 0, w, top)), (0, 0))
-    res.paste(s.crop((0, h - bottom, w, h)), (0, h - bottom))
+    if not top_only:
+        res.paste(s.crop((0, h - bottom, w, h)), (0, h - bottom))
     return res, '; '.join(out)
 
 
@@ -94,16 +103,19 @@ def self_test():
     cover = frame(False); cover.paste((0, 0, 0), (100, 20, 400, 60))  # app content under the status bar = never covered
     assert join(ins, cover, frame(True))[0] is None
     assert join(ins, frame(False).resize((1290, 2796)), frame(True))[0] is None
-    print('appstore_join self-test: PASS (a clean join + 3 refusals: seam, covered content, size)')
+    one, _ = join(ins, frame(True), frame(True).transpose(Image.FLIP_LEFT_RIGHT), top_only=True)  # another clock on top, its own bottom kept
+    assert one is not None and one.getpixel((1320 - 100, 80)) == (255, 255, 255) and one.getpixel((500, 2868 - 35)) == (0, 0, 0)
+    print('appstore_join self-test: PASS (a clean join + 3 refusals: seam, covered content, size; the top band alone)')
 
 
 if __name__ == '__main__':
     if sys.argv[1:] == ['--self-test']:
         self_test(); sys.exit(0)
     ins_f, b_f, s_f, out_f = sys.argv[1:5]
+    top_only = sys.argv[5:6] == ['--top-only']
     with open(ins_f, encoding='utf-8') as f:
         ins = json.load(f)
-    im, line = join(ins, Image.open(b_f), Image.open(s_f))
+    im, line = join(ins, Image.open(b_f), Image.open(s_f), top_only)
     if im is None:
         print(f'REFUSED {out_f}: {line}'); sys.exit(1)
     im.save(out_f, 'PNG', optimize=True)

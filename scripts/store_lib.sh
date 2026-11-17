@@ -18,9 +18,13 @@ set_lang() {
   [ "$(check lang)" = "$1" ] || echo "LANG FAIL $1" >> "$S/nav.txt"
 }
 set_theme() { # light | dark
-  nav go /more; sleep 2; nav click "[data-testid=\"theme-$1\"]"; sleep 2
-  local d; d=$(check theme)
-  [ "$d" = "$1" ] || echo "THEME FAIL $1 ($d)" >> "$S/nav.txt"
+  # cloud_40 (ios run 2, App Store iPhone): ONE tap lost to the remote hand's relay (connect ETIMEDOUT) left the theme dark - asked once more
+  local d _
+  for _ in 1 2; do
+    nav go /more; sleep 2; nav click "[data-testid=\"theme-$1\"]"; sleep 2
+    d=$(check theme); [ "$d" = "$1" ] && return 0
+  done
+  echo "THEME FAIL $1 ($d)" >> "$S/nav.txt"
 }
 # A-75 (1): BEFORE a language is shot, the export's unit words of card 242 and the list are read back in it
 units_ok() {

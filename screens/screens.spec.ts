@@ -746,6 +746,9 @@ const arrowsAre = async (p: Page, up: boolean, down: boolean) => {
 /** the page ready to scroll: its pictures in (the height final), a card's history opened (242 closed is < 3 viewports: no arrow - checked) */
 const arrowsPage = async (p: Page) => {
   await expect(arrowsOwner(p)).toBeVisible();
+  // cloud_40 (R-54): an article's «Читайте також» arrives AFTER the text (by design) and lengthens the page - the arrows are measured on
+  // the page as it stands once it came (the screen `read-also-held` proves the text never waits for it)
+  if (await p.locator(SHOWN).getByTestId('article').count()) await expect(p.locator(SHOWN).getByTestId('read-also')).toBeVisible({ timeout: 10_000 }).catch(() => undefined);
   await settled(p); await picturesSettled(p);
   if (await p.locator(SHOWN).getByTestId('card').count()) {
     const m = await arrowsScroll(p);
