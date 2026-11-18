@@ -9,3 +9,9 @@ export function versionBelow(a: string, b: string): boolean {
   for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0);
   return false;
 }
+
+/** A-62: versionCode = X*10000 + Y*100 + Z (build.gradle computes the same for Android; iOS CFBundleVersion = it) - 1.0.15 = 10015. */
+export function versionCode(v: string = APP_VERSION): number {
+  const [x, y, z] = v.split('.').map((p) => parseInt(p, 10) || 0);
+  return (x ?? 0) * 10000 + (y ?? 0) * 100 + (z ?? 0);
+}

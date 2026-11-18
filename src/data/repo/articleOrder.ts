@@ -14,19 +14,24 @@ const rated = (a: Pick<Article, 'rating'>) => !!a.rating && a.rating.count > 0;
 const week = (a: Pick<Article, 'views_week'>) => a.views_week ?? 0; // contract: 0 = none; an item saved without it counts 0
 const at = (a: Pick<Article, 'created_at' | 'published_at'>) => a.created_at ?? a.published_at;
 
+/** the eye (`views`, contract §3: null = 0) - since 17.11.2026 the rating order's third key (it was `views_week`) */
+const eye = (a: Pick<Article, 'views'>) => a.views ?? 0;
+const newer = (a: Article, b: Article) => at(b).localeCompare(at(a));
+
 /**
  * THE comparator of an order (A-15: ONE function for the offline list and the fixtures' server), null = the list's own order.
- * `rating` (contract §3 R-48 table): the rated first - the value as shown higher, then more ratings, then views_week; after them the
- * unrated (`{value:0,count:0}`) and news (`rating` null) together by views_week. A tie returns 0: the caller keeps the list's order.
+ * `rating` (contract §3 R-48 table, A-131 cloud_41): the rated first - the value as shown higher, then more ratings, then more views (the
+ * eye), then the NEWER first; after them the unrated (`{value:0,count:0}`) and news (`rating` null) together by views, then the newer.
+ * A full tie returns 0: the caller keeps the list's order.
  */
 export function articleOrder(sort: ArticleSort): ((a: Article, b: Article) => number) | null {
-  if (sort === 'created') return (a, b) => at(b).localeCompare(at(a));
+  if (sort === 'created') return newer;
   if (sort === 'views_week') return (a, b) => week(b) - week(a);
   if (sort === 'rating') return (a, b) => {
     const ra = rated(a), rb = rated(b);
     if (ra !== rb) return ra ? -1 : 1;
-    if (ra) return shown(b.rating!.value) - shown(a.rating!.value) || b.rating!.count - a.rating!.count || week(b) - week(a);
-    return week(b) - week(a);
+    if (ra) return shown(b.rating!.value) - shown(a.rating!.value) || b.rating!.count - a.rating!.count || eye(b) - eye(a) || newer(a, b);
+    return eye(b) - eye(a) || newer(a, b);
   };
   return null;
 }

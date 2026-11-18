@@ -7,7 +7,8 @@ import type { LeanRow as Row } from '@/data/repo/monasteries';
 import { formatKm } from '@/data/search/geo';
 import { hiddenMatch } from '@/data/search/highlight';
 import { LANGS } from '@/i18n';
-import { useT } from '@/state/AppContext';
+import { useApp, useT } from '@/state/AppContext';
+import { checkmarkCircle } from 'ionicons/icons';
 
 /**
  * THE list row (list, favourites, «near me», home) — as the site's /monasteries/ row (A-23 #4): cover · name · type marker +
@@ -16,6 +17,7 @@ import { useT } from '@/state/AppContext';
  */
 export function MonasteryRow({ row, onSelect, selected, q }: { row: Row; onSelect: (code: number) => void; selected?: boolean; q?: string }) {
   const { lang, t, dict } = useT();
+  const { visited } = useApp();
   const name = field(row, 'name', lang);
   const parts = rowParts(row, lang, dict);
   const address = field(row, 'address', lang) || [parts.town, parts.oblast].filter(Boolean).join(', ');
@@ -59,6 +61,8 @@ export function MonasteryRow({ row, onSelect, selected, q }: { row: Row; onSelec
         {why && <p className="mrow__sub mrow__why" data-testid="row-why">{t('search.match')} · {why.label}: <Hl text={why.text} q={q} /></p>}
         {row.distance_km != null && <p className="mrow__dist">{t('card.distance', { km: formatKm(row.distance_km) })}</p>}
       </IonLabel>
+      {/* A-133 (07:08): a marked house - a green check at the row's right edge (a shape, not only a colour); named for the screen reader */}
+      {visited.has(row.code) && <IonIcon slot="end" icon={checkmarkCircle} className="mrow__visited" role="img" aria-label={t('visited.row')} data-testid="row-visited" />}
     </IonItem>
   );
 }

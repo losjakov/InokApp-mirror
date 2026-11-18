@@ -41,7 +41,7 @@ const cardPath = (c: number) => `/monasteries/${c}`;
 
 /** Spec §3: the offline list with search (typos; the list filters itself as one types — no dropdown, A-23 #3), the /map/ filter set + stream + near me, sort by name/distance. */
 export function MonasteriesPage() {
-  const { db, fts, t, lang, dict } = useApp();
+  const { db, fts, t, lang, dict, visitedStat } = useApp();
   const wide = useWide();
   const navigate = useNavigate();
   const { selected, open } = useListDetail('code', wide, cardPath);
@@ -96,6 +96,7 @@ export function MonasteriesPage() {
     if (f.eparchy_id != null && facets) chips.push({ k: 'eparchy_id', label: field(facets.eparchies.find((e) => e.id === f.eparchy_id) ?? {}, 'name', lang) });
     if (f.oblast_id != null && facets) chips.push({ k: 'oblast_id', label: field(facets.oblasts.find((o) => o.id === f.oblast_id) ?? {}, 'name', lang) });
     if (f.has_stream) chips.push({ k: 'has_stream', label: t('monasteries.has_stream') });
+    if (f.visited) chips.push({ k: 'visited', label: t(f.visited === 'yes' ? 'visited.yes' : 'visited.no') });
     if (fs.nearMe) chips.push({ k: 'near', label: t('monasteries.radius', { km: fs.radiusKm }) });
     return chips;
   }, [fs, facets, dict, lang, t]);
@@ -110,7 +111,10 @@ export function MonasteriesPage() {
           chips, one line, scrolling sideways when they do not fit */}
       <div className="list-pin" data-testid="filters-pin">
       <div className="filters__row" data-testid="filters-row">
-        <IonNote className="filters__count" data-testid="count" aria-live="polite">{shown ? tCount(t, lang, 'monasteries.count', shown.keys.length) : '\u00a0'}</IonNote>
+        <IonNote className="filters__count" data-testid="count" aria-live="polite">{shown ? tCount(t, lang, 'monasteries.count', shown.keys.length) : '\u00a0'}
+          {/* A-133 (07:08): «· відвідано {n}» after the count, while anything is marked; the full «Відвідано {n} з {m}» for the screen reader */}
+          {shown && visitedStat.n > 0 && <span className="filters__visited" data-testid="visited-count" aria-label={t('visited.count', visitedStat)}> · {t('visited.count_short', visitedStat)}</span>}
+        </IonNote>
         {/* PLAN 7 (A-14) + A-96 W-3: «Єпархії» at the right of the filter row - THE filled button of the app (the photo placeholder's
             «Завантажити»: Ionic's solid small button), map icon kept, a 48 dp target */}
         <IonButton size="small" className="filters__end btn-target48" onClick={() => navigate(EPARCHIES_PATH)} data-testid="eparchies-open">

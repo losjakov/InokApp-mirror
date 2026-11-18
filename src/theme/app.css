@@ -557,3 +557,19 @@ ion-searchbar .searchbar-clear-button { min-width: 24px; }
 .read-also__link { display: block; box-sizing: border-box; min-height: 48px; padding: 10px 0; color: var(--ion-color-primary); text-decoration: none; font-size: var(--inok-type-body, 1rem); line-height: 1.35; }
 .read-also__link:active { opacity: 0.6; }
 .read-also--rows ion-list { padding-top: 0; }
+
+/* A-133 «Я тут був»: the row's check at the right edge, the card's toggle (filled = marked), the list counter's tail, the map badge legend */
+.mrow__visited { color: var(--inok-visited); font-size: 1.5rem; margin-inline-start: 8px; flex: 0 0 auto; }
+.filters__visited { white-space: nowrap; }
+.card__marks { display: flex; flex: 0 0 auto; }
+.map-legend { position: absolute; left: 8px; bottom: 8px; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border-radius: 16px; font-size: var(--inok-type-secondary); color: var(--ion-text-color); pointer-events: none; }
+.map-legend__badge { width: 20px; height: 20px; border-radius: 50%; background: #1b7a3a; box-shadow: 0 0 0 2px #fff; position: relative; flex: 0 0 auto; }
+.map-legend__badge::after { content: ''; position: absolute; left: 6px; top: 3px; width: 5px; height: 10px; border: solid #fff; border-width: 0 2.4px 2.4px 0; transform: rotate(45deg); }
+/* THE mark toggle (MarkToggle.tsx): a native button, 48 dp, the colour of where it sits (white in the toolbar); the star amber when on;
+   the visited check green when on OUTSIDE the toolbar (the tablet's title row; in the toolbar the filled shape says it, white) */
+.mark-toggle { appearance: none; background: transparent; border: 0; color: inherit; width: 48px; height: 48px; padding: 12px; margin: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+.mark-toggle ion-icon { font-size: 24px; }
+.mark-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
+.mark-toggle--fav.mark-toggle--on ion-icon { color: var(--ion-color-secondary); }
+.card__marks .mark-toggle--visited.mark-toggle--on ion-icon { color: var(--inok-visited); }
+.card__marks { margin: -4px -8px 0 4px; }

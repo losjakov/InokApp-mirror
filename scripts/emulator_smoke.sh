@@ -123,6 +123,28 @@ native_paths() {
   NATIVE="share=$share browser_tab=$browser"; echo "native paths: $NATIVE (front: $f)" | tee "$OUT/native.txt"
   [ "$share" = ok ] && [ "$browser" = ok ] || echo "::warning::API $API: a native path did not show its activity ($NATIVE)"
 }
+# cloud_41 (A-133 C1): the four app shortcuts - the launcher's list (`dumpsys shortcut`: the manifest's four, in order) and each one's OWN
+# intent (an explicit VIEW of MainActivity with `inokapp://tab/<id>`, what the launcher sends) from a COLD start and from the BACKGROUND;
+# the address the app lands on read back. Not gating (the browser ring gates the router): written, a wrong tab = a warning.
+quick_actions() {
+  QUICK=""
+  local listed; listed=$(adb shell dumpsys shortcut 2>/dev/null | grep -aoE "inokapp://tab/[a-z]+" | awk '!s[$0]++' | sed 's#inokapp://tab/##' | tr '\n' ',' || true)
+  QUICK="listed=${listed%,}"
+  local id want got
+  for id in streams monasteries map articles; do
+    case $id in streams) want=/streams;; monasteries) want=/monasteries;; map) want=/map;; articles) want=/articles;; esac
+    adb shell am force-stop $PKG; sleep 2
+    adb shell am start -a android.intent.action.VIEW -d "inokapp://tab/$id" -n $PKG/.MainActivity > /dev/null; sleep 14
+    got=$(nav url || true); QUICK="$QUICK cold:$id=$([ "$got" = "$want" ] && echo ok || echo "$got")"
+    nav go /monasteries/242 > /dev/null 2>&1 || true; sleep 3
+    adb shell am start -a android.intent.action.VIEW -d "inokapp://tab/$id" -n $PKG/.MainActivity > /dev/null; sleep 5
+    got=$(nav url || true); QUICK="$QUICK warm:$id=$([ "$got" = "$want" ] && echo ok || echo "$got")"
+  done
+  [ "$id" = articles ] && shot "$OUT/quick_articles.png"
+  echo "quick actions: $QUICK" | tee "$OUT/quick.txt"
+  echo "$QUICK" | grep -qE "(cold|warm):[a-z]+=[^o]" && echo "::warning::API $API: a quick action landed elsewhere ($OUT/quick.txt)"
+  return 0
+}
 # A-83 edge-to-edge on Android 15+ (API 35/36): Home and an article scrolled down, with gesture AND 3-button navigation (the review shots)
 edge_shots() {
   E2E=n/a; [ "${API%%-*}" -ge 35 ] || return 0
@@ -423,8 +445,8 @@ if [ "$WV" -ge "$FLOOR" ]; then
   LINKS=n/a; case "$API" in 26*) ;; *) bash "$ROOT/scripts/emu_links.sh" "$OUT" || true; LINKS="$(tail -1 "$OUT/links.txt" 2>/dev/null | sed 's/^links //' || true)";; esac
   # cloud_13 item 3: the Play screenshots from the live export, once, on the required image (scripts/emu_store.sh)
   STORE=n/a; case "$API" in 34-default*) bash "$ROOT/scripts/emu_store.sh" "$OUT" || true; STORE="$(grep -E '^store screenshots: [A-Z]+|^(missing|maps|pictures|anything|gallery|«Публікації»|language|unit words|status bar|colours|lavras|article top|on air)|^launcher label|STOPPED' "$OUT/store/sizes.txt" 2>/dev/null | sed 's/ (rules:.*//' | tr '\n' ';' || true)";; esac
-  native_paths; edge_shots; a11y_dumps; r8_scan; notify_proof
-  echo "FULL webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY]" | tee "$OUT/result.txt"
+  native_paths; quick_actions; edge_shots; a11y_dumps; r8_scan; notify_proof
+  echo "FULL webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
 else
   sleep 20
   shot "$OUT/home.png"

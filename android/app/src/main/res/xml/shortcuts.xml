@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- cloud_41 (A-133 C1): FOUR static app shortcuts in the owner's order - «Трансляції», «Монастирі», «Карта», «Публікації»; each an
+     in-app address of the app's OWN link router (src/app/quickActions.ts: inokapp://tab/<id>), delivered by Capacitor as the launch URL
+     (cold start) or `appUrlOpen` (from the background); labels by the system language (values / -uk / -ru); icons = the tab's glyph -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="streams" android:enabled="true" android:icon="@drawable/ic_shortcut_streams"
+        android:shortcutShortLabel="@string/shortcut_streams" android:shortcutLongLabel="@string/shortcut_streams">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="info.inok.app"
+            android:targetClass="info.inok.app.MainActivity" android:data="inokapp://tab/streams" />
+    </shortcut>
+    <shortcut android:shortcutId="monasteries" android:enabled="true" android:icon="@drawable/ic_shortcut_monasteries"
+        android:shortcutShortLabel="@string/shortcut_monasteries" android:shortcutLongLabel="@string/shortcut_monasteries">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="info.inok.app"
+            android:targetClass="info.inok.app.MainActivity" android:data="inokapp://tab/monasteries" />
+    </shortcut>
+    <shortcut android:shortcutId="map" android:enabled="true" android:icon="@drawable/ic_shortcut_map"
+        android:shortcutShortLabel="@string/shortcut_map" android:shortcutLongLabel="@string/shortcut_map">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="info.inok.app"
+            android:targetClass="info.inok.app.MainActivity" android:data="inokapp://tab/map" />
+    </shortcut>
+    <shortcut android:shortcutId="articles" android:enabled="true" android:icon="@drawable/ic_shortcut_articles"
+        android:shortcutShortLabel="@string/shortcut_articles" android:shortcutLongLabel="@string/shortcut_articles">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="info.inok.app"
+            android:targetClass="info.inok.app.MainActivity" android:data="inokapp://tab/articles" />
+    </shortcut>
+</shortcuts>

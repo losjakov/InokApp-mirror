@@ -65,6 +65,7 @@ jobs:
       matrix:
         include:
           - { runtime: newest, device: iphone, task: appstore }
+          - { runtime: newest, device: iphone63, task: appstore } # cloud_41 (E): 6.3-inch 1206 x 2622 (App Store Connect's required size)
           - { runtime: newest, device: ipad, task: appstore }
     name: appstore (${{ matrix.device }})
     steps:

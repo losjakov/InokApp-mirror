@@ -15,5 +15,6 @@ ext {
     cordovaAndroidVersion = '14.0.1'
     firebaseAnalyticsVersion = '23.2.0' // A-36; the ad id stays out (manifest + build.yml R-9)
     firebaseMessagingVersion = '25.0.1' // shared by @capacitor/push-notifications and FcmTopicsPlugin
+    playReviewVersion = '2.0.2' // cloud_41 (A-133 C2): InAppReviewPlugin - Google Play In-App Review
     playIntegrityVersion = '1.6.0' // A-66: IntegrityPlugin (standard requests); release_check.py names it in the AAB
 }

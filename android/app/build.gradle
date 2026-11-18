@@ -67,6 +67,7 @@ dependencies {
     implementation project(':capacitor-cordova-android-plugins')
     implementation "com.google.firebase:firebase-messaging:$firebaseMessagingVersion" // FcmTopicsPlugin, InokMessagingService
     implementation "com.google.firebase:firebase-analytics:$firebaseAnalyticsVersion" // AnalyticsPlugin (A-36: screens only, no ad id)
+    implementation "com.google.android.play:review:$playReviewVersion" // InAppReviewPlugin (A-133 C2: the store's own rating window)
     implementation "com.google.android.play:integrity:$playIntegrityVersion" // IntegrityPlugin (A-66: a token on every write)
 }
 

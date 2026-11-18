@@ -1,3 +1,8 @@
 "CFBundleDisplayName" = "inok.info";
 "NSLocationWhenInUseUsageDescription" = "To show the nearest monasteries and the distance to them. Your location never leaves the phone.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "The app asks for your location only while you use it: to show the nearest monasteries and the distance to them. Your location never leaves the phone.";
+/* cloud_41 (A-133 C1): the Home Screen quick actions */
+"SHORTCUT_streams" = "Streams";
+"SHORTCUT_monasteries" = "Monasteries";
+"SHORTCUT_map" = "Map";
+"SHORTCUT_articles" = "Publications";

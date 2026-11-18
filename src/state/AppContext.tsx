@@ -3,6 +3,7 @@ import type { Db } from '@/data/db/types';
 import { openDb } from '@/data/db';
 import { ensureSchema, getMeta, type FtsMode } from '@/data/db/schema';
 import { countMonasteries, getDictionary, listFavourites, toggleFavourite } from '@/data/repo/monasteries';
+import { listVisited, toggleVisited, visitedCount } from '@/data/repo/visited';
 import { cachedLiveStatus, fetchLiveStatus, loadConfig, loadLiveStatus, syncDirectory } from '@/data/sync';
 import { fetchArticles, listArticles } from '@/data/repo/articles';
 import { dueOnReturn, lastCheck as readLastCheck, runRefresh, type RefreshResult } from '@/data/refresh';
@@ -28,6 +29,11 @@ export interface AppState {
   dict: Record<string, string>;
   favourites: Set<number>;
   toggleFavourite(code: number): Promise<void>;
+  /** A-133 «Я тут був»: the marked houses (local only) and the counter «Відвідано {n} з {m}» (n = marked houses in the directory) */
+  visited: Set<number>;
+  visitedStat: { n: number; m: number };
+  /** the state after the tap and the counter after it (the toast says both) */
+  toggleVisited(code: number): Promise<{ on: boolean; n: number; m: number }>;
   config: AppConfig | null;
   live: { status: LiveStatus; stale: boolean } | null;
   liveChannelIds: Set<number>;
@@ -75,6 +81,8 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
   const [dictVersion, setDictVersion] = useState(0); // a re-import: the dictionary is read again (the loader below)
   const bumpDict = useCallback(() => setDictVersion((v) => v + 1), []);
   const [favourites, setFavourites] = useState<Set<number>>(new Set());
+  const [visited, setVisited] = useState<Set<number>>(new Set());
+  const [visitedStat, setVisitedStat] = useState<{ n: number; m: number }>({ n: 0, m: 0 });
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [live, setLive] = useState<{ status: LiveStatus; stale: boolean } | null>(null);
   const [exportVersion, setExportVersion] = useState<string | null>(null);
@@ -171,6 +179,7 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
       setDb(d);
       setFts(mode);
       setFavourites(new Set(await listFavourites(d)));
+      setVisited(new Set(await listVisited(d)));
       const n = await countMonasteries(d);
       bootLog(`db monasteries=${n}`);
       // A-64: 1.0.0 saved no settings until one was changed - an install that has the directory but no settings ran 1.0.0 with its
@@ -238,6 +247,17 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
     [db],
   );
 
+  const toggleVis = useCallback(async (code: number) => {
+    if (!db) return { on: false, n: 0, m: 0 };
+    const on = await toggleVisited(db, code);
+    const stat = await visitedCount(db);
+    setVisited((prev) => { const s = new Set(prev); s.delete(code); return on ? new Set([code, ...s]) : s; }); // the newest mark first
+    setVisitedStat(stat);
+    return { on, ...stat };
+  }, [db]);
+  // the counter follows the directory (m = its houses; a house gone keeps its mark, uncounted)
+  useEffect(() => { if (db && boot === 'ready') void visitedCount(db).then(setVisitedStat); }, [db, boot, exportVersion]);
+
   const retryFirstRun = useCallback(async () => {
     if (!db) return;
     setBoot('loading');
@@ -286,11 +306,11 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
   const value = useMemo<AppState | null>(
     () =>
       db && {
-        db, fts, boot, lang, t, settings, setSettings, dict, favourites, toggleFavourite: toggleFav,
+        db, fts, boot, lang, t, settings, setSettings, dict, favourites, toggleFavourite: toggleFav, visited, visitedStat, toggleVisited: toggleVis,
         config, live, liveChannelIds, refreshLive, articlesVersion, refreshArticles, exportVersion, refreshAll, refreshing, lastCheck,
         push, pushRegistered, enablePush, pushTap, clearPushTap,
       },
-    [db, fts, boot, lang, t, settings, setSettings, dict, favourites, toggleFav, config, live, liveChannelIds, refreshLive, articlesVersion, refreshArticles, exportVersion, refreshAll, refreshing, lastCheck,
+    [db, fts, boot, lang, t, settings, setSettings, dict, favourites, toggleFav, visited, visitedStat, toggleVis, config, live, liveChannelIds, refreshLive, articlesVersion, refreshArticles, exportVersion, refreshAll, refreshing, lastCheck,
       push, pushRegistered, enablePush, pushTap, clearPushTap],
   );
 

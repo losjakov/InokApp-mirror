@@ -24,7 +24,7 @@ export const countFor = async (db: Db, fts: FtsMode, s: FilterState, c: ListCont
   (await listMonasteries(db, fts, listQueryOf(s, c))).length;
 
 /** A-21(в): the filter keys a user can clear one by one (the sheet's «×» and the chips above the list); «Скинути» clears all. */
-export type FilterKey = 'type' | 'object_type' | 'subordination' | 'eparchy_id' | 'oblast_id' | 'has_stream' | 'near';
+export type FilterKey = 'type' | 'object_type' | 'subordination' | 'eparchy_id' | 'oblast_id' | 'has_stream' | 'near' | 'visited';
 /** ONE reset of ONE filter: the others stay; their facet counts are recounted by the caller from the new state (A-13). */
 export function clearOne(s: FilterState, k: FilterKey): FilterState {
   if (k === 'near') return { ...s, nearMe: false, sort: s.sort === 'distance' ? 'name' : s.sort };

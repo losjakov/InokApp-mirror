@@ -1,4 +1,10 @@
-import { UpdateOffer } from '@/components/UpdateOffer';
+import { UpdateOffer, overlayOpen } from '@/components/UpdateOffer';
+import { maybeAskReview, noteStart } from '@/state/reviewAsk';
+import { requestStoreReview } from '@/native/inAppReview';
+import { checkUpdate } from '@/native/play';
+import { isIos } from '@/native/platform';
+import { online } from '@/native/network';
+import { DoorGate } from '@/components/Door';
 import { NetHost } from '@/components/NetNotice';
 import { IonApp, IonIcon, IonLabel, IonRouterOutlet, IonTabBar, IonTabs } from '@ionic/react';
 import { Busy } from '@/components/Busy';
@@ -6,7 +12,7 @@ import { IonReactRouter } from '@ionic/react-router';
 import { Navigate, Route, useLocation, useNavigate } from 'react-router-dom';
 import { ellipsisHorizontalOutline, mapOutline, newspaperOutline, videocamOutline } from 'ionicons/icons';
 import { churchOutline } from '@/components/icons';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useFitTabLabels } from './tabLabels';
 import { routeForPush } from '@/data/live/pushRoute';
 import { EPARCHIES_PATH, TabButton, useHardwareBack } from './nav';
@@ -19,7 +25,7 @@ import { MonasteriesPage } from '@/pages/Monasteries';
 
 import { StreamsPage } from '@/pages/Streams';
 import { MorePage } from '@/pages/More';
-import { FavouritesPage } from '@/pages/Favourites';
+import { FavouritesPage, VisitedPage } from '@/pages/Favourites';
 import { LanguagePage } from '@/pages/Language';
 import { NotificationsPage } from '@/pages/Notifications';
 import { CommissionPage } from '@/pages/Commission';
@@ -43,6 +49,25 @@ function ScreenAnalytics(): null {
   return null;
 }
 
+/** cloud_41 (A-133 C2): back on «Головна» from another screen = the one moment the store's rating window may be asked (src/state/reviewAsk.ts).
+ *  A LEAF inside the tabs: the first-run screen and the reserve door never mount it. */
+function ReviewAsk(): null {
+  const { pathname } = useLocation();
+  const prev = useRef<string | null>(null);
+  useEffect(() => { void noteStart(); }, []);
+  useEffect(() => {
+    const was = prev.current;
+    prev.current = pathname;
+    if (pathname !== '/home' || was == null || was === '/home') return;
+    void (async () => {
+      const play = isIos() ? null : (await checkUpdate()).state;
+      const fromStore = isIos() || play === 'available' || play === 'none'; // Android: Play knows this install
+      await maybeAskReview({ backOnHome: true, overlay: overlayOpen(), door: false, firstRun: false, online: await online(), fromStore }, requestStoreReview);
+    })();
+  }, [pathname]);
+  return null;
+}
+
 function Tabs() {
   const { t, liveChannelIds, pushTap, clearPushTap, live } = useApp();
   const navigate = useNavigate();
@@ -59,6 +84,7 @@ function Tabs() {
   return (
     <>
     <UpdateOffer />
+    <ReviewAsk />
     <NetHost />
     <IonTabs>
       <IonRouterOutlet>
@@ -70,6 +96,7 @@ function Tabs() {
         <Route path="/articles" element={<ArticlesPage />} />
         <Route path="/more/articles" element={<Navigate to="/articles" replace />} />
         <Route path="/more/favourites" element={<FavouritesPage />} />
+        <Route path="/more/visited" element={<VisitedPage />} />
         <Route path="/more/language" element={<LanguagePage />} />
         <Route path="/more/notifications" element={<NotificationsPage />} />
         <Route path="/more/commission" element={<CommissionPage />} />
@@ -119,11 +146,14 @@ export function App() {
   return (
     <IonApp>
       <AppProvider fallback={<Splash />}>
-        <IonReactRouter>
-          <IonRouterOutlet>
-            <Route path="/*" element={<><ScreenAnalytics /><Tabs /></>} />
-          </IonRouterOutlet>
-        </IonReactRouter>
+        {/* A-132: the reserve door renders INSTEAD of the app (never over it) - a hard door leaves no router to reach behind it */}
+        <DoorGate fallback={<Splash />}>
+          <IonReactRouter>
+            <IonRouterOutlet>
+              <Route path="/*" element={<><ScreenAnalytics /><Tabs /></>} />
+            </IonRouterOutlet>
+          </IonReactRouter>
+        </DoorGate>
       </AppProvider>
     </IonApp>
   );

@@ -30,6 +30,7 @@
      a list row's «★»), 3.59:1 on #fff (1.0.2's #f2a900 = 2.01:1 failed WCAG 1.4.11). Dark: below. No other shade anywhere. */
   --inok-eye: #8a6a12;
   --inok-star: #b37d00;
+  --inok-visited: #1b7a3a; /* A-133 «Я тут був»: 5.4:1 on #fff (the check is a SHAPE too, never colour alone) */
   /* F3 (REVIEW cloud_25): THE action of the update banner (useBanner: «Оновити», «Перезапустити») - Material's «inverse primary»: the banner
      is Ionic's inverted surface (light: #333, dark: #d0d0d0), so the link blue of the OTHER theme. Drawn: 4.97:1 on #333 (1.0.4 rc: 2.00:1). */
   --inok-banner-action: #61acca;
@@ -56,6 +57,7 @@
     --inok-cover-bg: #22333b;
     --inok-eye: #c4a24e;   /* A-78: 7.69:1 on #121212 */
     --inok-star: #f2a900;  /* A-78: 9.3:1 on #121212 (unchanged) */
+    --inok-visited: #5cc47f; /* A-133: 9.0:1 on #121212 */
     --inok-banner-action: #0b5876; /* F3: 5.10:1 on the banner's #d0d0d0 (1.0.4 rc: 1.90:1) */
   }
 :root { --inok-toolbar-bg: #0c6486; --inok-toolbar-fg: #ffffff; }

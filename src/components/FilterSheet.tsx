@@ -87,6 +87,16 @@ function SheetBody({ onClose, value, onApply, hasPosition, ctx }: Props) {
           {coded(facets.subordinations, v.filters.subordination, 'subordination', dict.facet_subordination ?? '', 'subordination_')}
           {named(facets.eparchies, v.filters.eparchy_id, 'eparchy_id', dict.facet_eparchy ?? '')}
           {named(facets.oblasts, v.filters.oblast_id, 'oblast_id', dict.facet_oblast ?? '')}
+          {/* A-133: «Я тут був» - three states, with the other filters (the counts under them, A-13) */}
+          <IonItem data-testid="filter-visited">
+            <IonSelect label={t('visited.filter')} value={v.filters.visited ?? ''} interface="popover" cancelText={t('common.cancel')}
+              onIonChange={(e) => set({ visited: e.detail.value === '' ? null : e.detail.value })}>
+              <IonSelectOption value="">{t('visited.all')}</IonSelectOption>
+              <IonSelectOption value="yes" disabled={facets.visited.yes === 0 && v.filters.visited !== 'yes'}>{`${t('visited.yes')} (${facets.visited.yes})`}</IonSelectOption>
+              <IonSelectOption value="no" disabled={facets.visited.no === 0 && v.filters.visited !== 'no'}>{`${t('visited.no')} (${facets.visited.no})`}</IonSelectOption>
+            </IonSelect>
+            {clear('visited', v.filters.visited, t('visited.filter'))}
+          </IonItem>
           <IonItem>
             <IonToggle checked={!!v.filters.has_stream} disabled={!v.filters.has_stream && facets.streams === 0} onIonChange={(e) => set({ has_stream: e.detail.checked })}>{`${t('monasteries.has_stream')} (${facets.streams})`}</IonToggle>
           </IonItem>

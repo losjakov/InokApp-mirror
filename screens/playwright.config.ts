@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 /** Browser screens (ring 1): the app in fixtures mode, one test per screen × profile, output screens/out/. */
 export default defineConfig({
   testDir: '.',
-  testMatch: /(screens|nav|store|engine|share|crash)\.spec\.ts/,
+  testMatch: /(screens|nav|store|engine|share|crash|door)\.spec\.ts/,
   timeout: 60_000,
   retries: 0,
   workers: 2,

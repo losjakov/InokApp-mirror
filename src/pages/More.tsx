@@ -5,7 +5,7 @@ import { useRef } from 'react';
 import { takePhotoChooser } from '@/state/photoChooser';
 import { PHOTO_MODES, type PhotoMode } from '@/data/photos/policy';
 import { THEMES, type Theme } from '@/state/settings';
-import { callOutline, contrastOutline, mapOutline, imagesOutline, heartOutline, homeOutline, informationCircleOutline, languageOutline, notificationsOutline, peopleOutline, refreshOutline, starOutline, eyeOffOutline } from 'ionicons/icons';
+import { checkmarkCircleOutline, callOutline, contrastOutline, mapOutline, imagesOutline, heartOutline, homeOutline, informationCircleOutline, languageOutline, notificationsOutline, peopleOutline, refreshOutline, starOutline, eyeOffOutline } from 'ionicons/icons';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { useDataRefresh } from '@/components/Refresh';
@@ -28,6 +28,7 @@ export function MorePage() {
     { k: 'eparchies', icon: mapOutline, to: EPARCHIES_PATH }, // A-22: «Єпархії УПЦ» first, «Головна» second
     { k: 'home', icon: homeOutline, to: '/home' }, // the owner's word 01.11: an explicit way home besides the toolbar icon
     { k: 'favourites', icon: starOutline, to: '/more/favourites' },
+    { k: 'visited', icon: checkmarkCircleOutline, to: '/more/visited' }, // A-133 (07:08): right under «Обрані», the same kind of item
     { k: 'language', icon: languageOutline, to: '/more/language' },
     { k: 'commission', icon: peopleOutline, to: '/more/commission' },
     { k: 'contacts', icon: callOutline, to: '/more/contacts' }, // A-23 #2: right after «Про Комісію»

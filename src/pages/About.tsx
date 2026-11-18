@@ -10,7 +10,7 @@ import { openLink } from '@/native/intents';
 import { SITE_URL } from '@/data/api/client';
 import { isIos } from '@/native/platform';
 import { netFailure, type NetFailure } from '@/data/netFailure';
-import { checkUpdate, immediateUpdate, openListing, shareApp, storeLinksShown, type UpdateCheck } from '@/native/play';
+import { appStoreLinksShown, checkUpdate, immediateUpdate, openAppStoreUrl, openListing, shareApp, storeLinksShown, type UpdateCheck } from '@/native/play';
 import { useApp } from '@/state/AppContext';
 
 const OWN_TAPS = 7;
@@ -50,15 +50,18 @@ export function AboutPage() {
             {settings.ownDevice && <IonIcon slot="end" icon={eyeOffOutline} className="own-device" aria-label={t('views.own_device')} data-testid="own-device" />}
           </IonItem>
           {isIos() && <AttestCheck />}{/* cloud_40 (A1 g): App Attest of THIS iPhone / iPad, under the version */}
-          {/* iOS 1.0.11: the App Store listing is not public yet - share / rate follow it (REF_ios_state); the Play link is never offered on an iPhone */}
-          {storeLinksShown(config) && !isIos() && <>
-            <IonItem button detail={false} onClick={() => void shareApp(t('app.name'), t('about.share_text'), config)} data-testid="about-share">
+          {/* A-131 (R-57, R-60): «Поділитися» shares the smart link /app/get/ - on iOS always, on Android by R-41's switch as before;
+              «Оцінити» - each platform by ITS OWN pair (Android: store_links -> Play; iOS: app_store_links + app_store_url -> «write a review») */}
+          {(isIos() || storeLinksShown(config)) && (
+            <IonItem button detail={false} onClick={() => void shareApp(t('app.name'), t('about.share_text'))} data-testid="about-share">
               <IonIcon slot="start" icon={shareSocialOutline} aria-hidden="true" /><IonLabel>{t('about.share')}</IonLabel>
             </IonItem>
-            <IonItem button detail={false} onClick={() => void openListing(config)} data-testid="about-rate">
+          )}
+          {(isIos() ? appStoreLinksShown(config) : storeLinksShown(config)) && (
+            <IonItem button detail={false} onClick={() => void (isIos() ? openAppStoreUrl(config, true) : openListing(config))} data-testid="about-rate">
               <IonIcon slot="start" icon={starOutline} aria-hidden="true" /><IonLabel>{t('about.rate')}</IonLabel>
             </IonItem>
-          </>}
+          )}
           <IonItem button detail={false} disabled={check === 'busy'} onClick={() => void runCheck()} data-testid="about-update">
             <IonIcon slot="start" icon={cloudDownloadOutline} aria-hidden="true" />
             <IonLabel className="ion-text-wrap">{t('about.check')}{checkNote && <p data-testid="about-update-note" aria-live="polite">{checkNote}</p>}</IonLabel>

@@ -12,7 +12,7 @@ vi.mock('@capacitor/preferences', () => ({
 const shared = vi.hoisted(() => ({ calls: [] as unknown[] }));
 vi.mock('@capacitor/share', () => ({ Share: { share: async (o: unknown) => { shared.calls.push(o); } } }));
 
-import { AVAILABLE, checkUpdate, immediateUpdate, notFromPlay, openListing, playListingUrl, shareApp, storeLinksShown, type PlayUpdateInfo } from '@/native/play';
+import { AVAILABLE, appStoreLinksShown, appStorePageUrl, appStoreReviewUrl, checkUpdate, immediateUpdate, notFromPlay, openListing, playListingUrl, shareApp, storeLinksShown, type PlayUpdateInfo } from '@/native/play';
 import { BANNER_PAUSE_DAYS, decideOffer, FLEXIBLE_STALE_DAYS, startupOffer, UPDATE_CHECK_MS } from '@/state/updateOffer';
 import { versionBelow } from '@/app/version';
 import type { AppConfig } from '@/data/api/types';
@@ -50,10 +50,18 @@ describe('A-80: the Play seam', () => {
     expect(playListingUrl(cfg())).toBe('https://play.google.com/store/apps/details?id=info.inok.app');
     expect(playListingUrl(cfg({ store_url: 'https://play.google.com/store/apps/details?id=info.inok.app&hl=uk' }))).toContain('&hl=uk');
   });
-  it('the share payload: one line of text + the Play URL', async () => {
+  it('the share payload: one line of text + the smart link /app/get/ (cloud_41, R-60: both platforms, no «Android»)', async () => {
     vi.stubGlobal('navigator', { share: () => undefined });
-    await shareApp('Монастирський вісник України', 'Монастирський вісник України — застосунок inok.info для Android', cfg());
-    expect(shared.calls[0]).toMatchObject({ text: 'Монастирський вісник України — застосунок inok.info для Android', url: 'https://play.google.com/store/apps/details?id=info.inok.app' });
+    await shareApp('Монастирський вісник України', 'Монастирський вісник України — застосунок inok.info');
+    expect(shared.calls[0]).toMatchObject({ text: 'Монастирський вісник України — застосунок inok.info', url: 'https://inok.info/app/get/' });
+    for (const l of ['uk', 'ru', 'en']) expect(JSON.parse(readFileSync(`src/i18n/${l}.json`, 'utf8'))['about.share_text']).not.toMatch(/Android/);
+  });
+  it('R-57: iOS reads only its own pair; the App Store page falls back to the app\'s id; the review form', () => {
+    expect(appStoreLinksShown(cfg({ features: { store_links: true } }))).toBe(false);
+    expect(appStoreLinksShown(cfg({ features: { app_store_links: true } }))).toBe(false); // no address = hidden
+    expect(appStoreLinksShown(cfg({ features: { app_store_links: true }, app_store_url: 'https://apps.apple.com/app/id6835134380' }))).toBe(true);
+    expect(appStorePageUrl(cfg())).toBe('https://apps.apple.com/app/id6835134380');
+    expect(appStoreReviewUrl(cfg({ app_store_url: 'https://apps.apple.com/app/id6835134380' }))).toBe('https://apps.apple.com/app/id6835134380?action=write-review');
   });
   it('«Оцінити» opens the listing IN the Play app (com.android.vending) - never the In-App Review API', async () => {
     const asked = mockPlay({});

@@ -13,4 +13,9 @@
         <item quantity="many">%d нових публікацій</item>
         <item quantity="other">%d нових публікацій</item>
     </plurals>
+    <!-- cloud_41 (A-133 C1): the quick actions on the app icon, by the system language -->
+    <string name="shortcut_streams">Трансляції</string>
+    <string name="shortcut_monasteries">Монастирі</string>
+    <string name="shortcut_map">Карта</string>
+    <string name="shortcut_articles">Публікації</string>
 </resources>

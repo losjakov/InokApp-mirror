@@ -1,3 +1,4 @@
+import type { DoorNotice, DoorVersions } from '@/state/door';
 // Shapes of ref/REF_app_api_contract.md §2–§3 (v1). The app targets fields by name; unknown fields are ignored.
 import type { Lang } from '@/i18n';
 
@@ -124,7 +125,8 @@ export interface AppConfig {
     /** R-53 (A-127): the server takes iOS casts with an App Attest assertion; absent = every iOS cast answers 403 `integrity_required` */ app_attest?: boolean;
     /** R-54 (A-130): `GET articles/<id>/related` is answered («Читайте також» / «Дивіться також»); absent = no block */ articles_related?: boolean;
     /** R-55 (A-130): `GET articles/<id>/comments` takes `sort=score&limit&since`; absent = the 1.0.13 list */ comments_ranked?: boolean;
-    /** R-56 (A-130): the photo viewer's two links are live (`rights_url`, `photo_add_hash`); absent = no buttons */ photo_links?: boolean };
+    /** R-56 (A-130): the photo viewer's two links are live (`rights_url`, `photo_add_hash`); absent = no buttons */ photo_links?: boolean;
+    /** R-57 (A-131): the iOS twin of `store_links` - «Оцінити застосунок» (App Store) in «Про застосунок»; absent = false */ app_store_links?: boolean };
   donate_url: string;
   privacy_url: string;
   /** R-41: the Play listing's address; absent = the one built from the package id (src/native/play.ts) */
@@ -133,6 +135,12 @@ export interface AppConfig {
   rights_url?: string | null;
   /** R-56: the anchor that opens a card page's add-photo window («Додати фото», a MONASTERY's viewer only) */
   photo_add_hash?: string | null;
+  /** R-57: the App Store page (iOS reads only this pair with `features.app_store_links`) */
+  app_store_url?: string | null;
+  /** R-58 (A-132): ONE notice to the versions strictly below `below` (null = none) - read whole by src/state/door.ts */
+  notice?: DoorNotice | null;
+  /** R-59 (A-132): the two bars per platform (`min` hard, `recommended` soft) - read by src/state/door.ts */
+  versions?: DoorVersions | null;
 }
 
 /** R-49: one picture file of a card's gallery - https, the file's own size */

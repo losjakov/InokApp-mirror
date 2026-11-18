@@ -72,8 +72,10 @@ devtype() { xcrun simctl list runtimes -j | python3 -I -c '
 import json, re, sys
 rid, kind = sys.argv[1], sys.argv[2]
 r = next(r for r in json.load(sys.stdin)["runtimes"] if r["identifier"] == rid)
-ts = [t for t in r.get("supportedDeviceTypes", []) if t["name"].startswith(kind)]
-pref = [t for t in ts if re.search(r"Pro Max|Pro 13", t["name"])] or [t for t in ts if re.search(r"Plus|Pro \(12\.9", t["name"])]
+six3 = kind == "iPhone63"  # cloud_41 (E): the 6.3-inch iPhone Pro (1206 x 2622) - the REQUIRED «medium display» size of App Store Connect
+ts = [t for t in r.get("supportedDeviceTypes", []) if t["name"].startswith("iPhone" if six3 else kind)]
+pref = ([t for t in ts if re.search(r"^iPhone \d+ Pro$", t["name"])] if six3 else
+        [t for t in ts if re.search(r"Pro Max|Pro 13", t["name"])] or [t for t in ts if re.search(r"Plus|Pro \(12\.9", t["name"])])
 num = lambda t: [float(x) for x in re.findall(r"\d+(?:\.\d+)?", t["name"])]  # ios run 1: the list is not newest-last (iPhone 11 Pro Max came)
 t = max(pref or ts, key=num); print(t["identifier"] + "|" + t["name"])' "$RTID" "$1"; }
 
@@ -253,11 +255,22 @@ a3_walk() {
   # 8 favourites survive a restart
   nav go /monasteries/242; node "$NAVJS" wait '[data-testid="fav"]' >> "$OUT/nav.txt" 2>&1
   [ "$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=fav]')||{}).dataset?.on")" = 1 ] || nav click '[data-testid="fav"]'; sleep 2
+  # cloud_41 (A-133 C3): «Я тут був» on the same card, read back after the SAME restart below (the mark lives in the app's own table)
+  [ "$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=visited]')||{}).dataset?.on")" = 1 ] || nav click '[data-testid="visited"]'; sleep 2
   # cloud_41 (NOTE 2): rows of 242 on the TOP page (the last shown), read until the page has settled (<= 3 reads, 2 s apart)
   launch; nav go /more/favourites; sleep 3; local k; for k in 1 2 3; do
     v=$(ev "(() => { const ps = Array.from(document.querySelectorAll('.ion-page:not(.ion-page-hidden)')).filter((e) => e.querySelector('[data-testid=fav-empty], [data-testid^=mrow-]')); const top = ps[ps.length - 1]; return top ? top.querySelectorAll('[data-testid=mrow-242]').length + (ps.length > 1 ? ' (' + ps.length + ' pages shown)' : '') : 'no page'; })()")
-    [ "$v" = 1 ] && break; sleep 2; done; shot "$OUT/a3-favourites__$TAG.png"
-  [ "$v" = 1 ] && a3 "favourites after a restart" PASS "card 242 listed after terminate + launch" || a3 "favourites after a restart" FAIL "rows of 242: $v"
+    case "$v" in 1|'1 ('*) break;; esac; sleep 2; done; shot "$OUT/a3-favourites__$TAG.png"
+  # cloud_41 ios run 44243995446 (iOS 16.4 iPad): «1 (3 pages shown)» - the remote hand's `go` (pushState + popstate) leaves earlier pages in the
+  # DOM without `ion-page-hidden` (Home's «near me» lists 242 too: the old «rows of 242: 2»); the TOP page decides, the page count is written
+  case "$v" in 1|'1 ('*) a3 "favourites after a restart" PASS "card 242 listed once on the top page after terminate + launch: $v";; *) a3 "favourites after a restart" FAIL "rows of 242 on the top page: $v";; esac
+  # cloud_41 (A-133 C3): «Я тут був» after the same restart - «Ще -> Я тут був»: the row of 242 and «Відвідано 1 з N»
+  nav go /more/visited; sleep 3; for k in 1 2 3; do
+    v=$(ev "(() => { const ps = Array.from(document.querySelectorAll('.ion-page:not(.ion-page-hidden)')).filter((e) => e.querySelector('[data-testid=visited-count]')); const top = ps[ps.length - 1]; return top ? top.querySelectorAll('[data-testid=mrow-242]').length + ' | ' + top.querySelector('[data-testid=visited-count]').textContent : 'no page'; })()")
+    case "$v" in '1 | Відвідано '*' з '*) break;; esac; sleep 2; done; shot "$OUT/a3-visited__$TAG.png"
+  case "$v" in '1 | Відвідано '*' з '*) a3 "«Я тут був» after a restart" PASS "$v";; *) a3 "«Я тут був» after a restart" FAIL "${v:-no answer}";; esac
+  a3 "quick actions on the icon" NOT-PROVABLE "a Home Screen gesture (long press) has no simctl command - the owner's iPhone (PHONE_TEST_BACKLOG cloud_41); the router = the browser ring (quick-cold-* / quick-warm-*)"
+  a3 "the store's rating window" NOT-PROVABLE "StoreKit decides alone whether it shows - the rule = unit reviewAsk, the moment = the browser ring (review-moment)"
   guard_crash spot9
   # 9 a link inside an article opens the linked article in the app (R-39: 1832 -> 1833)
   nav go "/articles?id=1832"; node "$NAVJS" wait '[data-testid="article"] .card__title' >> "$OUT/nav.txt" 2>&1; sleep 2
@@ -375,18 +388,39 @@ appstore() { # set(phone|tablet) dir-name
     document.body.append(d); const c = getComputedStyle(d); const r = { top: parseFloat(c.paddingTop), right: parseFloat(c.paddingRight), bottom: parseFloat(c.paddingBottom), left: parseFloat(c.paddingLeft),
     rootPx: parseFloat(getComputedStyle(document.documentElement).fontSize), w: innerWidth, h: innerHeight, dpr: devicePixelRatio }; d.remove(); return JSON.stringify(r); })()" > "$OUT/appstore/insets-$2.json"
   for lang in uk ru en; do
+    sim_lang "$lang"   # cloud_41 (NOTE 7): the simulator's OWN language = the status bar in the frame's language (a fresh boot)
     set_lang "$lang"; units_ok "$lang" || return 1
-    # A-127: the App Store set goes WITHOUT 04-eparchy / 05-map - a GPU-less runner's simulator cannot draw a WebGL map (ios run 1, D12);
-    # phone 6, iPad 5 per language (Apple takes 1-10); those two frames: the owner's iPhone or the browser engine (REPORT cloud_39 C2)
     STORE_SKIP='eparchy|map' shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
+    # cloud_41 (E): 04-eparchy / 05-map NATIVELY, the LIVE export - each from a FRESH simulator (a WebGL screen freezes the NEXT picture,
+    # cloud_38 D12; the screen itself is checked by its own «drawn» + the white-box rule of store_png.py); a frame that fails is written
+    local f; for f in eparchy map; do reboot_sim; STORE_ONLY="$f" shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || echo "NATIVE FAIL $lang/$2 $f" >> "$OUT/nav.txt"; done
+    reboot_sim; visited_frame "$1" "$OUT/appstore/$lang/$2"
   done
+}
+# cloud_41 (NOTE 7 of REVIEW cloud_40): the status bar is the SYSTEM's, not the app's - the simulator's own language and region, then a boot
+sim_lang() {
+  local loc; case "$1" in uk) loc=uk_UA;; ru) loc=ru_RU;; *) loc=en_US;; esac
+  xcrun simctl spawn "$U" defaults write -g AppleLanguages -array "$1" 2>>"$OUT/nav.txt" || true
+  xcrun simctl spawn "$U" defaults write -g AppleLocale -string "$loc" 2>>"$OUT/nav.txt" || true
+  reboot_sim
+}
+# cloud_41 (A-133 C3, E): the «Я тут був» frame - the three lavras marked through the card's own toggle (the list's first rows); phone = the
+# list (green checks + «· відвідано 3»), tablet = the card 242 beside the list (its filled check at the name + the list's checks and counter)
+visited_frame() { # set dir
+  local c
+  for c in 242 111 98; do nav go "/monasteries/$c"; sleep 3; node "$NAVJS" wait '[data-testid="visited"]' >> "$OUT/nav.txt" 2>&1
+    [ "$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=visited]')||{}).dataset?.on")" = 1 ] || nav click '[data-testid="visited"]'; sleep 3; done
+  if [ "$1" = phone ]; then shot_frame "$2/09-visited.png" 09-visited /monasteries '[data-testid="visited-count"]' -
+  else shot_frame "$2/08-visited.png" 08-visited /monasteries/242 '[data-testid="visited-count"]' -; fi
+  local v; v=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=visited-count]')||{}).textContent||'none'"); echo "visited frame $2: $v" >> "$OUT/demo.txt"
+  case "$v" in *3) ;; *) echo "VISITED FAIL $2: $v" >> "$OUT/nav.txt";; esac
 }
 
 node "$ROOT/scripts/ios_relay.mjs" > "$OUT/relay.log" 2>&1 &
 RELAY=$!
 trap 'kill $RELAY 2>/dev/null' EXIT
 RC=0
-KINDS="iPhone iPad"; case "$DEV" in iphone) KINDS=iPhone;; ipad) KINDS=iPad;; esac
+KINDS="iPhone iPad"; case "$DEV" in iphone) KINDS=iPhone;; iphone63) KINDS=iPhone63;; ipad) KINDS=iPad;; esac
 for kind in $KINDS; do
   TAG="$(echo "$kind" | tr 'A-Z' 'a-z')"
   DT="$(devtype "$kind")"; [ -n "$DT" ] || { echo "::error::no $kind for $RTID"; RC=1; continue; }
@@ -402,7 +436,7 @@ for kind in $KINDS; do
   a3 "start + live import" PASS "$(grep -a 'InokBoot' "$OUT/${TAG}_console.txt" | tail -2 | sed 's/.*InokBoot: //' | tr '\n' ';' | cut -c1-200)"
   case "$MODE" in walk|both) a3_walk;; esac
   case "$MODE" in appstore|both)
-    if [ "$kind" = iPhone ]; then appstore phone iphone; else appstore tablet ipad; fi || { echo "App Store set STOPPED ($TAG): $(grep -E 'FAIL' "$OUT/nav.txt" | tail -1)" | tee -a "$OUT/demo.txt"; RC=1; };;
+    case "$kind" in iPhone) appstore phone iphone;; iPhone63) appstore phone iphone63;; *) appstore tablet ipad;; esac || { echo "App Store set STOPPED ($TAG): $(grep -E 'FAIL' "$OUT/nav.txt" | tail -1)" | tee -a "$OUT/demo.txt"; RC=1; };;
   esac
   xcrun simctl shutdown "$U" || true
 done

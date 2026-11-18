@@ -1542,6 +1542,104 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(toasts.first()).toContainText(added); // the shot: the favourite on, its message above the tab bar
       // the favourite shows up in «Обрані» (persistence across restarts is proven on the device, ring 3: the web DB is in-memory)
     } },
+  // cloud_41 (A-133 «Я ТУТ БУВ», amendments 06:56 / 07:08): the check LEFT of the «Обране» star (phone: the header; tablet: at the name),
+  // outline -> filled; a second tap un-marks; THE favourites toast on both taps with the counter AFTER the tap (polite, above the tab bar);
+  // a toggle button named «Я тут був» with its state (aria-pressed)
+  { name: 'visited-card', only: UK, path: '/monasteries/37', ready: async (p) => {
+      await expect(onShown(p, 'card')).toBeVisible();
+      const v = onShown(p, 'visited'), fav = onShown(p, 'fav');
+      await expect(v).toHaveAttribute('data-on', '0');
+      await expect(v).toHaveAttribute('aria-label', /^(Я тут був|Я здесь был|I have been here)/);
+      const [bv, bf] = [await v.boundingBox(), await fav.boundingBox()];
+      expect(bv!.x + bv!.width / 2, 'the check LEFT of the star').toBeLessThan(bf!.x + bf!.width / 2 - bf!.width / 2);
+      expect(Math.abs(bv!.y - bf!.y), 'on one line with the star').toBeLessThan(4);
+      expect(bv!.height, '48 dp').toBeGreaterThanOrEqual(44);
+      const toasts = p.locator('ion-toast[data-testid="visited-toast"]:not(.overlay-hidden)');
+      await v.click();
+      await expect(v).toHaveAttribute('data-on', '1');
+      await expect(v).toHaveAttribute('aria-pressed', 'true'); // a native toggle: the state the screen reader says, after EVERY tap
+      await expect(toasts.first()).toContainText(/(Позначено: я тут був\. Відвідано 1 з \d+|Отмечено: я здесь был\. Посещено 1 из \d+|Marked: I have been here\. Visited 1 of \d+)/);
+      expect(await toasts.first().evaluate((t) => t.shadowRoot!.querySelector('[role="status"]')?.getAttribute('aria-live'))).toBe('polite');
+      await toastAboveTabs(p, 'ion-toast[data-testid="visited-toast"]:not(.overlay-hidden)');
+      await v.click();
+      await expect(v).toHaveAttribute('data-on', '0');
+      await expect(v).toHaveAttribute('aria-pressed', 'false');
+      await expect(toasts.first()).toContainText(/(Позначку знято\. Відвідано 0 з \d+|Отметка снята\. Посещено 0 из \d+|Mark removed\. Visited 0 of \d+)/, { timeout: 1500 });
+      await expect(toasts).toHaveCount(0, { timeout: 4000 });
+      await v.click(); // the shot: marked, the message over the tab bar
+      await expect(toasts.first()).toContainText(/1/);
+    } },
+  // the list: a green check at a marked row's right edge (named «Відвідано»), «· відвідано 1» after the count; the row's check comes and goes
+  { name: 'visited-list', only: UK, path: '/monasteries/242', ready: async (p) => {
+      await onShown(p, 'visited').click();
+      await expect(onShown(p, 'visited')).toHaveAttribute('data-on', '1');
+      await inAppGo(p, '/monasteries');
+      await settled(p);
+      const row = onShown(p, 'mrow-242');
+      await expect(row.getByTestId('row-visited')).toBeVisible({ timeout: 15_000 });
+      await expect(row.getByTestId('row-visited')).toHaveAttribute('aria-label', /^(Відвідано|Посещено|Visited)$/);
+      await expect(onShown(p, 'mrow-37').getByTestId('row-visited')).toHaveCount(0);
+      await expect(onShown(p, 'visited-count')).toHaveText(/^ · (відвідано|посещено|visited) 1$/);
+      await expect(onShown(p, 'visited-count')).toHaveAttribute('aria-label', /^(Відвідано 1 з \d+|Посещено 1 из \d+|Visited 1 of \d+)$/);
+      const r = await row.boundingBox(), c = await row.getByTestId('row-visited').boundingBox();
+      expect(r!.x + r!.width - (c!.x + c!.width), 'the check at the right edge').toBeLessThan(40);
+    } },
+  // the filter sheet: «Усі / Відвідані / Ще не відвідані» beside the other filters, its counts; «Відвідані» -> the marked rows + its chip
+  { name: 'visited-filter', only: ['phone-light', 'tablet'], path: '/monasteries/242', ready: async (p) => {
+      await onShown(p, 'visited').click();
+      await inAppGo(p, '/monasteries/37'); await settled(p);
+      await onShown(p, 'visited').click();
+      await expect(onShown(p, 'visited')).toHaveAttribute('data-on', '1');
+      await inAppGo(p, '/monasteries'); await settled(p);
+      await onShown(p, 'filters-open').click();
+      const item = p.getByTestId('filter-visited');
+      await expect(item).toBeVisible();
+      await item.locator('ion-select').click();
+      await expect(p.locator('ion-popover')).toContainText(/(Відвідані|Посещённые|Visited) \(2\)/);
+      await expect(p.locator('ion-popover')).toContainText(/(Ще не відвідані|Ещё не посещённые|Not visited yet) \(\d+\)/);
+      await p.locator('ion-popover').getByText(/^(Відвідані|Посещённые|Visited) \(2\)$/).click();
+      await expect(p.getByTestId('filters-apply')).toHaveText(/2/);
+      await p.getByTestId('filters-apply').click();
+      await expect(onShown(p, 'count')).toContainText(/^2 /);
+      await expect(onShown(p, 'chip-visited')).toBeVisible();
+      await expect(onShown(p, 'list').locator('[data-testid^="mrow-"]')).toHaveCount(2);
+    } },
+  // «Ще»: «Я тут був» right under «Обрані»; its page = «Відвідано {n} з {m}» + the marked rows; empty = one inviting line
+  { name: 'visited-more', only: UK, path: '/monasteries/242', ready: async (p) => {
+      await onShown(p, 'visited').click();
+      await expect(onShown(p, 'visited')).toHaveAttribute('data-on', '1');
+      await inAppGo(p, '/more'); await settled(p);
+      const ids = await p.locator('.ion-page:not(.ion-page-hidden) [data-testid="more-list"] > ion-item').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')));
+      expect(ids.indexOf('more-visited'), 'right under «Обрані»').toBe(ids.indexOf('more-favourites') + 1);
+      await onShown(p, 'more-visited').click();
+      await expect(p).toHaveURL(/\/more\/visited$/);
+      await expect(onShown(p, 'visited-count')).toHaveText(/^(Відвідано 1 з \d+|Посещено 1 из \d+|Visited 1 of \d+)$/);
+      await expect(onShown(p, 'mrow-242')).toBeVisible();
+      await expect(onShown(p, 'page-title')).toHaveText(/^(Я тут був|Я здесь был|I have been here)$/);
+    } },
+  { name: 'visited-empty', only: ['phone-light'], path: '/more/visited', ready: async (p) => {
+      await expect(onShown(p, 'visited-empty')).toContainText(/«Я тут був»/);
+      await expect(onShown(p, 'visited-count')).toHaveText(/^Відвідано 0 з \d+$/);
+    } },
+  // the map: a badge on a marked house's pin (a white-ringed green disc with a check: both themes, not colour alone) + the legend
+  { name: 'visited-map', only: ['phone-light', 'phone-dark', 'tablet'], path: '/monasteries/242', ready: async (p) => {
+      await onShown(p, 'visited').click();
+      await expect(onShown(p, 'visited')).toHaveAttribute('data-on', '1');
+      await p.locator('ion-tab-button[tab="map"]').click();
+      await mapReady(p);
+      await expect(p.getByTestId('map-legend')).toContainText(/^(Відвідано|Посещено|Visited)$/);
+      await p.evaluate(() => (window as any).__inokMap.jumpTo({ center: [30.557, 50.434], zoom: 13 }));
+      await expect(p.getByTestId('map')).toHaveAttribute('data-drawn', '1', { timeout: 30_000 });
+      await expect.poll(() => p.evaluate(() => (window as any).__inokMap.queryRenderedFeatures({ layers: ['lavras-visited', 'points-visited'] }).map((f: { properties: { code: number } }) => f.properties.code)),
+        { timeout: 20_000, message: 'the badge drawn on 242' }).toContain(242);
+    } },
+  // 200 %: the two marks whole in the header (phone) / at the name (tablet), the toast whole
+  { name: 'visited-font200', only: ['phone-light', 'tablet'], path: '/monasteries/37', font: 200, ready: async (p) => {
+      await expect(onShown(p, 'card')).toBeVisible();
+      await onShown(p, 'visited').click();
+      await expect(onShown(p, 'visited')).toHaveAttribute('data-on', '1');
+      for (const id of ['visited', 'fav']) { const b = await onShown(p, id).boundingBox(); expect(b!.x).toBeGreaterThanOrEqual(0); expect(b!.x + b!.width).toBeLessThanOrEqual(p.viewportSize()!.width + 0.5); }
+    } },
   { name: 'streams', path: '/streams', ready: async (p) => { await expect(p.getByTestId('channels')).toBeVisible(); await expect(p.getByTestId('calendar')).toBeVisible(); await avatarsLoaded(p); } },
   // A-85 (1): «Додайте свій канал» at the end of the streams' content -> the site's /live/ with the «add a channel» anchor in the in-app tab
   { name: 'streams-add-channel', only: ['phone-light', 'phone-dark', 'tablet'], path: '/streams', ready: async (p) => {
@@ -2341,6 +2439,44 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p).toHaveURL(at, { timeout: 15_000 });
       await expect(onShown(p, shown)).toBeVisible({ timeout: 20_000 });
     } })),
+  // cloud_41 (A-133 C2): back on «Головна» from another screen, with every condition true (7 days, 10 cards, a Play install, online, no
+  // dialog) = ONE request to the store's own window (the browser records the bridge call); the next return = none (120 days)
+  ...([['review-moment', { updateAvailability: 1 }, 1], ['review-not-play', 'not_play', 0]] as const).map(([name, play, want]) => ({ name, only: ['phone-light'], path: '/monasteries/37',
+    before: async (p: Page) => { await withPlay(play as object)(p); await p.addInitScript(() => { if (!sessionStorage.getItem('rv')) { localStorage.setItem('CapacitorStorage.review_marks', JSON.stringify({ firstStartAt: Date.now() - 8 * 86400000, cardsOpened: 9, askedAt: null })); sessionStorage.setItem('rv', '1'); } }); },
+    ready: async (p: Page) => {
+      await expect(onShown(p, 'card')).toBeVisible({ timeout: 20_000 }); // the 10th card
+      await settled(p);
+      await p.locator('ion-tab-button[tab="more"]').click(); await settled(p);
+      await onShown(p, 'more-home').click();
+      await expect(p).toHaveURL(/\/home$/);
+      await expect.poll(() => p.evaluate(() => (window as unknown as { __reviewAsked?: number }).__reviewAsked ?? 0), { timeout: 10_000 }).toBe(want);
+      await p.locator('ion-tab-button[tab="more"]').click(); await settled(p);
+      await onShown(p, 'more-home').click();
+      await p.waitForTimeout(1500);
+      expect(await p.evaluate(() => (window as unknown as { __reviewAsked?: number }).__reviewAsked ?? 0), 'never twice').toBe(want);
+      await expect(p.locator('ion-alert:not(.overlay-hidden), ion-modal:not(.overlay-hidden)'), 'no window of our own').toHaveCount(0);
+    } })),
+  // cloud_41 (A-133 C1): a quick action on the app icon = the address `inokapp://tab/<id>` through THE link router: a COLD start lands on its
+  // tab (every bridge delay), from the BACKGROUND (`appUrlOpen`) it opens its tab over the current screen. Red before: the router knew only
+  // inok.info links (the address went to the browser, the app stayed on «Головна»).
+  ...([['streams', /\/streams$/, 'channels'], ['monasteries', /\/monasteries$/, 'list'], ['map', /\/map$/, 'map'], ['articles', /\/articles$/, 'articles']] as const).flatMap(([id, at, shown]) => [
+    { name: `quick-cold-${id}`, only: id === 'map' ? ['phone-light'] : ['phone-light', 'tablet'], path: '/', before: launchBy(`inokapp://tab/${id}`, 0), ready: async (p: Page) => {
+      await expect(p).toHaveURL(at, { timeout: 30_000 });
+      await expect(onShown(p, shown)).toBeVisible({ timeout: 20_000 });
+      for (const ms of [5, 400]) {
+        await p.evaluate(([u, m]) => sessionStorage.setItem('inok.launch', JSON.stringify({ url: u, ms: m })), [`inokapp://tab/${id}`, ms] as const);
+        await p.goto('/');
+        await expect(p, `delay ${ms} ms`).toHaveURL(at, { timeout: 15_000 });
+      }
+      await expect(onShown(p, shown)).toBeVisible({ timeout: 20_000 });
+    } },
+    { name: `quick-warm-${id}`, only: ['phone-light'], path: '/monasteries/242', ready: async (p: Page) => {
+      await expect(onShown(p, 'card')).toBeVisible({ timeout: 20_000 });
+      await p.evaluate((u) => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: u })), `inokapp://tab/${id}`);
+      await expect(p).toHaveURL(at, { timeout: 15_000 });
+      await expect(onShown(p, shown)).toBeVisible({ timeout: 20_000 });
+    } },
+  ]),
   { name: 'cold-link-browser', only: UK, path: '/', before: async (p) => { await recordOpens(p); await launchBy('https://inok.info/monasteries/table/', 0)(p); }, ready: async (p) => {
       await expect(p).toHaveURL(/\/home$/, { timeout: 30_000 });
       await settled(p); await expect(onShown(p, 'home-new')).toBeVisible({ timeout: 20_000 });
@@ -3178,11 +3314,14 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await onShown(p, 'about-update').click();
       await expect(onShown(p, 'about-update-note')).toHaveText(/(остання|последняя|the latest) .*1\.0\.\d+/);
       const a = (await asked(p)).filter((x) => x !== 'info'); // the start-up check asks Play too (A-80 ADDENDUM 1)
-      expect(a[0]).toMatch(/^share .*"text":"(Монастирський|Монастырский|Monastic).*inok\.info.*","url":"https:\/\/play\.google\.com\/store\/apps\/details\?id=info\.inok\.app"/);
+      // cloud_41 (A-131, R-60): the smart link on both platforms, no «Android» in the line
+      expect(a[0]).toMatch(/^share .*"text":"(Монастирський|Монастырский|Monastic)[^"]*inok\.info[^"]*","url":"https:\/\/inok\.info\/app\/get\/"/);
+      expect(a[0]).not.toMatch(/Android/);
       expect(a.slice(1)).toEqual(['store {"androidPackageName":"info.inok.app","androidStorePackageName":"com.android.vending"}']);
     } },
-  // cloud_36 (B2): the iPhone (the web plays it: `inok.platform` = ios) - the Play listing is never offered (share / rate hidden even with the
-  // site's switch on), the update check asks the App Store's lookup: not there yet = «не з App Store»; a newer version = its store page
+  // cloud_36 (B2) + cloud_41 (A-131, R-57 / R-60): the iPhone (the web plays it: `inok.platform` = ios) - the Play listing is never offered:
+  // Android's switch ON does NOT show «Оцінити» on iOS (each platform reads its own pair); «Поділитися» is always there and shares the smart
+  // link; the update check asks the App Store's lookup: not there yet = «не з App Store»
   { name: 'about-ios', only: ['phone-light', 'phone-dark', 'tablet'], path: '/more/about', before: async (p) => {
       await withPlay(null, STORE_ON)(p);
       await p.addInitScript(() => { localStorage.setItem('inok.platform', 'ios'); });
@@ -3190,10 +3329,35 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
     ready: async (p) => {
       await expect(onShown(p, 'app-version')).toBeVisible();
       await expect.poll(() => p.evaluate(() => !!(window as any).__inokConfig)).toBe(true);
-      await expect(p.getByTestId('about-share')).toHaveCount(0);
+      await expect(onShown(p, 'about-share')).toBeVisible();
       await expect(p.getByTestId('about-rate')).toHaveCount(0);
+      await p.evaluate(() => { (navigator as unknown as { share: (o: object) => Promise<void> }).share = async (o) => { (window as unknown as { __asked: string[] }).__asked.push(`share ${JSON.stringify(o)}`); }; });
+      await onShown(p, 'about-share').click();
+      expect((await asked(p)).filter((x) => x.startsWith('share'))[0]).toMatch(/"url":"https:\/\/inok\.info\/app\/get\/"/);
       await onShown(p, 'about-update').click();
       await expect(onShown(p, 'about-update-note')).toHaveText(/Встановлено не з App Store|Установлено не из App Store|Not installed from the App Store/);
+    } },
+  // cloud_41 (A-131, R-57): the site's App Store switch on (`app_store_links` + `app_store_url`) -> «Оцінити застосунок» on iOS opens the
+  // App Store's «write a review» form; the switch on but no address = still hidden
+  { name: 'about-ios-rate', only: ['phone-light', 'phone-dark', 'tablet'], path: '/more/about', before: async (p) => {
+      await withPlay(null, { features: { comments_write: false, embedded_player: false, app_store_links: true }, app_store_url: 'https://apps.apple.com/app/id6835134380' })(p);
+      await p.addInitScript(() => { localStorage.setItem('inok.platform', 'ios'); (window as unknown as { __opened: string[] }).__opened = []; window.open = ((u: string) => { (window as unknown as { __opened: string[] }).__opened.push(u); return null; }) as typeof window.open; });
+      await p.route('https://itunes.apple.com/lookup?**', (r) => r.fulfill({ json: { resultCount: 0, results: [] } })); },
+    ready: async (p) => {
+      await expect(onShown(p, 'about-rate')).toBeVisible();
+      const ids = await p.locator('[data-testid="app-version"]').locator('xpath=ancestor::ion-list[1]').locator('ion-item').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')));
+      expect(ids.indexOf('about-rate'), '«Оцінити» right after «Поділитися»').toBe(ids.indexOf('about-share') + 1);
+      await onShown(p, 'about-rate').click();
+      await expect.poll(() => p.evaluate(() => (window as unknown as { __opened: string[] }).__opened)).toEqual(['https://apps.apple.com/app/id6835134380?action=write-review']);
+    } },
+  { name: 'about-ios-rate-nourl', only: ['phone-light'], path: '/more/about', before: async (p) => {
+      await withPlay(null, { features: { comments_write: false, embedded_player: false, app_store_links: true } })(p);
+      await p.addInitScript(() => { localStorage.setItem('inok.platform', 'ios'); });
+      await p.route('https://itunes.apple.com/lookup?**', (r) => r.fulfill({ json: { resultCount: 0, results: [] } })); },
+    ready: async (p) => {
+      await expect(onShown(p, 'about-share')).toBeVisible();
+      await expect.poll(() => p.evaluate(() => !!(window as any).__inokConfig)).toBe(true);
+      await expect(p.getByTestId('about-rate')).toHaveCount(0);
     } },
   // cloud_40 (A1 g): «Перевірка Apple» under the version (iOS only): the state in words + «Скопіювати подробиці» shows the copied text;
   // a rejected call (1.0.13's «not implemented») = «помилка виклику», never «not supported»; no key id / install id in the text

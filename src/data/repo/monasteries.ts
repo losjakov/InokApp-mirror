@@ -32,6 +32,8 @@ function whereOf(f: Filters): { sql: string; params: (string | number)[] } {
   if (f.eparchy_id != null) { w.push('m.eparchy_id = ?'); p.push(f.eparchy_id); }
   if (f.oblast_id != null) { w.push('m.oblast_id = ?'); p.push(f.oblast_id); }
   if (f.has_stream) w.push('m.has_stream = 1');
+  if (f.visited === 'yes') w.push('m.code IN (SELECT code FROM visited)');
+  if (f.visited === 'no') w.push('m.code NOT IN (SELECT code FROM visited)');
   if (f.near) {
     // bounding box in SQL (uses ix_monastery_geo), exact haversine in JS below
     const dLat = f.near.radius_km / 111;
@@ -188,7 +190,13 @@ export async function getFacets(db: Db, filters: Filters = {}): Promise<Facets> 
     const { sql, params } = whereOf({ ...filters, has_stream: false });
     return (await db.query<{ n: number }>(`SELECT COUNT(*) AS n FROM monastery m${sql ? sql + ' AND' : ' WHERE'} m.has_stream = 1`, params))[0]?.n ?? 0;
   })();
+  const vis = await (async () => {
+    const { sql, params } = whereOf({ ...filters, visited: null });
+    const r = (await db.query<{ yes: number; n: number }>(`SELECT SUM(CASE WHEN m.code IN (SELECT code FROM visited) THEN 1 ELSE 0 END) AS yes, COUNT(*) AS n FROM monastery m${sql}`, params))[0];
+    return { yes: r?.yes ?? 0, no: (r?.n ?? 0) - (r?.yes ?? 0) };
+  })();
   return {
+    visited: vis,
     types: await vals<string>('type', 'type'),
     object_types: await vals<number>('object_type', 'object_type'),
     subordinations: await vals<number>('subordination', 'subordination'),

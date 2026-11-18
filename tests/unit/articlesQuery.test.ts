@@ -54,31 +54,35 @@ describe('A-97 offline: the saved publications filtered and ordered on the phone
   });
 });
 
-describe('R-48 (A-101): the rating order = the contract §3 table, ALL 9 rows, by THE one comparator', () => {
-  // A before B in each row; «unrated» = rating {value:0,count:0}, «news» = rating null (both after every rated item)
+describe('R-48 (A-101) + A-131 (cloud_41): the rating order = the contract §3 table, by THE one comparator', () => {
+  // A before B in each row; «unrated» = rating {value:0,count:0}, «news» = rating null (both after every rated item); v = `views` (the eye);
+  // A (id 1) is the NEWER by the helper's dates unless a row gives both the same date
   const r = (value: number, count: number) => ({ rating: { value, count } });
   const unrated = { rating: { value: 0, count: 0 } };
   const news = { kind: 'news', rating: null };
+  const same = { published_at: '2026-11-01T10:00:00Z' };
   const rows: [string, Partial<Article>, Partial<Article>][] = [
     ['1 the value first', r(4.8, 3), r(4.7, 90)],
     ['2 equal value: more ratings', r(4.6, 12), r(4.6, 5)],
     ['3 the value AS GIVEN is equal: more ratings', r(4.66, 2), r(4.74, 1)],
-    ['4 equal value and count: views_week', { ...r(4.6, 5), views_week: 30 }, { ...r(4.6, 5), views_week: 2 }],
-    ['5 all equal: the list\'s order', { ...r(4.6, 5), views_week: 0 }, { ...r(4.6, 5), views_week: 0 }],
-    ['6 any rated before every unrated', { ...r(1.0, 1), views_week: 0 }, { ...unrated, views_week: 500 }],
-    ['7 any rated before every news', { ...r(1.0, 1), views_week: 0 }, { ...news, views_week: 900 }],
-    ['8 after the rated: views_week, the kind does not count', { ...unrated, views_week: 9 }, { ...news, views_week: 3 }],
-    ['9 equal views_week: the list\'s order', { ...news, views_week: 3 }, { ...unrated, views_week: 3 }],
+    ['4 equal value and count: more views (the eye, not views_week)', { ...r(4.6, 5), views: 477, views_week: 0 }, { ...r(4.6, 5), views: 107, views_week: 90 }],
+    ['5 equal value, count, views: the NEWER first', { ...r(4.6, 5), views: 10 }, { ...r(4.6, 5), views: 10 }],
+    ['6 any rated before every unrated', { ...r(1.0, 1), views: 0 }, { ...unrated, views: 500 }],
+    ['7 any rated before every news', { ...r(1.0, 1), views: 0 }, { ...news, views: 900 }],
+    ['8 after the rated: views, the kind does not count', { ...unrated, views: 9 }, { ...news, views: 3 }],
+    ['9 equal views after the rated: the newer first', { ...news, views: 3 }, { ...unrated, views: 3 }],
+    ['10 null views count 0', { ...r(4.6, 5), views: 1 }, { ...r(4.6, 5), views: null }],
+    ['11 everything equal, the date too: the list\'s order', { ...r(4.6, 5), views: 3, ...same }, { ...r(4.6, 5), views: 3, ...same }],
   ];
   it.each(rows)('row %s', (_, A, B) => {
     const a = art(1, 'A', A), b = art(2, 'B', B);
     expect(sortArticles([a, b], 'rating').map((x) => x.id), 'A first when listed first').toEqual([1, 2]);
-    const tie = _.startsWith('5') || _.startsWith('9');
+    const tie = _.startsWith('11');
     expect(sortArticles([b, a], 'rating').map((x) => x.id), tie ? 'a tie keeps the list order' : 'A first when listed second').toEqual(tie ? [2, 1] : [1, 2]);
     expect(Math.sign(articleOrder('rating')!(a, b))).toBe(tie ? 0 : -1);
   });
-  it('the offline list orders by the same comparator', () => {
-    const list = [art(1, 'n', { kind: 'news', rating: null, views_week: 50 }), art(2, 'u', { rating: { value: 0, count: 0 }, views_week: 60 }), art(3, 'r', { rating: { value: 4.2, count: 1 } }), art(4, 'r2', { rating: { value: 5, count: 7 }, views_week: 1 })];
+  it('the offline list orders by the same comparator (no network: rating, count, the eye, the newer)', () => {
+    const list = [art(1, 'n', { kind: 'news', rating: null, views: 50 }), art(2, 'u', { rating: { value: 0, count: 0 }, views: 60 }), art(3, 'r', { rating: { value: 4.2, count: 1 } }), art(4, 'r2', { rating: { value: 5, count: 7 }, views: 1 })];
     expect(localQuery(list, '', 'rating').map((a) => a.id)).toEqual([4, 3, 2, 1]);
   });
 });

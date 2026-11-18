@@ -114,7 +114,7 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     const rows = [...sim.matchAll(/- \{ runtime: (\w+), device: (\w+), task: (\w+) \}/g)].map((m) => m.slice(1).join(' '));
     expect(rows).toEqual(['oldest iphone walk', 'oldest ipad walk', 'newest iphone walk', 'newest ipad walk']);
     const store = job('appstore');
-    expect([...store.matchAll(/- \{ runtime: (\w+), device: (\w+), task: (\w+) \}/g)].map((m) => m.slice(1).join(' '))).toEqual(['newest iphone appstore', 'newest ipad appstore']);
+    expect([...store.matchAll(/- \{ runtime: (\w+), device: (\w+), task: (\w+) \}/g)].map((m) => m.slice(1).join(' '))).toEqual(['newest iphone appstore', 'newest iphone63 appstore', 'newest ipad appstore']) // cloud_41 (E): + the 6.3-inch iPhone;
     expect(tf).not.toMatch(/appstore/);
     for (const j of [sim, store]) { expect(j).toMatch(/timeout-minutes: 90/); expect(j).toMatch(/uses: \.\/\.github\/actions\/ios-sim-run/); expect(j).not.toMatch(/continue-on-error/); } // a red spot is never hidden
     // A-127: the WebGL map (and a frame's PICTURE after it) is outside the lock - written OUT, never FAIL; the DOM checks of those screens stay in

@@ -1,7 +1,7 @@
 import { IonButton, IonContent, IonIcon } from '@ionic/react';
 import { Busy } from '@/components/Busy';
 import { FLASH_MS, useToast } from '@/components/toast';
-import { callOutline, copyOutline, globeOutline, imagesOutline, linkOutline, openOutline, mailOutline, mapOutline, navigateOutline, shareSocialOutline, star, starOutline, videocamOutline } from 'ionicons/icons';
+import { checkmarkCircle, checkmarkCircleOutline, callOutline, copyOutline, globeOutline, imagesOutline, linkOutline, openOutline, mailOutline, mapOutline, navigateOutline, shareSocialOutline, star, starOutline, videocamOutline } from 'ionicons/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useViewsEye } from '@/components/ViewsEye';
 import { Link, useNavigate } from 'react-router-dom';
@@ -26,6 +26,8 @@ import { detailHref } from '@/components/SplitContent';
 import { callPhone, mailTo, openLink, shareUrl, siteUrl } from '@/native/intents';
 import { useOpenChannel } from '@/components/StreamRow';
 import { useApp } from '@/state/AppContext';
+import { MarkToggle } from '@/components/MarkToggle';
+import { noteCardOpened } from '@/state/reviewAsk';
 import { churchOutline } from '@/components/icons';
 import { useWide } from '@/state/useWide';
 import { sideRow } from '@/components/sideRow';
@@ -38,11 +40,21 @@ function FavButton({ code }: { code: number }) {
   const toast = useToast();
   // A-96 W-6: ~2 s above the tab bar, a new one replaces the old; read by TalkBack (role status)
   const tap = async () => { await toggleFavourite(code); toast(t(fav ? 'card.favourite_removed' : 'card.favourite_added'), { duration: FLASH_MS, testId: 'fav-toast' }); };
-  return (
-    <IonButton fill="clear" onClick={() => void tap()} data-on={fav ? "1" : "0"} aria-pressed={fav} aria-label={fav ? t('card.favourite_remove') : t('card.favourite_add')} data-testid="fav">
-      <IonIcon slot="icon-only" icon={fav ? star : starOutline} color={fav ? 'secondary' : undefined} aria-hidden="true" />
-    </IonButton>
-  );
+  return <MarkToggle kind="fav" on={fav} label={fav ? t('card.favourite_remove') : t('card.favourite_add')} icon={fav ? star : starOutline} onTap={() => void tap()} testId="fav" />;
+}
+
+/** A-133 «Я ТУТ БУВ» (amendments 06:56 / 07:08): a check-in-a-circle LEFT of the «Обране» star (phone: the header; tablet: at the name);
+ *  outline = not marked, filled = marked; a second tap un-marks; THE toast of «Обране» on both taps with the counter AFTER the tap; a
+ *  toggle button (aria-pressed) - the screen reader says its name and state. Local only (src/data/repo/visited.ts). */
+function VisitedButton({ code }: { code: number }) {
+  const { t, visited, toggleVisited } = useApp();
+  const on = visited.has(code);
+  const toast = useToast();
+  const tap = async () => {
+    const r = await toggleVisited(code);
+    toast(t(r.on ? 'visited.marked_toast' : 'visited.removed_toast', { n: r.n, m: r.m }), { duration: FLASH_MS, testId: 'visited-toast' });
+  };
+  return <MarkToggle kind="visited" on={on} label={t('visited.mark')} icon={on ? checkmarkCircle : checkmarkCircleOutline} onTap={() => void tap()} testId="visited" />;
 }
 
 /** The card as the phone shows it (the list page renders this when a code is in the URL and the screen is narrow). */
@@ -50,7 +62,7 @@ export function MonasteryCardView({ code }: { code: number }) {
   const { t } = useApp();
   return (
     <>
-      <PageHeader title={t('monasteries.title')} end={<FavButton code={code} />} />
+      <PageHeader title={t('monasteries.title')} end={<><VisitedButton code={code} /><FavButton code={code} /></>} />
       <IonContent>
         <MonasteryDetail code={code} />
       </IonContent>
@@ -61,6 +73,7 @@ export function MonasteryCardView({ code }: { code: number }) {
 /** Keyed by code and language so every state below starts fresh for a new card. */
 export function MonasteryDetail({ code }: { code: number }) {
   const { lang } = useApp();
+  useEffect(() => { void noteCardOpened(); }, [code]); // cloud_41 (A-133 C2): a card opened (local counter of the rating moment)
   return <Detail key={`${code}-${lang}`} code={code} />;
 }
 
@@ -177,7 +190,7 @@ function Detail({ code }: { code: number }) {
         <PhotoViewer set={viewer} onClose={() => setViewer(null)} />
       </div>
       {/* D49: on ≥600 dp (no toolbar of its own) the star sits at the end of the title row — the cover carries only the open sign and «Фотогалерея» */}
-      <div className="card__title-row"><h1 className="card__title">{name}</h1>{wide && <FavButton code={row.code} />}</div>
+      <div className="card__title-row"><h1 className="card__title">{name}</h1>{wide && <span className="card__marks"><VisitedButton code={row.code} /><FavButton code={row.code} /></span>}</div>
       {/* owner 12.11.2026 (cloud_29): the card's eye stands at the RIGHT edge, on the place line's last line, without the « · » */}
       <div className="card__subrow"><p className="card__sub">{rowSubtitle(row, lang, dict) && <PlaceLine row={row} wide={wide} />}</p>{eye}</div>
       <LoadAllPhotos />

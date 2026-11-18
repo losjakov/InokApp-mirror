@@ -2,7 +2,7 @@ name: ios-sim-run
 description: cloud_39 (A-127) - THE simulator work of one job (the A-124 ring's walks AND the App Store set, two jobs, one code) - the Debug bundle with the remote hand, the simulator build, scripts/ios_sim_tour.sh, its artifact
 inputs:
   runtime: { description: 'oldest | newest', required: true }
-  device: { description: 'iphone | ipad', required: true }
+  device: { description: 'iphone | iphone63 | ipad', required: true }
   task: { description: 'walk | appstore', required: true }
 runs:
   using: composite

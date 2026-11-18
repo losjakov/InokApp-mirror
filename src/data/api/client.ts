@@ -32,7 +32,8 @@ export interface FetchOptions {
 
 const TIMEOUT_MS = 30000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-export const userAgent = () => `InokApp/${APP_VERSION} (${platform()})`;
+/** contract §1 / R-60: STRICTLY `InokApp/<version> (android|ios)` - the site counts an app view by this platform word */
+export const userAgent = () => `InokApp/${APP_VERSION} (${platform() === 'ios' ? 'ios' : 'android'})`;
 
 function baseHeaders(): Record<string, string> {
   const h: Record<string, string> = { 'X-Inok-App': APP_KEY, Accept: 'application/json, application/gzip' };

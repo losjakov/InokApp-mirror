@@ -1,4 +1,4 @@
-import { Map as MLMap, NavigationControl, setWorkerUrl, type ErrorEvent, type GeoJSONSource, type LngLatBoundsLike, type MapOptions, type RequestTransformFunction, type StyleSpecification } from 'maplibre-gl';
+import { Map as MLMap, NavigationControl, setWorkerUrl, type ErrorEvent, type GeoJSONSource, type LngLatBoundsLike, type MapOptions, type RequestTransformFunction, type StyleSpecification, type SymbolLayerSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 // MapLibre 6 resolves its worker as `./maplibre-gl-worker.mjs` next to its own module URL; after Vite bundling that
 // file is not next to the chunk → «Worker failed to load» → no rendering. Point it at OUR worker bundle (REF_gotchas):
@@ -93,7 +93,25 @@ export const ICON_PX = 36; // the site's 48 px pin drawn at 36 dp; rasterised at
 /** D51: a place that is not a house (the editorial office) — the pins' family, the brand colour */
 export const PLACE_ICON = 'place_office';
 const PLACE_URL = (import.meta.glob('../../assets/brand/place_office.svg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>);
+/** A-133 «Я тут був»: the badge on a marked house's pin - a green disc, a WHITE ring (seen on a light and a dark basemap) and a white
+ *  check (a SHAPE, never colour alone); drawn on a canvas, no file */
+export const VISITED_ICON = 'visited_badge';
+export const VISITED_GREEN = '#1b7a3a';
+function addVisitedBadge(map: MLMap): void {
+  if (map.hasImage(VISITED_ICON)) return;
+  try {
+    const px = 2, d = 20 * px, c = document.createElement('canvas');
+    c.width = d; c.height = d;
+    const g = c.getContext('2d')!;
+    g.beginPath(); g.arc(d / 2, d / 2, d / 2 - px, 0, Math.PI * 2); g.fillStyle = VISITED_GREEN; g.fill();
+    g.lineWidth = 2 * px; g.strokeStyle = '#fff'; g.stroke();
+    g.beginPath(); g.moveTo(5.5 * px, 10.5 * px); g.lineTo(8.5 * px, 13.5 * px); g.lineTo(14.5 * px, 7 * px);
+    g.lineWidth = 2.4 * px; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke();
+    map.addImage(VISITED_ICON, g.getImageData(0, 0, d, d), { pixelRatio: px });
+  } catch (e) { noteMapError({ error: { message: `visited badge: ${String(e)}` } }); }
+}
 async function addMarkerImages(map: MLMap): Promise<void> {
+  addVisitedBadge(map);
   const urls = { ...ICON_URLS, ...PLACE_URL };
   await Promise.all([...MARKER_ICONS, PLACE_ICON].map(async (name) => {
     if (map.hasImage(name)) return;
@@ -195,6 +213,8 @@ export class InokMap {
   private stopNet: () => void;
   private lang: Lang;
   private houses: Houses | null = null;
+  /** A-133: the marked houses (the badge layers read the feature's `visited`) */
+  private visited: ReadonlySet<number> = new Set();
   private place: GeoJSON.FeatureCollection = EMPTY;
 
   constructor(private o: InokMapOptions) {
@@ -321,12 +341,16 @@ export class InokMap {
         'circle-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.9, 0] } });
     map.addLayer({ id: 'points', type: 'symbol', source: SRC, filter: ['!', ['has', 'point_count']],
       layout: { 'icon-image': ['get', 'icon'], 'icon-anchor': 'bottom', 'icon-allow-overlap': true, 'icon-ignore-placement': false } });
+    // A-133: the «Я тут був» badge at the pin's upper right (never claims space: the pin claims it)
+    const badge: SymbolLayerSpecification['layout'] = { 'icon-image': VISITED_ICON, 'icon-anchor': 'center', 'icon-offset': [11, -40], 'icon-allow-overlap': true, 'icon-ignore-placement': true };
+    map.addLayer({ id: 'points-visited', type: 'symbol', source: SRC, filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'visited'], 1]], layout: badge });
     // the lavras above every marker and cluster (A-21(б)): the same pin and halo, a source and layers of their own, drawn last
     map.addLayer({ id: 'lavras-selected', type: 'circle', source: SRC_LAVRA,
       paint: { 'circle-color': '#ffe082', 'circle-radius': 20, 'circle-translate': [0, -14],
         'circle-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.9, 0] } });
     map.addLayer({ id: 'lavras', type: 'symbol', source: SRC_LAVRA,
       layout: { 'icon-image': ['get', 'icon'], 'icon-anchor': 'bottom', 'icon-allow-overlap': true, 'icon-ignore-placement': false } });
+    map.addLayer({ id: 'lavras-visited', type: 'symbol', source: SRC_LAVRA, filter: ['==', ['get', 'visited'], 1], layout: badge });
     // D53: every mark of ours is placed (allow-overlap) AND claims its box (ignore-placement false): the basemap's labels, placed after
     // the layers above them, give way - no town name under a pin or a cluster; the count's padding = the cluster circle
     // D35: a cluster's NUMBER is never hidden — its circle stays under the lavras (A-21), the count is drawn above every pin,
@@ -345,8 +369,10 @@ export class InokMap {
     const map = this.map;
     if (!map.getSource(SRC)) return;
     if (this.houses) {
-      (map.getSource(SRC) as GeoJSONSource).setData(this.houses.houses);
-      (map.getSource(SRC_LAVRA) as GeoJSONSource).setData(this.houses.lavras);
+      const mark = (fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollection => (this.visited.size === 0 ? fc : { ...fc, features: fc.features.map((f) =>
+        (this.visited.has(Number(f.properties?.code)) ? { ...f, properties: { ...f.properties, visited: 1 } } : f)) });
+      (map.getSource(SRC) as GeoJSONSource).setData(mark(this.houses.houses));
+      (map.getSource(SRC_LAVRA) as GeoJSONSource).setData(mark(this.houses.lavras));
     }
     (map.getSource('place') as GeoJSONSource).setData(this.place);
   }
@@ -369,6 +395,13 @@ export class InokMap {
       this.map.getContainer().dataset.markers = String(h.houses.features.length + h.lavras.features.length);
       this.map.getContainer().dataset.lavras = String(h.lavras.features.length);
     }
+  }
+
+  /** A-133: the houses marked «Я тут був» - a badge on their pins */
+  setVisited(v: ReadonlySet<number>) {
+    this.visited = v;
+    this.apply();
+    this.map.triggerRepaint();
   }
 
   /** a place that is not a house ([lon, lat]) or none */

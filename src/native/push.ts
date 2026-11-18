@@ -1,6 +1,8 @@
 import { PushNotifications, type ActionPerformed, type PushNotificationSchema } from '@capacitor/push-notifications';
 import { registerPlugin } from '@capacitor/core';
 import { isAndroid, isNative } from './platform';
+import { Preferences } from '@capacitor/preferences';
+import { versionCode } from '@/app/version';
 
 /** Local plugin (android/app/src/main/java/info/inok/app/FcmTopicsPlugin.java): FCM topics on the device (A-7). */
 interface FcmTopicsPlugin {
@@ -123,6 +125,7 @@ export async function syncTopics(wanted: string[]): Promise<void> {
   if (!isNative() || !registered) return;
   const want = new Set(deviceTopics(wanted));
   if (PUSH_TEST) { want.add(TOPIC_TEST); log(PUSH_TEST_MARK); }
+  await versionTopic();
   for (const t of want) {
     if (subscribed.has(t)) continue;
     try { await FcmTopics.subscribe({ topic: t }); subscribed.add(t); log('subscribed', t); } catch (e) { log('subscribe failed', t, String(e)); }
@@ -131,6 +134,33 @@ export async function syncTopics(wanted: string[]): Promise<void> {
     if (want.has(t)) continue;
     try { await FcmTopics.unsubscribe({ topic: t }); subscribed.delete(t); log('unsubscribed', t); } catch (e) { log('unsubscribe failed', t, String(e)); }
   }
+}
+
+/**
+ * A-132 (contract §4, R-58): the topic of THIS version, `appv_<versionCode>` (1.0.15 = `appv_10015`) - the site can tell one version «open
+ * the app». Kept apart from the person's topics (whatever the settings, while registered); the app keeps ONLY its own: the topic of an
+ * earlier version it subscribed (remembered on the device) is dropped. Never throws.
+ */
+export const VERSION_TOPIC_PREFIX = 'appv_';
+export const versionTopicName = (code: number = versionCode()): string => `${VERSION_TOPIC_PREFIX}${code}`;
+const VTOPIC_KEY = 'push_version_topic';
+let versionTopicDone = false;
+type TopicApi = Pick<FcmTopicsPlugin, 'subscribe' | 'unsubscribe'>;
+type KeptApi = { get(o: { key: string }): Promise<{ value: string | null }>; set(o: { key: string; value: string }): Promise<void> };
+/** the version topic on its own (the unit gives stand-ins for FCM and the device store); true = done */
+export async function syncVersionTopic(api: TopicApi = FcmTopics, kept: KeptApi = Preferences, code: number = versionCode()): Promise<boolean> {
+  const mine = versionTopicName(code);
+  let before: string | null = null;
+  try { before = (await kept.get({ key: VTOPIC_KEY })).value; } catch { /* none kept */ }
+  try {
+    await api.subscribe({ topic: mine }); log('subscribed', mine);
+    if (before && before !== mine && before.startsWith(VERSION_TOPIC_PREFIX)) { await api.unsubscribe({ topic: before }); log('unsubscribed', before); }
+    await kept.set({ key: VTOPIC_KEY, value: mine });
+    return true;
+  } catch (e) { log('version topic failed', String(e)); return false; } // asked again at the next sync (the network back, a start)
+}
+async function versionTopic(): Promise<void> {
+  if (!versionTopicDone) versionTopicDone = await syncVersionTopic();
 }
 
 /** A-84 (b): the tray forgets what the app has shown - all articles (Home's «Нове на сайті» seen) or the opened ones. Never throws. */
@@ -146,4 +176,4 @@ export async function liveChannelsNow(ids: Array<number | string>): Promise<void
 }
 
 /** Test seam: forget the device state (unit tests). */
-export function _resetPushState(): void { registered = false; subscribed = new Set(); }
+export function _resetPushState(): void { registered = false; subscribed = new Set(); versionTopicDone = false; }

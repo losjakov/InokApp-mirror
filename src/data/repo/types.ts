@@ -134,6 +134,8 @@ export interface Filters {
   oblast_id?: number | null;
   has_stream?: boolean;
   near?: { lat: number; lon: number; radius_km: number } | null;
+  /** A-133 «Я тут був»: 'yes' = the marked houses, 'no' = not marked yet; null / absent = all */
+  visited?: 'yes' | 'no' | null;
 }
 export type Sort = 'name' | 'distance';
 /** A facet value and the number of houses it would show under the other active filters (A-13). */
@@ -146,6 +148,8 @@ export interface Facets {
   oblasts: (NamedRow & { n: number })[];
   /** houses with a stream under the other filters */
   streams: number;
+  /** A-133: the houses marked «Я тут був» / not marked, under every OTHER active filter (the sheet's three states count them) */
+  visited: { yes: number; no: number };
 }
 
 /** The site's own rule (contract §2, R-10): the last opening is labelled «Останнє відкриття (відродження)» when the house has

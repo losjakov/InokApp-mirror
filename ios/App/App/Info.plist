@@ -82,5 +82,42 @@
 	<string>UIStatusBarStyleLightContent</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<!-- cloud_41 (A-133 C1): the four Home Screen quick actions in the owner's order; titles by the system language (InfoPlist.strings
+	     SHORTCUT_<id>); SF Symbols (the platform's own style); SceneDelegate hands each to the app's link router as inokapp://tab/<id> -->
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>info.inok.app.tab.streams</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>SHORTCUT_streams</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>video</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>info.inok.app.tab.monasteries</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>SHORTCUT_monasteries</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>building.columns</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>info.inok.app.tab.map</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>SHORTCUT_map</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>map</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>info.inok.app.tab.articles</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>SHORTCUT_articles</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>newspaper</string>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -15,4 +15,9 @@
         <item quantity="one">%d new publication</item>
         <item quantity="other">%d new publications</item>
     </plurals>
+    <!-- cloud_41 (A-133 C1): the quick actions on the app icon, by the system language -->
+    <string name="shortcut_streams">Streams</string>
+    <string name="shortcut_monasteries">Monasteries</string>
+    <string name="shortcut_map">Map</string>
+    <string name="shortcut_articles">Publications</string>
 </resources>

@@ -99,8 +99,26 @@ export async function openAppStorePage(id?: number): Promise<void> {
   window.open(`https://apps.apple.com/app/id${id}`, '_blank', 'noopener');
 }
 
-/** «Поділитися застосунком»: the system share sheet with one line and the listing's address (`@capacitor/share`, A-43's call). */
-export const shareApp = (title: string, line: string, c?: AppConfig | null): Promise<void> => shareUrl(title, playListingUrl(c), line);
+/** R-60 (A-131): THE address «Поділитися застосунком» shares on BOTH platforms - the site's smart link (iPhone / iPad -> the App Store while
+ *  its switch is on, Android -> Google Play, anything else -> /app/); the share line names no platform. */
+export const APP_SHARE_URL = 'https://inok.info/app/get/';
+/** «Поділитися застосунком»: the system share sheet with one line and the smart link (`@capacitor/share`, A-43's call). */
+export const shareApp = (title: string, line: string): Promise<void> => shareUrl(title, APP_SHARE_URL, line);
+
+/** R-57 (A-131): the App Store - iOS reads ONLY this pair (`features.app_store_links` + `app_store_url`); Android reads only R-41's. */
+export const APP_STORE_ID = '6835134380';
+export const APP_STORE_PAGE = `https://apps.apple.com/app/id${APP_STORE_ID}`;
+/** the App Store page: the site's `app_store_url`, absent = the app's own id (the door's update button never stays without an address) */
+export const appStorePageUrl = (c?: AppConfig | null): string => c?.app_store_url || APP_STORE_PAGE;
+/** «Оцінити застосунок» on iOS: only while the site's App Store switch is on AND it gives the address */
+export const appStoreLinksShown = (c?: AppConfig | null): boolean => c?.features?.app_store_links === true && !!c?.app_store_url;
+export const appStoreReviewUrl = (c?: AppConfig | null): string => `${appStorePageUrl(c)}?action=write-review`;
+/** the App Store page (or its «write a review» form) in the App Store app; the browser ring: a tab */
+export async function openAppStoreUrl(c?: AppConfig | null, review = false): Promise<void> {
+  const url = review ? appStoreReviewUrl(c) : appStorePageUrl(c);
+  if (isNative()) { window.location.href = url.replace(/^https:\/\/apps\.apple\.com\//, 'itms-apps://apps.apple.com/'); return; }
+  window.open(url, '_blank', 'noopener');
+}
 
 /** Google's own full-screen update (an update the row found, or a version below the site's minimum); not allowed -> the listing. */
 export async function immediateUpdate(info: PlayUpdateInfo, c?: AppConfig | null): Promise<void> {

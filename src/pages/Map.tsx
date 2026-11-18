@@ -33,7 +33,7 @@ const NO_SCOPE_CHROME = { ...SCOPE_CHROME, top: 0 };
  * its tiles lost → a note that says so (the houses stay). No WebGL → message + list.
  */
 export function MapPage() {
-  const { db, t, lang, config, dict } = useApp();
+  const { db, t, lang, config, dict, visited } = useApp();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const box = useRef<HTMLDivElement>(null);
@@ -66,6 +66,7 @@ export function MapPage() {
   }, [db, lang, dict, eparchyId]);
 
   const fc = useMemo(() => (rows ? splitLavras(rows, lang) : null), [rows, lang]);
+  const visitedShown = useMemo(() => (rows ?? []).filter((r) => visited.has(r.code)).length, [rows, visited]);
   const at = parseAt(params.get('at'));
   const atKey = at?.join(',') ?? null;
   const styleUrl = config?.map_style_url ?? null;
@@ -128,6 +129,8 @@ export function MapPage() {
 
   // markers follow the DB rows and the language
   useEffect(() => { if (ready) ctl.current?.setHouses(fc); }, [fc, ready]);
+  // A-133: the «Я тут був» badges follow the marks
+  useEffect(() => { if (ready) ctl.current?.setVisited(visited); }, [visited, ready]);
   // «Контакти» → its map: the place drawn where the mini-map showed it
   useEffect(() => {
     if (ready) ctl.current?.setPlace(atKey ? (atKey.split(',').map(Number) as [number, number]) : null);
@@ -245,6 +248,8 @@ export function MapPage() {
                 </ChipButton>
               </div>
             )}
+            {/* A-133: the legend of the badge, only while some house of the map is marked (the same badge, its word) */}
+            {visitedShown > 0 && <div className="map-legend over-map" data-testid="map-legend"><span className="map-legend__badge" aria-hidden="true" />{t('visited.legend')}</div>}
             {offline && <div className="map-banner over-map" role="status" data-testid="map-offline">{t('map.offline')}</div>}
             {locating && <div className="map-banner over-map"><Busy name="dots" /> {t('map.locating')}</div>}
             {posError && <div className="map-banner map-banner--error over-map">{t('monasteries.no_location')}</div>}

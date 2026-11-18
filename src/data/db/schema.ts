@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 ${directoryDdl()}
 ${MONASTERY_INDEXES}
 CREATE TABLE IF NOT EXISTS favourite(code INTEGER PRIMARY KEY, added_at INTEGER NOT NULL);
+-- cloud_41 (A-133 «Я тут був»): the person's own marks, beside «Обрані»; LOCAL only, never touched by an import or a reset (A-132)
+CREATE TABLE IF NOT EXISTS visited(code INTEGER PRIMARY KEY, at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS article(id INTEGER NOT NULL, lang TEXT NOT NULL, kind TEXT, published_at TEXT, json TEXT NOT NULL,

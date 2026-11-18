@@ -2,3 +2,8 @@
 "CFBundleDisplayName" = "inok.info";
 "NSLocationWhenInUseUsageDescription" = "Щоб показати найближчі обителі й відстань до них. Місцезнаходження не залишає телефон.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Застосунок питає місцезнаходження лише під час користування: щоб показати найближчі обителі й відстань до них. Місцезнаходження не залишає телефон.";
+/* cloud_41 (A-133 C1): the Home Screen quick actions */
+"SHORTCUT_streams" = "Трансляції";
+"SHORTCUT_monasteries" = "Монастирі";
+"SHORTCUT_map" = "Карта";
+"SHORTCUT_articles" = "Публікації";

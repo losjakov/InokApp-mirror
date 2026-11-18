@@ -5,11 +5,14 @@ import { getMonastery } from '@/data/repo/monasteries';
 import { openLink } from '@/native/intents';
 import { launchUrl, onUrlOpen } from '@/native/appLinks';
 import { useApp } from '@/state/AppContext';
+import { quickRoute } from './quickActions';
 import type { Db } from '@/data/db/types';
 
 /** THE in-app screen of a site link (A-21(а), R-39, A-76): a card in the DB -> the card; an article -> `/articles?id=` (the app's language;
  *  the screen asks the server for an id its cache lacks, R-35); anything else -> null = the browser. */
 async function linkRoute(db: Db, href: string): Promise<string | null> {
+  const quick = quickRoute(href); // cloud_41 (A-133 C1): a quick action on the app icon = its tab
+  if (quick) return quick;
   const to = linkTarget(href);
   if (to?.kind === 'card' && (await getMonastery(db, to.code))) return `/monasteries/${to.code}`;
   if (to?.kind === 'article') return `/articles?id=${to.id}`;

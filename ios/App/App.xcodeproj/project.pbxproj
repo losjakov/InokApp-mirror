@@ -20,6 +20,7 @@
 		1C0A11000000000000000005 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000004 /* InfoPlist.strings */; };
 		1C0A11000000000000000011 /* FcmTopicsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000010 /* FcmTopicsPlugin.swift */; };
 		1C0A11000000000000000041 /* AppAttestPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000040 /* AppAttestPlugin.swift */; };
+		1C0A11000000000000000051 /* InAppReviewPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000050 /* InAppReviewPlugin.swift */; };
 		1C0A11000000000000000013 /* InokBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000012 /* InokBridgeViewController.swift */; };
 		1C0A11000000000000000015 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000014 /* Localizable.strings */; };
 		1C0A11000000000000000021 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 1C0A11000000000000000020 /* FirebaseMessaging */; };
@@ -44,6 +45,7 @@
 		1C0A11000000000000000008 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		1C0A11000000000000000010 /* FcmTopicsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FcmTopicsPlugin.swift; sourceTree = "<group>"; };
 		1C0A11000000000000000040 /* AppAttestPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAttestPlugin.swift; sourceTree = "<group>"; };
+		1C0A11000000000000000050 /* InAppReviewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppReviewPlugin.swift; sourceTree = "<group>"; };
 		1C0A11000000000000000012 /* InokBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokBridgeViewController.swift; sourceTree = "<group>"; };
 		1C0A11000000000000000016 /* uk */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = uk; path = uk.lproj/Localizable.strings; sourceTree = "<group>"; };
 		1C0A11000000000000000017 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -89,6 +91,7 @@
 				1C0A11000000000000000012 /* InokBridgeViewController.swift */,
 				1C0A11000000000000000010 /* FcmTopicsPlugin.swift */,
 				1C0A11000000000000000040 /* AppAttestPlugin.swift */,
+				1C0A11000000000000000050 /* InAppReviewPlugin.swift */,
 				1C0A11000000000000000014 /* Localizable.strings */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -214,6 +217,7 @@
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				1C0A11000000000000000011 /* FcmTopicsPlugin.swift in Sources */,
 				1C0A11000000000000000041 /* AppAttestPlugin.swift in Sources */,
+				1C0A11000000000000000051 /* InAppReviewPlugin.swift in Sources */,
 				1C0A11000000000000000013 /* InokBridgeViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
