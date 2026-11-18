@@ -70,6 +70,8 @@ shoot_frames() { # set dir lang
   FR=(); while IFS= read -r line; do FR+=("$line"); done < <(frames "$set")
   for line in "${FR[@]}"; do
     IFS='|' read -r name path ready steps <<< "$line"
+    # cloud_41 (E): STORE_NOSCROLL=1 (the App Store set) = the frame as it opens - the home not scrolled to whole rows
+    if [ -n "${STORE_NOSCROLL:-}" ]; then steps="${steps//;do:wholeRows/}"; steps="${steps//do:wholeRows;/}"; [ "$steps" = do:wholeRows ] && steps=-; fi
     case "$name" in *-dark) set_theme dark;; esac
     shot_frame "$d/$name.png" "$name" "$path" "$ready" "$steps"
     if [ "$name" = "${FR[0]%%|*}" ]; then # A-74 (4) fail fast: the FIRST frame of each language read back before the others are shot
@@ -95,7 +97,8 @@ store_summary() {
     '«Публікації» not on «Статті» (A-122):KIND FAIL' 'language / theme switches not taken:LANG FAIL|THEME FAIL' \
     'unit words / first frames wrong:UNITS FAIL|FIRST FRAME FAIL' 'lavras cut / steps failed:LAVRAS FAIL|STEP FAIL' 'article top cut:ARTICLE TOP FAIL' \
     'colours wrong:COLOUR FAIL' 'crash screen in a frame (E11):CRASH FAIL' 'map view not on Ukraine / canvas not sized (D16):MAP VIEW FAIL' \
-    'list beside the article starts on a cut row (NOTE 7):LIST TOP FAIL' 'a home frame ends on a cut row (NOTE 9):ROWS CUT FAIL'; do
+    'list beside the article starts on a cut row (NOTE 7):LIST TOP FAIL' 'a home frame ends on a cut row (NOTE 9):ROWS CUT FAIL' \
+    '«Я тут був» frame without its three marks (cloud_41):VISITED FAIL'; do
     echo "${w%%:*}: $(grep -cE "^(${w#*:})" "$S/nav.txt" 2>/dev/null || true)"
   done
   echo "on air at the minute of the frames: $(grep '^live on air' "$S/demo.txt" | sed 's/.*: //' | tr '\n' ' ')"

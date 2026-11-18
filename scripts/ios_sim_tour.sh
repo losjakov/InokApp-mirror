@@ -392,7 +392,8 @@ appstore() { # set(phone|tablet) dir-name
     set_lang "$lang"; units_ok "$lang" || return 1
     # A-127: without 04-eparchy / 05-map - cloud_41 MEASURED it again natively from a FRESH simulator (ios 44251885403, appstore ipad: all six
     # files BLANK, «MAP NOT PAINTED»): a GPU-less runner cannot draw WebGL; those two stay the joined frames (store/ios/screenshots/README)
-    STORE_SKIP='eparchy|map' shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
+    # cloud_41 (E, REVIEW cloud_40 «APP STORE SUBMISSION»): the App Store iPad home NOT scrolled - its frames go without `do:wholeRows`
+    STORE_NOSCROLL=1 STORE_SKIP='eparchy|map' shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
     visited_frame "$1" "$OUT/appstore/$lang/$2"
   done
 }
@@ -405,14 +406,23 @@ sim_lang() {
 }
 # cloud_41 (A-133 C3, E): the «Я тут був» frame - the three lavras marked through the card's own toggle (the list's first rows); phone = the
 # list (green checks + «· відвідано 3»), tablet = the card 242 beside the list (its filled check at the name + the list's checks and counter)
+# ios 44270077149 (cloud_41): the FIRST shown page's toggle was read (the remote hand leaves the previous card page un-hidden) - the count
+# said 1, not 3 -> the toggle of the LAST shown page (the card just opened), set to the wanted state by its own click; the marks are taken
+# off again after the frame, so the next language's 01-07 carry none (each language marks its own)
+mark_visited() { # code on|off
+  nav go "/monasteries/$1"; sleep 3; node "$NAVJS" wait '[data-testid="visited"]' >> "$OUT/nav.txt" 2>&1
+  local want; want=$([ "$2" = on ] && echo 1 || echo 0)
+  ev "(() => { const b = Array.from(document.querySelectorAll('.ion-page:not(.ion-page-hidden) [data-testid=visited]')).pop(); if (!b) return 'none';
+    if (b.dataset.on !== '$want') b.click(); return 'ok'; })()" > /dev/null; sleep 3
+}
 visited_frame() { # set dir
   local c
-  for c in 242 111 98; do nav go "/monasteries/$c"; sleep 3; node "$NAVJS" wait '[data-testid="visited"]' >> "$OUT/nav.txt" 2>&1
-    [ "$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=visited]')||{}).dataset?.on")" = 1 ] || nav click '[data-testid="visited"]'; sleep 3; done
+  for c in 242 111 98; do mark_visited "$c" on; done
   if [ "$1" = phone ]; then shot_frame "$2/09-visited.png" 09-visited /monasteries '[data-testid="visited-count"]' -
   else shot_frame "$2/08-visited.png" 08-visited /monasteries/242 '[data-testid="visited-count"]' -; fi
-  local v; v=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=visited-count]')||{}).textContent||'none'"); echo "visited frame $2: $v" >> "$OUT/demo.txt"
+  local v; v=$(ev "(Array.from(document.querySelectorAll('.ion-page:not(.ion-page-hidden) [data-testid=visited-count]')).pop()||{}).textContent||'none'"); echo "visited frame $2: $v" >> "$OUT/demo.txt"
   case "$v" in *3) ;; *) echo "VISITED FAIL $2: $v" >> "$OUT/nav.txt";; esac
+  for c in 242 111 98; do mark_visited "$c" off; done
 }
 
 node "$ROOT/scripts/ios_relay.mjs" > "$OUT/relay.log" 2>&1 &
