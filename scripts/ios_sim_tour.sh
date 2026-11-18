@@ -99,10 +99,14 @@ shotof() {
   shot "${1%.png}-WRONG.png"; echo "WRONG CONTENT $(basename "$1"): no $2" >> "$OUT/nav.txt"; return 1
 }
 capture() { shot "$1"; }
-launch() { # (re)start the app with its console captured; wait for «home painted» and for the remote hand to ask the relay
+launch() { # (re)start the app with its console captured; wait for a NEW «home painted» and for the remote hand to ask the relay
+  # cloud_41 (NOTE 2 of REVIEW cloud_40, «favourites after a restart: rows of 242: 2»): the console file is APPENDED across launches, so
+  # `grep -q 'home painted'` matched the PREVIOUS start at once and the relay's health was still the old process's - the spot could read
+  # the app while it was going down / coming up (two pages in the DOM). Now: the count of «home painted» lines must GROW.
+  local n0; n0=$(grep -c 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null || true); n0=${n0:-0}
   xcrun simctl terminate "$U" "$BUNDLE" > /dev/null 2>&1 || true
   xcrun simctl launch --console-pty --terminate-running-process "$U" "$BUNDLE" -AppleLanguages '(uk)' -AppleLocale uk_UA >> "$OUT/${TAG}_console.txt" 2>&1 &
-  local _; for _ in $(seq 1 90); do grep -q 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null && break; sleep 2; done
+  local _; for _ in $(seq 1 90); do [ "$(grep -c 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null || echo 0)" -gt "$n0" ] && break; sleep 2; done
   for _ in $(seq 1 30); do [ "$(curl -s localhost:8765/health | python3 -I -c 'import json,sys; a=json.load(sys.stdin)["ago"]; print(1 if a is not None and a < 20000 else 0)')" = 1 ] && return 0; sleep 2; done
   echo "the remote hand never asked the relay ($TAG)" | tee -a "$OUT/nav.txt"; return 1
 }
@@ -171,12 +175,16 @@ a3_walk() {
   # (each arrow tapped after the page's transition and its map are over - a tap during the transition is refused, D45)
   nav go /monasteries; node "$NAVJS" wait '[data-testid^="mrow-"]' >> "$OUT/nav.txt" 2>&1; sleep 2; nav click '[data-testid^="mrow-"]'; sleep 4
   local c1; c1=$(node "$NAVJS" url); nav click '[data-testid="back"]'; sleep 3; local u1; u1=$(node "$NAVJS" url)
+  # cloud_41 (NOTE 3 of REVIEW cloud_40): the verdict is read HERE, before the eparchy page - its embedded WebGL mini-map stops a GPU-less
+  # simulator answering (relay 504 x N, ios 44075276669 / 44107648718 iOS 16.4 iPad, 44166204628 iOS 26.5 iPad) and the old spot read the
+  # width AFTER it (empty = FAIL) although list -> card -> back had already returned to /monasteries. A tablet opens the card in its
+  # second pane (`/monasteries?code=N`), a phone as its own page (`/monasteries/N`).
+  local wide; wide=$(ev "innerWidth >= 600 ? 'wide' : 'phone'")
+  if [ "$u1" = /monasteries ] && { [ "${c1#/monasteries/}" != "$c1" ] || [ "${c1#/monasteries?code=}" != "$c1" ]; }; then
+    a3 "back (header arrow)" PASS "list->$c1->back=$u1 ($wide)"; else a3 "back (header arrow)" FAIL "list->$c1->back=$u1 ($wide)"; fi
   nav go /more/eparchies/1; node "$NAVJS" wait '[data-testid="eparchy-title"]' >> "$OUT/nav.txt" 2>&1; sleep 2; AFTER_GL=1; nav click '[data-testid="eparchy-map"]'; sleep 4
   node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1; sleep 2
   local m1; m1=$(node "$NAVJS" url); nav click '[data-testid="back"]'; sleep 3; local u2; u2=$(node "$NAVJS" url)
-  local wide; wide=$(ev "innerWidth >= 600 ? 'wide' : 'phone'")
-  if [ "$wide" = wide ] || { [ "${c1#/monasteries/}" != "$c1" ] && [ "$u1" = /monasteries ]; }; then
-    a3 "back (header arrow)" PASS "list->$c1->back=$u1 ($wide)"; else a3 "back (header arrow)" FAIL "list->$c1->back=$u1 ($wide)"; fi
   # A-127: the eparchy's way back crosses its WebGL map - outside the lock (ios run 1 of cloud_39: the page stopped answering on the map)
   if [ "${m1#/map}" != "$m1" ] && [ "$u2" = /more/eparchies/1 ]; then a3 "back over the map (header arrow)" PASS "eparchy->$m1->back=$u2"
   else a3 "back over the map (header arrow)" OUT "eparchy->$m1->back=$u2 - the WebGL map on the way (A-127)"; fi
@@ -245,7 +253,10 @@ a3_walk() {
   # 8 favourites survive a restart
   nav go /monasteries/242; node "$NAVJS" wait '[data-testid="fav"]' >> "$OUT/nav.txt" 2>&1
   [ "$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=fav]')||{}).dataset?.on")" = 1 ] || nav click '[data-testid="fav"]'; sleep 2
-  launch; nav go /more/favourites; sleep 3; v=$(ev "document.querySelectorAll('.ion-page:not(.ion-page-hidden) [data-testid=mrow-242]').length"); shot "$OUT/a3-favourites__$TAG.png"
+  # cloud_41 (NOTE 2): rows of 242 on the TOP page (the last shown), read until the page has settled (<= 3 reads, 2 s apart)
+  launch; nav go /more/favourites; sleep 3; local k; for k in 1 2 3; do
+    v=$(ev "(() => { const ps = Array.from(document.querySelectorAll('.ion-page:not(.ion-page-hidden)')).filter((e) => e.querySelector('[data-testid=fav-empty], [data-testid^=mrow-]')); const top = ps[ps.length - 1]; return top ? top.querySelectorAll('[data-testid=mrow-242]').length + (ps.length > 1 ? ' (' + ps.length + ' pages shown)' : '') : 'no page'; })()")
+    [ "$v" = 1 ] && break; sleep 2; done; shot "$OUT/a3-favourites__$TAG.png"
   [ "$v" = 1 ] && a3 "favourites after a restart" PASS "card 242 listed after terminate + launch" || a3 "favourites after a restart" FAIL "rows of 242: $v"
   guard_crash spot9
   # 9 a link inside an article opens the linked article in the app (R-39: 1832 -> 1833)

@@ -91,7 +91,9 @@ adb logcat -c || true
 # («InokPush: subscribed test»), and A-36 counted 0 screens twice. Now the file is a SNAPSHOT of the device's ring (one 64 MB ring for the
 # whole smoke, cleared above), refreshed every 2 s and on demand (`logsync`) before a decisive count.
 adb logcat -G 64M > /dev/null 2>&1 || true; adb logcat -g > "$OUT/logcat_ring.txt" 2>&1 || true   # the ring sizes, as set
-logsync() { adb logcat -d -v threadtime > "$OUT/logcat_full.tmp" 2>/dev/null && mv -f "$OUT/logcat_full.tmp" "$OUT/logcat_full.txt"; return 0; }
+# cloud_41 (NOTE 4 of REVIEW cloud_40): the 2-s loop and the foreground both call this - ONE tmp file per writer ($BASHPID), and a lost
+# `mv` never ends the smoke under `set -e` (it was the last command of an && list: emulator 44046052975, API 35, after a green walk).
+logsync() { local t="$OUT/logcat_full.$BASHPID.tmp"; { adb logcat -d -v threadtime > "$t" 2>/dev/null && mv -f "$t" "$OUT/logcat_full.txt"; } || rm -f "$t"; return 0; }
 ( while :; do logsync; sleep 2; done ) &
 LOGCAT_PID=$!
 # stage 3: notifications allowed up front (Android 13+ runtime permission) so the app registers its FCM token at boot

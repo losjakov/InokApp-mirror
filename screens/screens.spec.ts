@@ -908,7 +908,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(live).toHaveAttribute('role', 'status');
       const [off, retry] = await words(p, ['net.offline', 'net.retry']);
       await expect(live).toContainText(off, { timeout: 15_000 });
-      await expect(homeBlocks(p)).resolves.toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [] });
+      await expect.poll(() => homeBlocks(p), { timeout: 15_000, message: 'cloud_41 NOTE 4: the kept rows, polled' }).toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [] });
       await expect(p.locator('.ion-page:not(.ion-page-hidden) .home__list ion-spinner')).toHaveCount(0);
       await live.scrollIntoViewIfNeeded();
       const r = await live.getByRole('button', { name: retry }).boundingBox();
@@ -1476,7 +1476,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(img).toHaveAttribute('src', /\/monasteries\/242\/00\.jpg$/);
       await expect(viewerBlock(p)).toHaveCount(0);
       await expect(img).toBeFocused(); // P10: the focus is not lost with the button
-      expect(gallery(p).photos).toEqual(['242/00.jpg']);
+      await expect.poll(() => gallery(p).photos, { timeout: 15_000 }).toEqual(['242/00.jpg']);
       await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
     } },
   // A-112: WITHOUT a tap the next photo waits too - the count of asked files does not grow
@@ -1519,7 +1519,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(viewerBlock(p)).toHaveAttribute('data-why', 'wifi');
       await p.evaluate(() => { localStorage.setItem('inok.net', JSON.stringify({ connected: true, metered: false, dataSaver: false })); dispatchEvent(new Event('online')); });
       await expect(p.getByTestId('viewer-img')).toHaveAttribute('data-full', '1');
-      expect(gallery(p).photos).toEqual(['242/00.jpg']);
+      await expect.poll(() => gallery(p).photos, { timeout: 15_000, message: 'cloud_41 NOTE 4: poll the counter itself' }).toEqual(['242/00.jpg']);
       await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
     } },
   { name: 'monastery-favourite', path: '/monasteries/37', ready: async (p) => {

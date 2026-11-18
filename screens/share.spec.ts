@@ -50,10 +50,12 @@ for (const profile of REVIEW) {
         await share.scrollIntoViewIfNeeded();
         await picturesSettled(page);
         await page.waitForTimeout(250);
-        // the last block of the screen's content, the whole button above the tab bar (nothing covers it)
-        const box = (await share.boundingBox())!;
+        // the last block of the screen's content, the whole button above the tab bar (nothing covers it). cloud_41 (NOTE 4; mirror screens
+        // 44166204794, tablet article: 1502 > 1223): a late block («Читайте також», comments) moved the button after the scroll - scroll and
+        // measure again until the button rests above the bar (gotcha «a late block moves the page under a test»)
         const tabTop = await page.locator('ion-tab-bar').evaluate((b) => b.getBoundingClientRect().top);
-        expect(box.y + box.height, 'the button above the tab bar').toBeLessThanOrEqual(tabTop + 0.5);
+        await expect.poll(async () => { await share.scrollIntoViewIfNeeded(); const b = (await share.boundingBox())!; return b.y + b.height; },
+          { timeout: 15_000, message: 'the button above the tab bar' }).toBeLessThanOrEqual(tabTop + 0.5);
         const covered = await share.locator('ion-button').evaluate((b) => { const r = b.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !(hit && (b.contains(hit) || hit.contains(b) || b.shadowRoot?.contains(hit))); });
         expect(covered, 'nothing over the button').toBe(false);
         expect(await share.locator('ion-button').textContent()).toContain(cfg.locale.startsWith('uk') ? 'Поділитися' : '');

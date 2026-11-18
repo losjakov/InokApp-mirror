@@ -20,11 +20,20 @@ export const jumpDrawn = async (p: Page, camera: { center: [number, number]; zoo
   await p.evaluate((c) => (window as any).__inokMap.jumpTo(c), camera);
   await expect(p.getByTestId('map')).toHaveAttribute('data-drawn', '1', { timeout: 30_000 });
 };
+/** cloud_41 (NOTE 4; mirror screens 44166204794 `map-card`: ready 1, 18 markers, drawn 0 for 30 s): on a GPU-less runner a lost / restored
+ *  GL context may leave MapLibre without a further frame, so `idle` never comes. Wait on the SAME signal, asking MapLibre for one more
+ *  frame (`triggerRepaint` - no camera move, no timer decides) between the polls. */
+const drawnSignal = (p: Page) => expect.poll(async () => p.evaluate(() => {
+  const m = (window as unknown as { __inokMap?: { triggerRepaint(): void } }).__inokMap;
+  const v = document.querySelector('[data-testid="map"]')?.getAttribute('data-drawn');
+  if (v !== '1') m?.triggerRepaint();
+  return v;
+}), { timeout: 45_000, intervals: [1000, 2000, 3000] }).toBe('1');
 export const mapReady = async (p: Page, markers = '18') => {
   await expect(p.getByTestId('map')).toHaveAttribute('data-ready', '1', { timeout: 20_000 });
   await expect(p.getByTestId('map')).toHaveAttribute('data-markers', markers);
   // D61: the map's own «drawn» signal (MapLibre `idle`: no movement, the view's tiles loaded), never a timer; the probe proves the signal tells the truth
-  await expect(p.getByTestId('map')).toHaveAttribute('data-drawn', '1', { timeout: 30_000 });
+  await drawnSignal(p);
   // cloud_16 (CI, slow runner; the cloud_15 base fails it too under CPU throttling): «drawn» came while a re-fit / the symbol placement
   // still had 0 pins on screen - wait on the TRUTH (our marks rendered), then on «drawn» again; never a timer
   if (markers !== '0' && await p.evaluate(() => !!(window as unknown as { __inokMap?: unknown }).__inokMap)) {

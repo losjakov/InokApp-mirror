@@ -69,7 +69,9 @@ for (const [device, cfg] of Object.entries(RING)) test.describe(`store ring ${de
     // the live eye of card 242 (1146 on 08.11.2026) - the frame «card» waits for it
     await page.route('**/fixtures/views.json', async (r) => r.fulfill({ json: { ...JSON.parse(readFileSync('fixtures/views.json', 'utf8')), 'monasteries/242/views': 1146 } }));
     // the live «Статті» list holds 1832 (the fixture's feed does not): the fixture feed + 1832 of the R-39 sample, for `do:showSelected`
-    await page.route(/\/fixtures\/articles\.json$/, async (r) => { const j = await (await r.fetch()).json(); const art = JSON.parse(readFileSync('fixtures/articles_links.json', 'utf8')).uk.items.find((x: { id: number }) => x.id === 1832);
+    // cloud_41 (NOTE 4; mirror screens 44166204794: «Response has been disposed»): a request the page dropped while its fixture was read is
+    // left alone - the handler never throws into the test
+    await page.route(/\/fixtures\/articles\.json$/, async (r) => { let j; try { j = await (await r.fetch()).json(); } catch { await r.abort().catch(() => {}); return; } const art = JSON.parse(readFileSync('fixtures/articles_links.json', 'utf8')).uk.items.find((x: { id: number }) => x.id === 1832);
       await r.fulfill({ json: { ...j, items: [...j.items, ...Array.from({ length: 12 }, (_, k) => ({ ...j.items[0], id: 900 + k })), art] } }); });
     await page.addInitScript(() => { if (!sessionStorage.getItem('ring')) { localStorage.setItem('CapacitorStorage.settings', JSON.stringify({ lang: 'en', photos: 'any', asked: ['articles', 'streams'] })); sessionStorage.setItem('ring', '1'); } });
     await page.goto('/home');
