@@ -390,11 +390,10 @@ appstore() { # set(phone|tablet) dir-name
   for lang in uk ru en; do
     sim_lang "$lang"   # cloud_41 (NOTE 7): the simulator's OWN language = the status bar in the frame's language (a fresh boot)
     set_lang "$lang"; units_ok "$lang" || return 1
+    # A-127: without 04-eparchy / 05-map - cloud_41 MEASURED it again natively from a FRESH simulator (ios 44251885403, appstore ipad: all six
+    # files BLANK, «MAP NOT PAINTED»): a GPU-less runner cannot draw WebGL; those two stay the joined frames (store/ios/screenshots/README)
     STORE_SKIP='eparchy|map' shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || return 1
-    # cloud_41 (E): 04-eparchy / 05-map NATIVELY, the LIVE export - each from a FRESH simulator (a WebGL screen freezes the NEXT picture,
-    # cloud_38 D12; the screen itself is checked by its own «drawn» + the white-box rule of store_png.py); a frame that fails is written
-    local f; for f in eparchy map; do reboot_sim; STORE_ONLY="$f" shoot_frames "$1" "$OUT/appstore/$lang/$2" "$lang" || echo "NATIVE FAIL $lang/$2 $f" >> "$OUT/nav.txt"; done
-    reboot_sim; visited_frame "$1" "$OUT/appstore/$lang/$2"
+    visited_frame "$1" "$OUT/appstore/$lang/$2"
   done
 }
 # cloud_41 (NOTE 7 of REVIEW cloud_40): the status bar is the SYSTEM's, not the app's - the simulator's own language and region, then a boot

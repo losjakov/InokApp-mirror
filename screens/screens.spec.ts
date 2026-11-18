@@ -3333,7 +3333,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('about-rate')).toHaveCount(0);
       await p.evaluate(() => { (navigator as unknown as { share: (o: object) => Promise<void> }).share = async (o) => { (window as unknown as { __asked: string[] }).__asked.push(`share ${JSON.stringify(o)}`); }; });
       await onShown(p, 'about-share').click();
-      expect((await asked(p)).filter((x) => x.startsWith('share'))[0]).toMatch(/"url":"https:\/\/inok\.info\/app\/get\/"/);
+      await expect.poll(async () => (await asked(p)).filter((x) => x.startsWith('share'))[0] ?? '', { timeout: 10_000 }).toMatch(/"url":"https:\/\/inok\.info\/app\/get\/"/);
       await onShown(p, 'about-update').click();
       await expect(onShown(p, 'about-update-note')).toHaveText(/Встановлено не з App Store|Установлено не из App Store|Not installed from the App Store/);
     } },

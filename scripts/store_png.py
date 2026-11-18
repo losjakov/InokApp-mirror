@@ -13,7 +13,7 @@ import sys
 
 # A-122 (1.0.11): phone 8, each tablet 7 (scripts/store_frames.txt); --appstore = the App Store set of the iOS simulator (ios_sim_tour.sh)
 SETS = {'phone': (1080, 1920, 8), 'tablet7': (1920, 1080, 7), 'tablet10': (1920, 1080, 7)}
-APPSTORE = {'iphone': (1320, 2868, 9), 'iphone63': (1206, 2622, 9), 'ipad': (2064, 2752, 8)}  # cloud_41 (E): 01-08 + 09-visited / 01-07 + 08-visited, 04 / 05 native
+APPSTORE = {'iphone': (1320, 2868, 7), 'iphone63': (1206, 2622, 7), 'ipad': (2064, 2752, 6)}  # cloud_41 (E): + 09-visited / 08-visited; 04 / 05 not on a GPU-less runner (A-127, measured again)
 LANGS = ('uk', 'ru', 'en')
 MAX_BYTES = 8 * 1024 * 1024
 BLANK_MIN = 0.985  # the share of the body (below the status bar, above the navigation) in ONE colour that makes a frame blank
