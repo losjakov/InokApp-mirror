@@ -609,7 +609,7 @@ ion-searchbar .searchbar-clear-button { min-width: 24px; }
 .readbar__words { font-size: var(--inok-type-secondary); color: var(--ion-color-medium); }
 .arow__read { margin-top: 4px; }
 .arow__done { color: var(--inok-visited); font-size: var(--inok-type-secondary); }
-.arow__saved { color: var(--inok-star); margin-inline-end: 4px; }
+.arow__saved { color: var(--ion-color-primary); /* owner 19.11 (cloud_42 mock-up fav_star_colors, B): HIS mark in the app colour, the readers rating stays gold */ margin-inline-end: 4px; }
 .resume-pill { position: fixed; left: 16px; right: 16px; margin: 0 auto; width: fit-content; top: calc(var(--inok-safe-top, 0px) + 64px); z-index: 20; display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; padding: 4px 6px 4px 14px; border-radius: 20px; background: rgba(30, 40, 48, .92); color: #fff; font-size: var(--inok-type-secondary);
   transition: opacity .4s; }
 .resume-pill--gone { opacity: 0; pointer-events: none; }

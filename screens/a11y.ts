@@ -30,7 +30,17 @@ export async function axeScreen(page: Page, name: string, profile: string): Prom
   const r = await new AxeBuilder({ page }).withTags(A11Y_TAGS).analyze();
   // `target-size` measures a target at the CURRENT scroll position: a row cut by the fixed toolbar / tab bar at the viewport's edge is
   // «partially obscured» there and full-size (48 dp) once scrolled to - not a size of ours; such nodes are listed apart, never failed
-  const obscured = (n: { any: { data?: unknown }[] }) => n.any.some((c) => /obscured/i.test(JSON.stringify(c.data ?? '')));
+  // cloud_42 (mirror screens 44602222711, tablet home-live-open: «Усі: Нове на сайті» with 3 px above the tab bar): axe calls a target that is
+  // ALMOST wholly under the fixed bar «too small», not «obscured» - the same edge case, judged by the geometry: its box crosses the shown
+  // page's toolbar / tab bar edge (measured now, in the page)
+  const cut = new Set(await page.evaluate((sels) => sels.filter((sel) => {
+    const e = document.querySelector(sel); if (!e) return false;
+    const b = e.getBoundingClientRect();
+    const bar = document.querySelector('ion-tab-bar')?.getBoundingClientRect();
+    const head = document.querySelector('.ion-page:not(.ion-page-hidden) ion-header')?.getBoundingClientRect();
+    return (!!bar && b.bottom > bar.top + 0.5 && b.top < bar.bottom) || (!!head && b.top < head.bottom - 0.5 && b.bottom > head.top);
+  }), r.violations.filter((v) => v.id === 'target-size').flatMap((v) => v.nodes.map((n) => String(n.target[0])))));
+  const obscured = (n: { any: { data?: unknown }[]; target: unknown[] }) => n.any.some((c) => /obscured/i.test(JSON.stringify(c.data ?? ''))) || cut.has(String(n.target[0]));
   const all: A11yHit[] = r.violations.map((v) => ({ rule: v.id, impact: v.impact ?? null, help: v.help,
     targets: v.nodes.filter((n) => !(v.id === 'target-size' && obscured(n))).map((n) => n.target.map(String).join(' > ')) })).filter((v) => v.targets.length > 0);
   const edge = r.violations.filter((v) => v.id === 'target-size').flatMap((v) => v.nodes.filter(obscured).map((n) => n.target.map(String).join(' > ')));

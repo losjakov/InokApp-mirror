@@ -21,10 +21,11 @@ const EPARCHY_LINK = /^\/(?:(?:uk|ru|en)\/)?dioceses\/(\d+)\/?$/;
 
 /** A-138 (+ amendment): the app's LIST screens a site list page names - ONE table (DRY): the site's path (no language prefix, no query)
  *  -> the list. The article sections come from THE section table (`ARTICLE_SECTIONS`). */
-export type SiteList = 'monasteries' | 'eparchies' | ArticleKind;
+export type SiteList = 'monasteries' | 'eparchies' | 'streams' | ArticleKind;
 const SITE_LISTS: [string, SiteList][] = [
   ['monasteries/', 'monasteries'],
   ['dioceses/', 'eparchies'],
+  ['live/', 'streams'], // A-143 (5): the site's /live/ -> «Трансляції» (the App Store's «Трансляції» page and the feast events link here)
   ...(Object.entries(ARTICLE_SECTIONS) as [ArticleKind, string][]).map(([k, path]): [string, SiteList] => [path, k]),
 ];
 const listOf = (pathname: string): SiteList | null => {
@@ -39,8 +40,8 @@ export type LinkTarget = { kind: 'card'; code: number } | { kind: 'article'; id:
  * A-21(а) + R-39 + A-76: THE ONE link router - of every html-lite text (article lead / body, card history) AND of an App Link that opened the
  * app. A link to the site's card `/monasteries/<code>/` or to an article `/articles/<publications|news|video>/<id>/` - absolute or relative,
  * http or https, with or without www, `?lang=` (ignored: the app shows its own language) and `#…` - names that card / article.
- * A-138 (cloud_42): an eparchy `/dioceses/<id>/` names its page; a LIST page (`/monasteries/`, `/dioceses/`, `/articles/publications|video|news/`,
- * any query) names that list. Anything else (`/monasteries/table/…`, `/live/`, `/articles/`, an unknown form, another host) is null: the browser.
+ * A-138 (cloud_42): an eparchy `/dioceses/<id>/` names its page; a LIST page (`/monasteries/`, `/dioceses/`, `/live/`, `/articles/publications|video|news/`,
+ * any query) names that list. Anything else (`/monasteries/table/…`, `/live/<anything>`, `/articles/`, an unknown form, another host) is null: the browser.
  */
 export function linkTarget(href: string): LinkTarget | null {
   const abs = absoluteHref(href);

@@ -1048,7 +1048,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.locator('[data-testid="list"] .mrow')).toHaveCount(6); // the search has settled (98, 105, 108, 110, 111, 242)
       const unmarked = await p.locator('[data-testid="list"] .mrow').evaluateAll((es) => es.filter((e) => !e.querySelector('mark.hl')).map((e) => e.getAttribute('data-testid')));
       expect(unmarked, 'rows with nothing marked').toEqual([]);
-      await expect(p.locator('[data-testid="row-why"]').first()).toBeVisible();
+      // A-140: a unit's match on its parent's name is now SEEN on the row («↳ … Лавра» marked) - no hidden «Збіг» line is needed for it
+      await expect(p.getByTestId('mrow-110').getByTestId('row-parent').locator('mark.hl')).toHaveText(/^Лавр$/);
       await expect(p.getByTestId('mrow-242').getByTestId('row-born')).toHaveText(/^19\.04\.1961 (р\. н\.|г\. р\.)$/); // R-22
       const bg = await p.locator('mark.hl').first().evaluate((e) => getComputedStyle(e).backgroundColor);
       expect(bg).toBe('rgb(255, 255, 0)'); // the site's span.highlight colour
@@ -1962,7 +1963,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       // A-88: TalkBack hears «tab, 1 of 4, selected» - the row is a tablist, each kind a tab with its selected state
       expect(await p.locator(SHOWN).getByTestId('kinds').evaluate((k) => [k.getAttribute('role'), ...Array.from(k.querySelectorAll('ion-segment-button'))
         .map((b) => { const n = b.shadowRoot?.querySelector('button'); return `${n?.getAttribute('role')}:${n?.getAttribute('aria-selected')}`; })]))
-        .toEqual(['tablist', 'tab:true', 'tab:false', 'tab:false', 'tab:false']); // Ionic draws the tab on the inner (shadow) button
+        .toEqual(['tablist', 'tab:true', 'tab:false', 'tab:false', 'tab:false', 'tab:false']); // Ionic draws the tab on the inner (shadow) button; + «★» (A-141)
       await p.locator(SHOWN).getByTestId('kind-tab-publication').click();
       await expect(p.locator(SHOWN).getByTestId('kind-tab-publication')).toHaveClass(/segment-button-checked/);
       await p.mouse.move(0, 0); await p.waitForTimeout(400); // the segment's indicator transition
@@ -3853,6 +3854,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await longPress(p, onShown(p, 'arow-2869'));
       await p.locator('ion-action-sheet[data-testid="quick-sheet-a"]:not(.overlay-hidden)').getByTestId('qs-fav').click();
       await expect(onShown(p, 'asaved-2869')).toBeVisible();
+      await expect(p.locator('ion-action-sheet:not(.overlay-hidden)')).toHaveCount(0); // the shot without the sheet's backdrop (the live dot's pixel)
     } },
   // P4: a finger that moves (a scroll) opens no sheet; a short tap opens the row as always
   { name: 'sheet-not-on-scroll', only: ['phone-light'], path: '/monasteries', ready: async (p) => {
@@ -3894,6 +3896,9 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       if (p.viewportSize()!.width < 600) { await settled(p); await onShown(p, 'back').click(); }
       await expect(onShown(p, 'kinds')).toBeVisible();
       await expect(onShown(p, 'asaved-2869')).toBeVisible(); // ★ before the title in the feed
+      // the owner 19.11 (mock-up fav_star_colors, B): his mark in the app's primary colour, never the readers' rating gold
+      const [starColor, primary] = await onShown(p, 'asaved-2869').evaluate((e) => [getComputedStyle(e).color, getComputedStyle(e).getPropertyValue('--ion-color-primary-rgb').trim()]);
+      expect(starColor.replace(/\s/g, ''), 'the saved mark = the primary colour').toBe(`rgb(${primary.replace(/\s/g, '')})`);
       const tab = onShown(p, 'kind-tab-saved');
       expect(await tab.evaluate((b) => b.getAttribute('aria-label') ?? b.shadowRoot?.querySelector('button')?.getAttribute('aria-label') ?? null), 'the icon tab\'s name').toBe((await words(p, ['articles.saved_tab']))[0]);
       await tab.click();
@@ -4112,6 +4117,17 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(onShown(p, 'kind-tab-news')).toHaveClass(/segment-button-checked/);
       await expect(p.getByTestId('articles-search')).toHaveCount(0);
       await expect(p.getByTestId('sort-open')).toHaveAttribute('data-sort', 'published');
+      expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
+    } },
+  // A-143 (5): the site's /live/ (any ?lang=) -> «Трансляції»: cold start AND the running app (from a card), never the browser
+  { name: 'link-live', only: UK, path: '/', before: async (p) => { await recordOpens(p); await launchBy('https://inok.info/live/?lang=ru', 0)(p); }, ready: async (p) => {
+      await expect(p).toHaveURL(/\/streams$/, { timeout: 30_000 });
+      await expect(onShown(p, 'channels')).toBeVisible({ timeout: 20_000 });
+      await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/monasteries/242/' })));
+      await expect(p).toHaveURL(/\/monasteries\/242$/);
+      await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/live/' })));
+      await expect(p).toHaveURL(/\/streams$/);
+      await expect(onShown(p, 'channels')).toBeVisible({ timeout: 20_000 });
       expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
     } },
   // backlog 13:57 (InokSite 376): an eparchy link `/dioceses/<id>/` - cold start AND inside an article's text -> the app's OWN eparchy page

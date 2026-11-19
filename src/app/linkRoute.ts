@@ -12,7 +12,7 @@ export type ListEntry = { reset: number; kind?: ArticleKind };
 export type LinkRoute = { to: string; entry?: ListEntry };
 
 const LIST_ROUTES: Record<SiteList, LinkRoute['to']> = {
-  monasteries: '/monasteries', eparchies: '/more/eparchies', publication: '/articles', video: '/articles', news: '/articles',
+  monasteries: '/monasteries', eparchies: '/more/eparchies', streams: '/streams', publication: '/articles', video: '/articles', news: '/articles',
 };
 
 /** THE in-app screen of a site link (A-21(а), R-39, A-76, A-138): a card / an eparchy in the DB -> its page; an article -> `/articles?id=`
@@ -25,7 +25,7 @@ export async function linkRoute(db: Db, href: string, now: () => number = Date.n
   if (to?.kind === 'article') return { to: `/articles?id=${to.id}` };
   if (to?.kind === 'eparchy') return (await getEparchy(db, to.id)) ? { to: `/more/eparchies/${to.id}` } : null;
   if (to?.kind === 'list') {
-    const kind = to.list === 'monasteries' || to.list === 'eparchies' ? undefined : to.list;
+    const kind = to.list === 'monasteries' || to.list === 'eparchies' || to.list === 'streams' ? undefined : to.list;
     return { to: LIST_ROUTES[to.list], entry: { reset: now(), ...(kind ? { kind } : {}) } };
   }
   return null;

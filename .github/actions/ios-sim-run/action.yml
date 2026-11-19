@@ -32,6 +32,28 @@ runs:
         { echo "### iOS ${{ inputs.task }} ${{ inputs.runtime }} ${{ inputs.device }} (exit $rc)"; grep '^== ' "$O/runtimes.txt"; echo '```'; cat "$O/a3.txt" 2>/dev/null; cat "$O/blank.txt" 2>/dev/null; echo '```';
           cat "$O/sizes.txt" 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
         exit $rc
+    - name: App Store 04-eparchy / 05-map - the browser half on the LIVE export, joined with this run's marks (cloud_42, A-135; never fails the job)
+      if: inputs.task == 'appstore' && inputs.device != 'iphone63'
+      shell: bash
+      run: |
+        set +e   # the frames are evidence for CD, never a gate: every outcome is written, the job's verdict stays the tour's
+        O="ios-out/${{ inputs.task }}-${{ inputs.runtime }}-${{ inputs.device }}"; D="${{ inputs.device }}"; L="$O/appstore_join.txt"
+        [ -f "$O/appstore/insets-$D.json" ] || { echo "LIVE 04/05: SKIPPED - no insets-$D.json from the tour" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; }
+        UA="InokApp/$V (ios)"; API=https://inok.info/api/app/v1/export
+        # the LIVE export in place of the sample (this job's checkout only; nothing is committed): the same two files the app downloads
+        if curl -fsS -A "$UA" "$API/manifest.json" -o fixtures/manifest.json && curl -fsS -A "$UA" "$API/directory_v1.json.gz" -o fixtures/directory_v1.json.gz; then
+          echo "LIVE export: $(python3 -c 'import json;print(json.load(open("fixtures/manifest.json"))["export_version"])')" | tee -a "$L"
+        else echo "LIVE 04/05: SKIPPED - the export did not answer this runner" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; fi
+        npx playwright install chromium > /dev/null 2>&1
+        INSETS="$O/appstore" APPSTORE_RAW="$O/appstore_raw" npx playwright test -c screens/appstore.config.ts --grep "$D" > "$O/appstore_frames.txt" 2>&1
+        tail -4 "$O/appstore_frames.txt" | tee -a "$L"
+        for lang in uk ru en; do for n in 04-eparchy 05-map; do
+          raw="$O/appstore_raw/$lang/$D/$n.png"; sim="$O/appstore/$lang/$D/02-home.png"
+          if [ -f "$raw" ] && [ -f "$sim" ]; then "$PY" scripts/appstore_join.py "$O/appstore/insets-$D.json" "$raw" "$sim" "$O/appstore/$lang/$D/$n.png" 2>&1 | sed "s|^|$lang $n: |" | tee -a "$L"
+          else echo "$lang $n: NOT MADE (browser $( [ -f "$raw" ] && echo ok || echo none ), simulator 02-home $( [ -f "$sim" ] && echo ok || echo none ))" | tee -a "$L"; fi
+        done; done
+        grep -c '^.. 0[45]-[a-z]*: JOINED' "$L" | sed 's/^/LIVE 04 \/ 05 joined: /' | tee -a "$GITHUB_STEP_SUMMARY"
+        exit 0
     - uses: actions/upload-artifact@v7
       if: always()
       with: { name: 'ios-${{ inputs.task }}-${{ inputs.runtime }}-${{ inputs.device }}', path: ios-out/, retention-days: 30, if-no-files-found: ignore }

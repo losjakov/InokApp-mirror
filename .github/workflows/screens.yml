@@ -22,7 +22,7 @@ jobs:
   playwright:
     if: ${{ !github.event.repository.private || vars.MIRROR_LIVE != '1' }} # A-104 split (REF_public_mirror §3): MIRROR_LIVE=1 = it runs in the public mirror, SKIPPED here
     runs-on: ubuntu-24.04 # pinned (A-39 / cloud_13 0b): every green build, screens and KVM emulator run is on 24.04; ubuntu-latest moves to 26.04 gradually 19.10-19.11.2026
-    timeout-minutes: 60 # the a11y gate (A-88, axe on every screen) made the ring ~45 min: run 43068777412 hit the old 45-min cap at test 649 of ~663
+    timeout-minutes: 75 # cloud_42: +~60 screen tests (A-138..A-143) -> ~55 min;  the a11y gate (A-88, axe on every screen) made the ring ~45 min: run 43068777412 hit the old 45-min cap at test 649 of ~663
     env: # A-87: no apt, no `--with-deps`; the browser from GitHub's cache (or Playwright's CDN, retried); every network step named
       INOK_CI_DIR: /tmp/inok-ci
       INOK_SUMMARY: /tmp/inok-ci/summary.md

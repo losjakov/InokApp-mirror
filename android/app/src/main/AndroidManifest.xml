@@ -48,6 +48,7 @@
                 <data android:pathPrefix="/articles/news/" />
                 <data android:pathPrefix="/monasteries/" />
                 <data android:pathPrefix="/dioceses/" />
+                <data android:pathPrefix="/live/" />
             </intent-filter>
 
         </activity>

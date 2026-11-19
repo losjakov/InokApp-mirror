@@ -27,6 +27,10 @@ describe('linkRoute (StartRoute + useAppLinks + the article text)', () => {
     expect(await linkRoute(db, `https://inok.info/dioceses/${epId}/?lang=ru`, now)).toEqual({ to: `/more/eparchies/${epId}` });
     expect(await linkRoute(db, 'https://inok.info/dioceses/999999/', now)).toBeNull();
   });
+  it('A-143 (5): /live/ (any ?lang=) -> the «Трансляції» tab', async () => {
+    for (const h of ['https://inok.info/live/', 'https://inok.info/live/?lang=ru', 'https://inok.info/live?lang=en', 'https://www.inok.info/live/'])
+      expect(await linkRoute(db, h, now), h).toEqual({ to: '/streams', entry: { reset: 1234 } });
+  });
   it('a new link = a new mark (the list resets again even when it is open)', async () => {
     let n = 0;
     const a = await linkRoute(db, 'https://inok.info/monasteries/', () => ++n);
@@ -38,6 +42,6 @@ describe('linkRoute (StartRoute + useAppLinks + the article text)', () => {
     expect(await linkRoute(db, 'https://inok.info/articles/news/1833/', now)).toEqual({ to: '/articles?id=1833' });
     expect(await linkRoute(db, 'inokapp://tab/map', now)).toEqual({ to: '/map' });
     expect(await linkRoute(db, 'https://inok.info/monasteries/table/', now)).toBeNull();
-    expect(await linkRoute(db, 'https://inok.info/live/', now)).toBeNull();
+    expect(await linkRoute(db, 'https://inok.info/live/12/', now)).toBeNull();
   });
 });

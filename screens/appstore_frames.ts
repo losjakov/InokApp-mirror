@@ -12,6 +12,7 @@ import { KYIV, localPictures, picturesSettled } from './shared';
  * simulator frames of the same size, theme and language. The line-up = scripts/store_frames.txt (phone = iPhone, tablet = iPad).
  */
 const INSETS = process.env.INSETS ?? '';
+const IOS_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
 const OUT = process.env.APPSTORE_RAW ?? new URL('./out/appstore_raw/', import.meta.url).pathname;
 const frames = readFileSync(new URL('../scripts/store_frames.txt', import.meta.url), 'utf8').split('\n')
   .filter((l) => /^(phone|tablet)\|0[45]-/.test(l)).map((l) => l.split('|'));
@@ -21,7 +22,8 @@ for (const [set, device] of [['phone', 'iphone'], ['tablet', 'ipad']] as const) 
   test(`${device} ${lang}`, async ({ browser }) => {
     test.skip(!INSETS, 'INSETS=<dir> (the simulator run\'s insets-<device>.json)');
     const ins: Insets = JSON.parse(readFileSync(`${INSETS}/insets-${device}.json`, 'utf8'));
-    const page = await browser.newPage({ viewport: { width: ins.w, height: ins.h }, deviceScaleFactor: ins.dpr, colorScheme: 'light',
+    // cloud_42: the site serves its pictures to a normal mobile engine, not to «HeadlessChrome» (the live export's pictures come from inok.info)
+    const page = await browser.newPage({ userAgent: IOS_UA, viewport: { width: ins.w, height: ins.h }, deviceScaleFactor: ins.dpr, colorScheme: 'light',
       locale: { uk: 'uk-UA', ru: 'ru-RU', en: 'en-US' }[lang], geolocation: KYIV, permissions: ['geolocation'] });
     await page.addInitScript(({ i, l }) => {
       localStorage.setItem('inok.platform', 'ios'); // the iPhone's branches of the one code (no Play links)

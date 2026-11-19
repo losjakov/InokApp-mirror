@@ -32,4 +32,12 @@ open_link 'https://inok.info/monasteries/table/' browser table
 open_link 'https://inok.info/articles/publications/1832/' '^/articles\?id=1832$' cold_article_1832 cold
 open_link 'https://inok.info/monasteries/242/' '^/monasteries/242$' cold_card_242 cold
 open_link 'https://inok.info/articles/publications/1833/?lang=ru' '^/articles\?id=1833$' warm_after_cold_1833_ru
+# cloud_42 (A-138 + amendment): the LIST pages and /dioceses/ - the app's own screens, never the browser; running AND cold
+open_link 'https://inok.info/monasteries/?lang=ru' '^/monasteries$' list_monasteries
+open_link 'https://inok.info/articles/video/' '^/articles$' list_video
+open_link 'https://inok.info/dioceses/1/?lang=en' '^/more/eparchies/1$' eparchy_1
+open_link 'https://inok.info/live/?lang=ru' '^/streams$' list_live
+open_link 'https://inok.info/monasteries/' '^/monasteries$' cold_list_monasteries cold
+open_link 'https://inok.info/articles/news/?lang=ru' '^/articles$' cold_list_news cold
+open_link 'https://inok.info/live/' '^/streams$' cold_list_live cold
 echo "links $RES" | tee -a "$L"
