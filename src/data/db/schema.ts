@@ -54,12 +54,16 @@ CREATE INDEX IF NOT EXISTS ix_monastery_type ON monastery(type);
 CREATE INDEX IF NOT EXISTS ix_monastery_geo ON monastery(lat, lon);
 `;
 
+/** cloud_42: `saved_article` / `reading` (A-141) = the person's saved articles (the item's JSON whole) and the reading places of the last 50,
+ *  LOCAL, beside «Обрані», never touched by an import or a reset (KEPT_TABLES). NO «;» inside a `--` line of this SQL: the native plugin cuts
+ *  the text at «;» + end of line, and a chunk that is only a comment = «Execute: not an error (code 0)» (emulator 44615766139: the start
+ *  crashed after the first import) - unit `schemaDdl` pins it. */
 const DDL = `
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 ${directoryDdl()}
 ${MONASTERY_INDEXES}
 CREATE TABLE IF NOT EXISTS favourite(code INTEGER PRIMARY KEY, added_at INTEGER NOT NULL);
--- cloud_41 (A-133 «Я тут був»): the person's own marks, beside «Обрані»; LOCAL only, never touched by an import or a reset (A-132)
+-- cloud_41 (A-133 «Я тут був»): the person's own marks, beside «Обрані», LOCAL only, never touched by an import or a reset (A-132)
 CREATE TABLE IF NOT EXISTS visited(code INTEGER PRIMARY KEY, at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at INTEGER NOT NULL);
@@ -68,8 +72,6 @@ CREATE TABLE IF NOT EXISTS article(id INTEGER NOT NULL, lang TEXT NOT NULL, kind
 CREATE INDEX IF NOT EXISTS ix_article_date ON article(lang, published_at);
 CREATE TABLE IF NOT EXISTS article_rating(id INTEGER PRIMARY KEY, value INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS comment_hidden(id INTEGER PRIMARY KEY, hidden_at INTEGER NOT NULL);
--- cloud_42 (A-141): the person's saved articles (stored WHOLE: the item's JSON as shown) and the reading places of the last 50 articles;
--- LOCAL only, new tables beside «Обрані» (no existing table changes), never touched by an import or a reset (KEPT_TABLES)
 CREATE TABLE IF NOT EXISTS saved_article(id INTEGER PRIMARY KEY, lang TEXT NOT NULL, json TEXT NOT NULL, saved_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS reading(id INTEGER PRIMARY KEY, kind TEXT NOT NULL, snap TEXT NOT NULL, anchor INTEGER NOT NULL DEFAULT 0,
   frac REAL NOT NULL DEFAULT 0, pct INTEGER NOT NULL DEFAULT 0, started INTEGER NOT NULL DEFAULT 0, finished INTEGER NOT NULL DEFAULT 0,
