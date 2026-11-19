@@ -43,7 +43,7 @@ runs:
         # the LIVE export in place of the sample (this job's checkout only; nothing is committed): the same two files the app downloads
         if curl -fsS -A "$UA" "$API/manifest.json" -o fixtures/manifest.json && curl -fsS -A "$UA" "$API/directory_v1.json.gz" -o fixtures/directory_v1.json.gz; then
           echo "LIVE export: $(python3 -c 'import json;print(json.load(open("fixtures/manifest.json"))["export_version"])')" | tee -a "$L"
-        else echo "LIVE 04/05: SKIPPED - the export did not answer this runner" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; fi
+        else echo "LIVE 04/05: SKIPPED - the export refused this runner (HTTP $(curl -s -o /dev/null -w '%{http_code}' -A "$UA" "$API/manifest.json")): a browser half needs the site to serve it (QUESTIONS cloud_42)" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; fi
         npx playwright install chromium > /dev/null 2>&1
         INSETS="$O/appstore" APPSTORE_RAW="$O/appstore_raw" npx playwright test -c screens/appstore.config.ts --grep "$D" > "$O/appstore_frames.txt" 2>&1
         tail -4 "$O/appstore_frames.txt" | tee -a "$L"
