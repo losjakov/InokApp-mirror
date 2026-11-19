@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Locator, type Page, type Route } from '@playwright/test';
 import { onShown, settled, SHOWN, watchTransitions } from './settle';
 import { A11Y_PROFILES, axeScreen } from './a11y';
 import { ANDROID_UA, KYIV, jumpDrawn, localPictures, mapReady, picturesSettled, toastAboveTabs, benignPageError } from './shared';
@@ -506,6 +506,35 @@ const FEED_AND_ITEM = /\/fixtures\/articles\.json(\?.*)?$/;
 /** A-78 1: the app started BY a link (the browser ring's stand-in for the launch intent, `src/native/appLinks.ts`) */
 const launchBy = (url: string, ms: number) => async (p: Page) => { await p.addInitScript(([u, m]) => { const o = sessionStorage.getItem('inok.launch'); (window as any).__inokLaunch = o ? JSON.parse(o) : { url: u, ms: m }; }, [url, ms] as const); };
 const ruLang = async (p: Page) => { await p.addInitScript(() => localStorage.setItem('CapacitorStorage.settings', JSON.stringify({ lang: 'ru' }))); };
+
+
+/** A-142: a held finger (0.7 s, still) on a row */
+const longPress = async (p: Page, row: Locator) => {
+  await row.scrollIntoViewIfNeeded();
+  const b = (await row.boundingBox())!;
+  await p.mouse.move(b.x + Math.min(120, b.width / 2), b.y + Math.min(30, b.height / 2)); await p.mouse.down(); await p.waitForTimeout(750); await p.mouse.up();
+};
+/** A-141 helpers: the article's scroller (the tablet's detail pane or the page's ion-content) */
+const scrollerOf = (p: Page) => p.locator(SHOWN).locator('[data-testid="article"]').first();
+const scrollTopOf = (p: Page) => scrollerOf(p).evaluate(async (a) => { const pane = a.closest('.split__pane') as HTMLElement | null; const el = pane ?? await (a.closest('ion-content') as HTMLIonContentElement).getScrollElement(); return Math.round(el.scrollTop); });
+/** scroll to the given share of the text; returns the text of the block now at the reading line */
+const readTo = async (p: Page, share: number): Promise<string> => {
+  await scrollerOf(p).evaluate(async (a, f) => {
+    const pane = a.closest('.split__pane') as HTMLElement | null; const el = pane ?? await (a.closest('ion-content') as HTMLIonContentElement).getScrollElement();
+    const body = a.querySelector('.aview__body') as HTMLElement; const top = body.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+    el.scrollTop = top + body.offsetHeight * f; el.dispatchEvent(new Event('scroll'));
+  }, share);
+  await p.waitForTimeout(400);
+  await scrollerOf(p).evaluate(async (a) => { const pane = a.closest('.split__pane') as HTMLElement | null; const el = pane ?? await (a.closest('ion-content') as HTMLIonContentElement).getScrollElement(); el.scrollTop += 2; el.dispatchEvent(new Event('scroll')); });
+  await p.waitForTimeout(300);
+  return topBlock(p);
+};
+const topBlock = (p: Page): Promise<string> => scrollerOf(p).evaluate(async (a) => {
+  const pane = a.closest('.split__pane') as HTMLElement | null; const el = pane ?? await (a.closest('ion-content') as HTMLIonContentElement).getScrollElement();
+  const line = el.getBoundingClientRect().top + 8;
+  const b = Array.from(a.querySelectorAll('.aview__lead > *, .aview__body > *')).find((x) => x.getBoundingClientRect().bottom > line);
+  return (b?.textContent ?? '').trim().slice(0, 60);
+});
 /** the review profiles of a screen whose checks read Ukrainian words */
 /** F2 (A-79 2, REVIEW cloud_24): the tablet's list-detail = TWO scrollers (Material list-detail). (1) the wheel over one pane moves that pane only -
  *  the other pane's anchor stays at its y; (2) tapping another row shows the new detail's TOP (its title in view) and the list did not move.
@@ -2186,7 +2215,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   { name: 'article-vote-closed', only: UK, path: '/articles?id=2869', ready: async (p) => {
       const up = p.getByTestId('vote-up-108').locator('visible=true');
       await up.click();
-      await expect(p.getByTestId('vote-status').locator('visible=true')).toHaveText('Голосування відкриється з виходом застосунку в Google Play');
+      await expect(p.getByTestId('vote-status').locator('visible=true')).toHaveText('Голосування тимчасово недоступне');
       await expect(up).toHaveAttribute('data-mine', 'n'); // rolled back
       await expect(up).toContainText('1');
       await expect(p.locator('.comment__votes[data-closed="y"]').locator('visible=true')).toHaveCount(4); // every toggle knows
@@ -3787,6 +3816,312 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await settled(p); await onShown(p, 'back').click(); // D45: the arrow of the shown page, after its transition
       await expect(p).toHaveURL(/\/more\/eparchies\/1$/);
       await expect(p.getByTestId('eparchy-title').locator('visible=true')).toBeVisible();
+    } },
+  // ===== cloud_42 =====
+  // ---- A-142: the long press = a bottom sheet of quick actions ----
+  ...(['sheet-monastery', 'sheet-monastery-near'] as const).map((name) => ({ name, only: name === 'sheet-monastery' ? [...UK, 'phone-ru'] : ['phone-light'],
+    path: name === 'sheet-monastery' ? '/monasteries' : '/more/eparchies/1', ready: async (p: Page) => {
+      const row = onShown(p, 'mrow-37');
+      await expect(row).toBeVisible({ timeout: 20_000 });
+      await longPress(p, row);
+      const sheet = p.locator('ion-action-sheet[data-testid="quick-sheet-m"]:not(.overlay-hidden)');
+      await expect(sheet).toBeVisible();
+      const ids = await sheet.locator('[data-testid^="qs-"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-testid')));
+      expect(ids, 'the owner\'s items in his order (no site item)').toEqual(['qs-page', 'qs-fav', 'qs-visited', 'qs-route', 'qs-map', 'qs-call', 'qs-share', 'qs-cancel'].filter((x) => ids.includes(x) || x !== 'qs-call'));
+      expect(ids).not.toContain('qs-site');
+      await expect(sheet.locator('.action-sheet-title')).toContainText(/Церковщина|Церковщ/);
+      expect(new URL(p.url()).pathname, 'the hold did not open the card too').toMatch(/^\/(monasteries|more\/eparchies\/1)$/);
+      if (name === 'sheet-monastery-near') return;
+      const [added] = await words(p, ['card.favourite_added']);
+      await sheet.getByTestId('qs-fav').click();
+      await expect(p.locator('ion-toast[data-testid="fav-toast"]:not(.overlay-hidden)').first()).toContainText(added);
+      await longPress(p, onShown(p, 'mrow-37'));
+      const again = p.locator('ion-action-sheet[data-testid="quick-sheet-m"]:not(.overlay-hidden)');
+      await expect(again.getByTestId('qs-fav')).toContainText((await words(p, ['sheet.fav_remove']))[0]);
+    } })),
+  { name: 'sheet-article', only: [...UK, 'phone-ru'], path: '/articles', ready: async (p) => {
+      await toAll(p);
+      const row = onShown(p, 'arow-2869');
+      await expect(row).toBeVisible({ timeout: 20_000 });
+      await longPress(p, row);
+      const sheet = p.locator('ion-action-sheet[data-testid="quick-sheet-a"]:not(.overlay-hidden)');
+      await expect(sheet).toBeVisible();
+      expect(await sheet.locator('[data-testid^="qs-"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-testid')))).toEqual(['qs-open', 'qs-fav', 'qs-read', 'qs-share', 'qs-cancel']);
+      expect(new URL(p.url()).search, 'the hold did not open the article').toBe('');
+      await sheet.getByTestId('qs-read').click();
+      await expect(onShown(p, 'aread-2869')).toBeVisible(); // «✓ прочитано» in the row
+      await longPress(p, onShown(p, 'arow-2869'));
+      await p.locator('ion-action-sheet[data-testid="quick-sheet-a"]:not(.overlay-hidden)').getByTestId('qs-fav').click();
+      await expect(onShown(p, 'asaved-2869')).toBeVisible();
+    } },
+  // P4: a finger that moves (a scroll) opens no sheet; a short tap opens the row as always
+  { name: 'sheet-not-on-scroll', only: ['phone-light'], path: '/monasteries', ready: async (p) => {
+      const row = onShown(p, 'mrow-37');
+      await expect(row).toBeVisible({ timeout: 20_000 });
+      const b = (await row.boundingBox())!;
+      await p.mouse.move(b.x + 100, b.y + 20); await p.mouse.down(); await p.mouse.move(b.x + 100, b.y + 60, { steps: 4 }); await p.waitForTimeout(800); await p.mouse.up();
+      await expect(p.locator('ion-action-sheet:not(.overlay-hidden)')).toHaveCount(0);
+      await row.click();
+      await expect(p).toHaveURL(/\/monasteries\/37$/);
+    } },
+  // A-142 (4): the hint over the list the first time it is shown (a browser screen asks for it: `inok.hint`); not again in the same run
+  { name: 'quick-hint', only: ['phone-light', 'phone-dark'], path: '/monasteries', before: async (p) => { await p.addInitScript(() => localStorage.setItem('inok.hint', '1')); }, ready: async (p) => {
+      const hint = p.locator('ion-toast[data-testid="quick-hint-monastery"]:not(.overlay-hidden)');
+      await expect(hint).toBeVisible({ timeout: 10_000 });
+      await expect(hint).toContainText((await words(p, ['sheet.hint']))[0]);
+      await toastAboveTabs(p, 'ion-toast[data-testid="quick-hint-monastery"]:not(.overlay-hidden)');
+    } },
+  // ---- A-141: favourite articles + «continue reading» ----
+  // (1) + amendment: the article star after «A− A+», THE card's message (keys card.favourite_added / removed, ~2 s, polite, above the tabs),
+  // a native toggle (aria-pressed after every tap); the saved article in the «★» tab (named «Обрані») with ★ before its title in every list
+  { name: 'article-star', only: [...UK, 'phone-ru'], path: '/articles?id=2869', ready: async (p) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      const star = p.locator('[data-testid="article-fav"]:visible');
+      const order = await p.locator(SHOWN).locator('ion-header').first().evaluate((h) => Array.from(h.querySelectorAll('[data-testid="text-smaller"], [data-testid="text-larger"], [data-testid="article-fav"]'))
+        .filter((e) => (e as HTMLElement).offsetWidth > 0).map((e) => e.getAttribute('data-testid')));
+      expect(order, 'the star after «A− A+»').toEqual(['text-smaller', 'text-larger', 'article-fav']);
+      const [added, removed] = await words(p, ['card.favourite_added', 'card.favourite_removed']);
+      const toasts = p.locator('ion-toast[data-testid="fav-toast"]:not(.overlay-hidden)');
+      await star.click();
+      await expect(star).toHaveAttribute('aria-pressed', 'true');
+      await expect(toasts.first()).toContainText(added);
+      await toastAboveTabs(p, 'ion-toast[data-testid="fav-toast"]:not(.overlay-hidden)');
+      await star.click();
+      await expect(star).toHaveAttribute('aria-pressed', 'false');
+      await expect(toasts.first()).toContainText(removed);
+      await star.click();
+      await expect(star).toHaveAttribute('aria-pressed', 'true');
+      if (p.viewportSize()!.width < 600) { await settled(p); await onShown(p, 'back').click(); }
+      await expect(onShown(p, 'kinds')).toBeVisible();
+      await expect(onShown(p, 'asaved-2869')).toBeVisible(); // ★ before the title in the feed
+      const tab = onShown(p, 'kind-tab-saved');
+      expect(await tab.evaluate((b) => b.getAttribute('aria-label') ?? b.shadowRoot?.querySelector('button')?.getAttribute('aria-label') ?? null), 'the icon tab\'s name').toBe((await words(p, ['articles.saved_tab']))[0]);
+      await tab.click();
+      await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]')).toHaveCount(1);
+      await expect(onShown(p, 'arow-2869')).toBeVisible();
+      await expect(onShown(p, 'continue')).toHaveCount(0); // no continue card on «★»
+    } },
+  // (1) stored WHOLE: saved, then the feed forgets it and the site does not answer for it -> it opens from the phone (text + cover); the
+  // same article NOT saved = the «no connection» line. Red before: no star, no «★».
+  { name: 'article-saved-offline', only: ['phone-light', 'tablet'], path: '/articles?id=2869', ready: async (p) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      const text = (await onShown(p, 'article').locator('.aview__body p').first().textContent())!.trim();
+      await p.locator('[data-testid="article-fav"]:visible').click();
+      await expect(p.locator('[data-testid="article-fav"]:visible')).toHaveAttribute('aria-pressed', 'true');
+      // the feed now carries other items, dated older (the cache drops 2869, the site's window moved); the item itself does not answer
+      await p.route(/\/fixtures\/articles\.json(\?.*)?$/, async (r) => {
+        if (/item=/.test(r.request().url())) return r.abort();
+        const j = await fixtureJson(r); if (!j) return;
+        j.items = j.items.map((a: { id: number }, i: number) => ({ ...a, id: 50_000 + i, published_at: '2020-01-0' + ((i % 9) + 1) + 'T00:00:00Z' }));
+        await r.fulfill({ json: j });
+      });
+      if (p.viewportSize()!.width < 600) { await settled(p); await onShown(p, 'back').click(); }
+      await onShown(p, 'refresh').click();
+      await expect(onShown(p, 'refresh')).toHaveAttribute('data-busy', '0', { timeout: 15_000 });
+      await toAll(p);
+      await expect(onShown(p, 'arow-50000')).toBeVisible({ timeout: 15_000 });
+      await expect(onShown(p, 'articles').locator('[data-testid="arow-2869"]')).toHaveCount(0); // the feed cache forgot it
+      await onShown(p, 'kind-tab-saved').click();
+      await onShown(p, 'arow-2869').click();
+      await expect(onShown(p, 'article').locator('.aview__body p').first()).toHaveText(text, { timeout: 15_000 });
+      await expect(onShown(p, 'article-net')).toHaveCount(0);
+    } },
+  // (2) THE PLACE + (3) the continue card: read past the first screen for > 20 s (the page clock), leave -> the list shows ONE card
+  // «Продовжити читання» with the bar and «прочитано N%» and the row its bar; Home shows the same card under the four buttons; the card
+  // reopens the article AT the paragraph left, with the pill «↺ Продовжено… · З початку»; A+ keeps that paragraph; «З початку» = the top.
+  ...(['continue-list', 'continue-home', 'article-resume'] as const).map((name) => ({ name, only: name === 'article-resume' ? [...UK, 'phone-ru'] : UK, path: '/articles?id=2869',
+    before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      const left = await readTo(p, 0.45);
+      await p.clock.fastForward(21_000);
+      await p.waitForTimeout(1500); // the view's 1 s judge + the 0.7 s write
+      const wide = p.viewportSize()!.width >= 600;
+      if (!wide) { await settled(p); await onShown(p, 'back').click(); }
+      const card = onShown(p, 'continue');
+      await expect(card).toBeVisible({ timeout: 10_000 });
+      await expect(card.getByTestId('continue-open')).toHaveAttribute('data-id', '2869');
+      const pct = Number(await card.locator('.readbar').getAttribute('data-pct'));
+      expect(pct, 'прочитано N%').toBeGreaterThan(5);
+      expect(pct).toBeLessThan(100);
+      await expect(card.locator('.readbar')).toHaveAttribute('aria-label', new RegExp(`${pct}`));
+      if (!wide) await expect(onShown(p, 'apct-2869')).toBeVisible(); // the row's bar
+      if (name === 'continue-list') return;
+      if (name === 'continue-home') {
+        for (let i = 0; i < 3 && !/\/home$/.test(p.url()); i++) { await settled(p); await onShown(p, 'back').click(); await p.waitForTimeout(300); }
+        await expect(p).toHaveURL(/\/home$/);
+        await expect(onShown(p, 'home-continue')).toBeVisible();
+        const g = await p.locator(SHOWN).evaluate((pg) => { const t = pg.querySelector('[data-testid="tiles"]')!.getBoundingClientRect(); const c = pg.querySelector('[data-testid="home-continue"]')!.getBoundingClientRect(); return c.top - t.bottom; });
+        expect(g, 'under the four buttons').toBeGreaterThanOrEqual(0);
+        expect(g).toBeLessThan(40);
+        return;
+      }
+      if (wide) { await onShown(p, 'arow-2868').click(); await expect(p).toHaveURL(/id=2868/); } // the tablet: another article in the pane first
+      await card.getByTestId('continue-open').click();
+      await expect(onShown(p, 'resume-pill')).toBeVisible({ timeout: 10_000 });
+      expect(await topBlock(p), 'the same paragraph at the reading line').toBe(left);
+      await p.locator('[data-testid="text-larger"]:visible').click();
+      await p.waitForTimeout(500);
+      expect(await topBlock(p), 'A+: still that paragraph').toBe(left);
+      await p.locator('[data-testid="text-smaller"]:visible').click();
+      await p.waitForTimeout(500);
+      await expect(onShown(p, 'resume-start')).toBeVisible();
+    } })),
+  { name: 'article-from-start', only: ['phone-light'], path: '/articles?id=2869', before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      await readTo(p, 0.45); await p.clock.fastForward(21_000); await p.waitForTimeout(1500);
+      await settled(p); await onShown(p, 'back').click();
+      await onShown(p, 'continue-open').click();
+      await onShown(p, 'resume-start').click();
+      await expect.poll(() => scrollTopOf(p)).toBe(0);
+    } },
+  // (2) FINISHED: the ratings below the text reached -> «✓ прочитано» in the row, out of «continue»; (3) two unfinished -> «ще 1 ›» -> «Недочитані»
+  { name: 'article-finished', only: ['phone-light'], path: '/articles?id=2869', before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      await readTo(p, 0.45); await p.clock.fastForward(21_000); await p.waitForTimeout(1500);
+      await onShown(p, 'rating').scrollIntoViewIfNeeded(); await p.waitForTimeout(1500);
+      await settled(p); await onShown(p, 'back').click();
+      await expect(onShown(p, 'aread-2869')).toBeVisible();
+      await expect(onShown(p, 'continue')).toHaveCount(0);
+    } },
+  { name: 'unfinished-page', only: UK, path: '/articles?id=2869', before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      await readTo(p, 0.3); await p.clock.fastForward(21_000); await p.waitForTimeout(1500);
+      const wide = p.viewportSize()!.width >= 600;
+      if (!wide) { await settled(p); await onShown(p, 'back').click(); }
+      await onShown(p, 'arow-2868').click();
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      await readTo(p, 0.3); await p.clock.fastForward(21_000); await p.waitForTimeout(1500);
+      if (!wide) { await settled(p); await onShown(p, 'back').click(); }
+      await expect(onShown(p, 'continue-open')).toHaveAttribute('data-id', '2868'); // the latest first
+      await onShown(p, 'continue-more').click();
+      await expect(p).toHaveURL(/\/articles\/unfinished$/);
+      await expect(onShown(p, 'unfinished').locator('[data-testid^="arow-"]')).toHaveCount(2);
+      await expect(onShown(p, 'apct-2869')).toBeVisible();
+    } },
+  { name: 'continue-dismiss', only: ['phone-light'], path: '/articles?id=2869', before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      await readTo(p, 0.3); await p.clock.fastForward(21_000); await p.waitForTimeout(1500);
+      await settled(p); await onShown(p, 'back').click();
+      await onShown(p, 'continue-dismiss').click();
+      await expect(onShown(p, 'continue')).toHaveCount(0);
+      await expect(onShown(p, 'apct-2869')).toBeVisible(); // the place is kept (the row still says how far)
+    } },
+  // A-140 (1): the house row - right of the thumbnail the name, «↳ <parent>» (aria: the name only), the eparchy; UNDER it, full width, the
+  // address WITHOUT the postal code and the head; no «чол. / жін.» chip; the thumbnail's top on the CAP LINE of the name's first line (the
+  // REAL face's cap height, measured with a canvas - not the CSS constant), at 100 % and 200 %; nothing cut. Red before: a type chip, no
+  // parent line, the address with «03026», the thumbnail centred on the whole row.
+  ...([100, 200] as const).map((font) => ({ name: font === 100 ? 'house-row' : 'house-row-font200', font: font === 100 ? undefined : font,
+    only: font === 100 ? [...UK, 'phone-ru'] : ['phone-light'], path: '/more/eparchies/1', ready: async (p: Page) => {
+      const units = p.locator(SHOWN).locator('[data-testid="mrow-110"], [data-testid="mrow-105"], [data-testid="mrow-37"]');
+      await expect(units.first()).toBeVisible({ timeout: 20_000 });
+      await onShown(p, 'mrow-110').scrollIntoViewIfNeeded();
+      const r = await p.locator(SHOWN).locator('[data-testid^="mrow-"]').evaluateAll((rows) => rows.map((row) => {
+        const title = row.querySelector('.hrow__title') as HTMLElement; const thumb = row.querySelector('.hrow__thumb') as HTMLElement;
+        const cs = getComputedStyle(title); const fs = parseFloat(cs.fontSize); const lh = parseFloat(cs.lineHeight);
+        const c = document.createElement('canvas').getContext('2d')!; c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const cap = c.measureText('Н').actualBoundingBoxAscent; // the face's own cap height (Cyrillic En = Latin H)
+        const want = title.getBoundingClientRect().top + (lh - cap) / 2;
+        const parent = row.querySelector('[data-testid="row-parent"]');
+        const addr = row.querySelector('[data-testid="row-address"]');
+        return { code: row.getAttribute('data-testid'), off: Math.abs(thumb.getBoundingClientRect().top - want), fs,
+          chip: row.querySelectorAll('.mrow__type').length, parent: parent?.textContent ?? null, parentAria: parent?.querySelector('[aria-hidden="true"]')?.textContent ?? null,
+          addrPost: /\b\d{5}\b/.test(addr?.textContent ?? ''), addrUnder: addr ? addr.getBoundingClientRect().top >= thumb.getBoundingClientRect().bottom - 1 || addr.getBoundingClientRect().left < thumb.getBoundingClientRect().right : true,
+          cut: Array.from(row.querySelectorAll('h2, p')).some((e) => (e as HTMLElement).scrollWidth > (e as HTMLElement).clientWidth + 1 || getComputedStyle(e).whiteSpace === 'nowrap') };
+      }));
+      expect(r.length).toBeGreaterThan(2);
+      for (const x of r) {
+        expect(x.off, `${x.code}: thumbnail top on the cap line (font ${x.fs}px)`).toBeLessThanOrEqual(1.5);
+        expect(x.chip, `${x.code}: no type chip`).toBe(0);
+        expect(x.addrPost, `${x.code}: no postal code`).toBe(false);
+        expect(x.addrUnder, `${x.code}: the address under the thumbnail, full width`).toBe(true);
+        expect(x.cut, `${x.code}: nothing cut`).toBe(false);
+      }
+      const unit = r.find((x) => x.code === 'mrow-110');
+      expect(unit?.parent, 'the unit says whose it is').toMatch(/↳ .*(Лавр|Lavra)/);
+      expect(unit?.parentAria, '«↳» is drawn, not read').toBe('↳ ');
+      expect(r.filter((x) => x.code === 'mrow-98').every((x) => x.parent === null), 'a parent has no line').toBe(true);
+    } })),
+  // A-140 (2): the card head - «↳ <parent> ›» right under the h1 (48 dp), a tap -> the parent's card; the parent's units list without «↳»
+  { name: 'card-parent-head', only: [...UK, 'phone-ru'], path: '/monasteries/110', ready: async (p) => {
+      const link = onShown(p, 'parent-link');
+      await expect(link).toBeVisible({ timeout: 20_000 });
+      const g = await p.locator(SHOWN).locator('.card__title').first().evaluate((h) => {
+        const l = document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid="parent-link"]')!.getBoundingClientRect(); const b = h.getBoundingClientRect();
+        return { gap: Math.round(l.top - b.bottom), h: Math.round(l.height) };
+      });
+      expect(g.gap, 'right under the name').toBeLessThanOrEqual(6);
+      expect(g.h, '48 dp target').toBeGreaterThanOrEqual(47);
+      await expect(link).toContainText(/(Лавр|Lavra)/);
+      if (p.viewportSize()!.width < 600) {
+        await link.click();
+        await expect(p).toHaveURL(/\/monasteries\/98$/);
+        await expect(onShown(p, 'units')).toBeVisible({ timeout: 20_000 });
+        await expect(onShown(p, 'units').locator('[data-testid="row-parent"]')).toHaveCount(0);
+        await settled(p); await onShown(p, 'back').click();
+        await expect(p).toHaveURL(/\/monasteries\/110$/);
+      }
+    } },
+  // A-140 (3): the map card - «↳ <parent> ›» + «<town>, <oblast>» for EVERY house (a parent too); the link opens the parent's card
+  { name: 'map-card-parent', only: UK, path: '/map?code=110', ready: async (p) => {
+      await mapReady(p);
+      await expect(p.getByTestId('map-card').getByTestId('parent-link')).toContainText(/(Лавр|Lavra)/);
+      await expect(p.getByTestId('map-card-place')).toContainText(/, .*(обл|Крим)/);
+    } },
+  { name: 'map-card-place', only: ['phone-light'], path: '/map?code=37', ready: async (p) => {
+      await mapReady(p);
+      await expect(p.getByTestId('map-card').getByTestId('parent-link')).toHaveCount(0);
+      await expect(p.getByTestId('map-card-place')).toContainText(/, .*обл/);
+    } },
+  // A-138 (owner 19.11 08:49): the site's LIST link while the app runs, the list open WITH a search and a filter -> «Монастирі» as if just
+  // opened (no search, no chip, the full count, the top), NO browser. Red before: `/monasteries/` was null -> the in-app browser.
+  { name: 'link-list-monasteries', only: UK, path: '/monasteries', before: recordOpens, ready: async (p) => {
+      await expect(onShown(p, 'list')).toBeVisible();
+      const full = (await onShown(p, 'count').textContent())!.trim();
+      await p.getByTestId('filters-open').click();
+      await p.getByTestId('filter-list').locator('ion-select').nth(1).click();
+      await p.locator('ion-popover ion-radio, ion-popover ion-item').filter({ hasText: /(Лаври|Лавры|Lavras) \(3\)/ }).first().click();
+      await p.getByTestId('filters-apply').click();
+      await expect(p.getByTestId('chip-object_type')).toBeVisible();
+      await p.getByTestId('search').locator('input').fill('Лавра');
+      await expect.poll(async () => (await onShown(p, 'count').textContent())!.trim()).not.toBe(full);
+      await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/monasteries/?lang=ru' })));
+      await expect(p).toHaveURL(/\/monasteries$/);
+      await expect(p.getByTestId('chip-object_type')).toHaveCount(0);
+      await expect(p.getByTestId('search').locator('input')).toHaveValue('');
+      await expect.poll(async () => (await onShown(p, 'count').textContent())!.trim()).toBe(full);
+      expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
+    } },
+  // A-138 amendment: the article SECTION links - cold start (the system started the app with it) -> «Публікації» on that kind's tab, NO browser
+  ...([['video', 'video'], ['news', 'news'], ['publications', 'publication']] as const).map(([path, kind]) => (
+    { name: `link-cold-articles-${path}`, only: path === 'video' ? UK : ['phone-light'], path: '/',
+      before: async (p: Page) => { await recordOpens(p); await launchBy(`https://inok.info/articles/${path}/?lang=en`, 0)(p); }, ready: async (p: Page) => {
+        await expect(p).toHaveURL(/\/articles$/, { timeout: 30_000 });
+        await expect(onShown(p, `kind-tab-${kind}`)).toHaveClass(/segment-button-checked/, { timeout: 20_000 });
+        await expect(onShown(p, 'articles')).toBeVisible({ timeout: 20_000 });
+        await expect.poll(() => p.locator(SHOWN).locator('[data-testid^="arow-"]').evaluateAll((es) => [...new Set(es.map((e) => e.getAttribute('data-kind')))])).toEqual([kind]);
+        expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
+      } })),
+  // the running app on «Відео» with a search open and the order changed -> the news link: «Новини», no search, the default order
+  { name: 'link-warm-articles-reset', only: ['phone-light'], path: '/articles', before: recordOpens, ready: async (p) => {
+      await expect(onShown(p, 'articles')).toBeVisible();
+      await onShown(p, 'kind-tab-video').click();
+      await expect(onShown(p, 'kind-tab-video')).toHaveClass(/segment-button-checked/);
+      await p.getByTestId('search-open').click();
+      await expect(p.getByTestId('articles-search')).toBeVisible();
+      await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/articles/news/' })));
+      await expect(onShown(p, 'kind-tab-news')).toHaveClass(/segment-button-checked/);
+      await expect(p.getByTestId('articles-search')).toHaveCount(0);
+      await expect(p.getByTestId('sort-open')).toHaveAttribute('data-sort', 'published');
+      expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
+    } },
+  // backlog 13:57 (InokSite 376): an eparchy link `/dioceses/<id>/` - cold start AND inside an article's text -> the app's OWN eparchy page
+  { name: 'link-cold-eparchy', only: UK, path: '/', before: async (p) => { await recordOpens(p); await launchBy('https://inok.info/dioceses/1/?lang=ru', 0)(p); }, ready: async (p) => {
+      await expect(p).toHaveURL(/\/more\/eparchies\/1$/, { timeout: 30_000 });
+      await expect(p.getByTestId('eparchy-title').locator('visible=true')).toBeVisible({ timeout: 20_000 });
+      expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
+      await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/monasteries/' })));
+      await expect(p).toHaveURL(/\/monasteries$/);
+      await expect(onShown(p, 'list')).toBeVisible();
     } },
 ];
 

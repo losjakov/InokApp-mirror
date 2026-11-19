@@ -10,6 +10,7 @@ import { checkedLabel } from '@/data/refresh';
 import { StreamRow } from '@/components/StreamRow';
 import { CalendarStrip } from '@/components/CalendarStrip';
 import { MonasteryRow } from '@/components/MonasteryRow';
+import { ContinueReading } from '@/components/ContinueReading';
 import { churchOutline } from '@/components/icons';
 import { listChannels } from '@/data/repo/channels';
 import { nearbyMonasteries } from '@/data/repo/monasteries';
@@ -98,6 +99,7 @@ export function HomePage() {
             </Link>
           ))}
         </nav>
+        <ContinueReading testId="home-continue" />{/* A-141 (3): under the four buttons, only while something is unfinished */}
         <CalendarStrip />
         <IonList className="home__list">
           {header(online.length ? t('home.live_now_n', { n: online.length }) : t('home.live_now'), '/streams', 'home-live')}

@@ -22,8 +22,9 @@ export interface Settings {
   ownDevice: boolean;
 }
 /** A-64 / A-67: the two soft notification questions - after the first opened article, on the first open of «Трансляції» */
-export type AskKind = 'articles' | 'streams';
-const ASK_KINDS: AskKind[] = ['articles', 'streams'];
+export type AskKind = 'articles' | 'streams' | 'hint_monastery' | 'hint_article';
+/** + A-142 (4): `hint_<kind>` = that long-press hint is retired on this install (the store / ring scripts set it: no hint in a frame) */
+const ASK_KINDS: AskKind[] = ['articles', 'streams', 'hint_monastery', 'hint_article'];
 /** A-23 #8: five steps of the article text, on top of the system font scale */
 export const ARTICLE_SCALES = [0.85, 1, 1.15, 1.3, 1.5];
 const DEFAULT_SCALE = 1;

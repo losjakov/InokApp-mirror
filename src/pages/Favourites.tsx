@@ -6,6 +6,8 @@ import { MonasteryRow } from '@/components/MonasteryRow';
 import { getMonasteriesInOrder } from '@/data/repo/monasteries';
 import type { MonasteryListRow as Row } from '@/data/repo/types';
 import { useApp } from '@/state/AppContext';
+import { useReading } from '@/state/reading';
+import { ArticleRow } from '@/components/ArticleRow';
 
 /** THE page of the person's own marks (A-15: one component) - «Обрані» (the star) and «Я тут був» (A-133: the counter in its head, the
  *  same rows; empty = one inviting line). Both lists are local and work offline. */
@@ -38,4 +40,21 @@ export function FavouritesPage() {
 export function VisitedPage() {
   const { t, visited, visitedStat } = useApp();
   return <MarkedPage codes={visited} title={t('visited.title')} empty={t('visited.empty')} emptyId="visited-empty" counter={t('visited.count', visitedStat)} />;
+}
+
+/** A-141 (3) «Недочитані» («ще N ›» of the continue card): every unfinished article, the latest first, THE article rows with their bars; offline. */
+export function UnfinishedPage() {
+  const { t } = useApp();
+  const { unfinished } = useReading();
+  const navigate = useNavigate();
+  return (
+    <IonPage>
+      <PageHeader title={t('reading.unfinished')} />
+      <IonContent>
+        {unfinished.length === 0 ? <div className="empty" data-testid="unfinished-empty">{t('reading.unfinished_empty')}</div> : (
+          <IonList data-testid="unfinished">{unfinished.map((p) => <ArticleRow key={p.id} a={{ ...p.snap, body: null }} onSelect={(id) => navigate(`/articles?id=${id}`)} />)}</IonList>
+        )}
+      </IonContent>
+    </IonPage>
+  );
 }

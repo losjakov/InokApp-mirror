@@ -30,6 +30,7 @@ if (import.meta.env.VITE_SIM_DRIVER === '1') void import('./app/simDriver').then
 installCrashGuard(); // A-48: never die white - window errors, rejections, the renderer gone, the crash of the last launch
 // cloud_36 (B2): iOS has no system Back - the edge swipe walks the page stack as the header arrow does (Ionic's gesture; the md look stays)
 setupIonicReact({ mode: 'md', swipeBackEnabled: isIos() });
+document.documentElement.dataset.os = isIos() ? 'ios' : 'android'; // A-140: the system face's cap height in CSS (Roboto / SF Pro)
 applyTheme('system'); // before the first paint; the stored choice follows once the settings are read (AppContext)
 applyTextScale(window, isIos()); // A-56: hyphenation only at a large system text scale; cloud_37: on iOS the root size follows Dynamic Type
 

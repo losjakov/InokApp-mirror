@@ -36,6 +36,8 @@ export interface MonasteryRow {
   /** the eparchy's and oblast's names (LEFT JOIN in the repo) — the list row's second line */
   eparchy_uk?: string | null; eparchy_ru?: string | null; eparchy_en?: string | null;
   oblast_uk?: string | null; oblast_ru?: string | null; oblast_en?: string | null;
+  /** A-140: the parent house's own name (LEFT JOIN on parent_code) — «↳ <parent>» */
+  parent_uk?: string | null; parent_ru?: string | null; parent_en?: string | null;
   /** filled by the repo when the user's position is known */
   distance_km?: number;
 }
@@ -66,6 +68,10 @@ export function rowParts(row: PlaceNames, lang: Lang, dict: Record<string, strin
     eparchy: withLabel(field(row, 'eparchy', lang), dict.facet_eparchy),
   };
 }
+/** A-140 (1): the postal code is not printed in lists - a part of the address that is only a 5-digit code (Ukraine's index) is dropped,
+ *  wherever it stands («…, м. Київ, 01015», «01015, м. Київ, …»); nothing else of the address changes. */
+export const withoutPostcode = (address: string): string => address.split(/\s*,\s*/).filter((p) => !/^\d{5}$/.test(p)).join(', ');
+
 /**
  * The head's line of the list row, as /monasteries/ prints it: «Намісник (ігумен) - митрополит Павел (Лебідь), Вишгородський і
  * Чорнобильський» — the post (capitalised), the person (the site sets it in bold: title, name, surname in brackets), the rest

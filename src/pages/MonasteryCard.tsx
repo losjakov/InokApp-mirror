@@ -18,6 +18,8 @@ import { ScrollArrows } from '@/components/ScrollArrows';
 import { longDate } from '@/i18n/date';
 import { getMonastery, getUnits } from '@/data/repo/monasteries';
 import { MonasteryRow as HouseRow } from '@/components/MonasteryRow';
+import { ParentLine } from '@/components/ParentLine';
+import { useFavToast, useVisitedToast } from '@/components/FavMark';
 import { phoneGroups } from '@/data/repo/phones';
 import { getChannelOfMonastery } from '@/data/repo/channels';
 import { field, headBorn, revivalLabel, rowParts, rowSubtitle, type ChannelRow, type MonasteryListRow, type MonasteryRow } from '@/data/repo/types';
@@ -37,9 +39,8 @@ import { LANGS, type Lang } from '@/i18n';
 function FavButton({ code }: { code: number }) {
   const { t, favourites, toggleFavourite } = useApp();
   const fav = favourites.has(code);
-  const toast = useToast();
-  // A-96 W-6: ~2 s above the tab bar, a new one replaces the old; read by TalkBack (role status)
-  const tap = async () => { await toggleFavourite(code); toast(t(fav ? 'card.favourite_removed' : 'card.favourite_added'), { duration: FLASH_MS, testId: 'fav-toast' }); };
+  const flash = useFavToast(); // A-96 W-6 + A-141 amendment: THE message of every star
+  const tap = async () => { await toggleFavourite(code); flash(!fav); };
   return <MarkToggle kind="fav" on={fav} label={fav ? t('card.favourite_remove') : t('card.favourite_add')} icon={fav ? star : starOutline} onTap={() => void tap()} testId="fav" />;
 }
 
@@ -49,11 +50,8 @@ function FavButton({ code }: { code: number }) {
 function VisitedButton({ code }: { code: number }) {
   const { t, visited, toggleVisited } = useApp();
   const on = visited.has(code);
-  const toast = useToast();
-  const tap = async () => {
-    const r = await toggleVisited(code);
-    toast(t(r.on ? 'visited.marked_toast' : 'visited.removed_toast', { n: r.n, m: r.m }), { duration: FLASH_MS, testId: 'visited-toast' });
-  };
+  const flash = useVisitedToast();
+  const tap = async () => flash(await toggleVisited(code));
   return <MarkToggle kind="visited" on={on} label={t('visited.mark')} icon={on ? checkmarkCircle : checkmarkCircleOutline} onTap={() => void tap()} testId="visited" />;
 }
 
@@ -191,6 +189,8 @@ function Detail({ code }: { code: number }) {
       </div>
       {/* D49: on ≥600 dp (no toolbar of its own) the star sits at the end of the title row — the cover carries only the open sign and «Фотогалерея» */}
       <div className="card__title-row"><h1 className="card__title">{name}</h1>{wide && <span className="card__marks"><VisitedButton code={row.code} /><FavButton code={row.code} /></span>}</div>
+      {/* A-140 (2): whose house - «↳ <parent> ›» right under the name, a tap opens the parent's card (the facts' row below stays) */}
+      <ParentLine row={row} onOpen={() => navigate(`/monasteries/${row.parent_code}`)} className="card__parent" />
       {/* owner 12.11.2026 (cloud_29): the card's eye stands at the RIGHT edge, on the place line's last line, without the « · » */}
       <div className="card__subrow"><p className="card__sub">{rowSubtitle(row, lang, dict) && <PlaceLine row={row} wide={wide} />}</p>{eye}</div>
       <LoadAllPhotos />
@@ -232,7 +232,7 @@ function Detail({ code }: { code: number }) {
       {units.length > 0 && (
         <section className="units" data-testid="units">
           <h2 className="inok-heading">{dict.label_units ?? ''}</h2>
-          {units.map((u) => <HouseRow key={u.code} row={u} onSelect={(c) => navigate(`/monasteries/${c}`)} />)}
+          {units.map((u) => <HouseRow key={u.code} row={u} noParent onSelect={(c) => navigate(`/monasteries/${c}`)} />)}
         </section>
       )}
       {links.length > 0 && (

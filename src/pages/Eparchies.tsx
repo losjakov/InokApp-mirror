@@ -20,7 +20,7 @@ import { ShareFooter } from '@/components/ShareFooter';
 import { SplitContent, useListDetail } from '@/components/SplitContent';
 import { sitePageUrl } from '@/data/links/sitePages';
 import { siteUrl } from '@/native/intents';
-import { EPARCHIES_PATH, eparchyPath } from '@/app/nav';
+import { EPARCHIES_PATH, eparchyPath, useListEntry } from '@/app/nav';
 
 const hostOf = (url: string): string => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
 
@@ -55,6 +55,7 @@ export function EparchiesPage() {
   const wide = useWide();
   const { selected, open } = useListDetail('id', wide, eparchyPath);
   const [q, setQ] = useState('');
+  useListEntry(() => setQ('')); // A-138: the site's `/dioceses/` = the list as if just opened
   const [rows, setRows] = useState<EparchyRow[] | null>(null);
   useEffect(() => { let on = true; void listEparchies(db, lang, q).then((r) => on && setRows(r)); return () => { on = false; }; }, [db, lang, q]);
 

@@ -221,7 +221,7 @@ a3_walk() {
   case "$g1|$g2|$g3|$gs" in "1 / "*"|2 / "*"|closed|ok") a3 "gallery (app's viewer)" PASS "$g1 -> $g2 -> $g3; the frame = the viewer";; *) a3 "gallery (app's viewer)" FAIL "$g1 -> $g2 -> $g3; frame $gs";; esac
   guard_crash spot5
   # 5 «Автозавантаження фото» = «Вручну» (the select's dialog, tapped), then a card's cover waits with its button; back to Wi-Fi and mobile
-  nav go /more; sleep 2; nav click '[data-testid="photos-mode"]'; sleep 2
+  nav go /more; nav wait '[data-testid="photos-mode"]'; nav click '[data-testid="photos-mode"]'; sleep 2
   # the radio and «OK» in two taps (one script doing both: OK read the choice before the radio had taken it - measured in WebKit)
   ev "(() => { const b = Array.from(document.querySelectorAll('ion-alert .alert-radio-button')); b[b.length - 1].click(); return 'ok'; })()" > /dev/null; sleep 1
   ev "(() => { const ok = document.querySelectorAll('ion-alert .alert-button'); ok[ok.length - 1].click(); return 'ok'; })()" > /dev/null; sleep 2
@@ -229,7 +229,7 @@ a3_walk() {
   nav go /monasteries/37; sleep 4; v=$(ev "document.querySelectorAll('.ion-page:not(.ion-page-hidden) [data-testid=photo-wait]').length")
   shot "$OUT/a3-photos-manual__$TAG.png"
   [ "$pm" = manual ] && [ "${v:-0}" -gt 0 ] 2>/dev/null && a3 "photo setting «Вручну»" PASS "setting=$pm; the card waits: $v placeholder(s)" || a3 "photo setting «Вручну»" FAIL "setting=$pm; placeholders $v"
-  nav go /more; sleep 2; nav click '[data-testid="photos-mode"]'; sleep 2   # back to «Wi-Fi і мобільний» (PHOTO_MODES[1]) by the same dialog
+  nav go /more; nav wait '[data-testid="photos-mode"]'; nav click '[data-testid="photos-mode"]'; sleep 2   # back to «Wi-Fi і мобільний» (PHOTO_MODES[1]) by the same dialog
   ev "(() => { document.querySelectorAll('ion-alert .alert-radio-button')[1].click(); return 'ok'; })()" > /dev/null; sleep 1
   ev "(() => { const ok = document.querySelectorAll('ion-alert .alert-button'); ok[ok.length - 1].click(); return 'ok'; })()" > /dev/null; sleep 2
   guard_crash spot6
@@ -247,7 +247,7 @@ a3_walk() {
   local n0 n1; n0=$(ev "document.querySelectorAll('.ion-page:not(.ion-page-hidden) [data-testid^=mrow-]').length")
   ev "(() => { const s = document.querySelector('.ion-page:not(.ion-page-hidden) ion-searchbar[data-testid=search]'); s.value = 'Лавра'; s.dispatchEvent(new CustomEvent('ionInput', { detail: { value: 'Лавра' } })); return 'ok'; })()" > /dev/null; sleep 3
   n1=$(ev "document.querySelectorAll('.ion-page:not(.ion-page-hidden) [data-testid^=mrow-]').length"); shot "$OUT/a3-search__$TAG.png"
-  nav go /articles; sleep 3; nav click '[data-testid="sort-open"]'; sleep 2
+  nav go /articles; nav wait '[data-testid="sort-open"]'; nav click '[data-testid="sort-open"]'; sleep 2
   ev "(document.querySelector('ion-action-sheet [data-testid=sort-views_week]') || {}).click?.(), 'ok'" > /dev/null; sleep 4
   local so; so=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=sort-open]')||{}).dataset?.sort||'none'"); shot "$OUT/a3-sort__$TAG.png"
   [ "${n1:-0}" -gt 0 ] 2>/dev/null && [ "${n1:-0}" -lt "${n0:-0}" ] && [ "$so" = views_week ] && a3 "search + sort" PASS "list $n0 -> «Лавра» $n1; articles sort=$so" || a3 "search + sort" FAIL "list $n0 -> «Лавра» $n1; articles sort=$so"
@@ -278,7 +278,7 @@ a3_walk() {
   [ "${v#*id=1833}" != "$v" ] && a3 "link inside an article" PASS "1832 -> $v" || a3 "link inside an article" FAIL "1832 -> $v"
   guard_crash spot10
   # 10 the dark theme by the system (the app on «system»)
-  nav go /more; sleep 1; nav click '[data-testid="theme-system"]'; sleep 1
+  nav go /more; nav wait '[data-testid="theme-system"]'; nav click '[data-testid="theme-system"]'; sleep 1
   xcrun simctl ui "$U" appearance dark; sleep 3; nav go /home; sleep 3; v=$(check theme); shot "$OUT/a3-dark__$TAG.png"
   xcrun simctl ui "$U" appearance light; sleep 2
   [ "$v" = dark ] && a3 "dark theme (system)" PASS "the system dark -> the app $v" || a3 "dark theme (system)" FAIL "the system dark -> the app $v"
@@ -291,7 +291,7 @@ a3_walk() {
   xcrun simctl ui "$U" content_size large; launch
   guard_crash spot12
   # 12 «Перевірити оновлення»: the App Store's answer under the row
-  nav go /more/about; sleep 2; nav click '[data-testid="about-update"]'; sleep 6
+  nav go /more/about; nav wait '[data-testid="about-update"]'; nav click '[data-testid="about-update"]'; sleep 6
   v=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=about-update-note]')||{}).textContent||'none'"); shot "$OUT/a3-update__$TAG.png"
   [ "$v" != none ] && a3 "update check" PASS "«${v}»" || a3 "update check" FAIL "no answer under the row"
   guard_crash spot13
@@ -378,7 +378,7 @@ a3_walk() {
 appstore() { # set(phone|tablet) dir-name
   local lang
   ev "(async () => { const P = Capacitor.Plugins.Preferences; const v = (await P.get({ key: 'settings' })).value;
-    const s = Object.assign(v ? JSON.parse(v) : {}, { theme: 'light', photos: 'any', asked: ['articles', 'streams'], ownDevice: true });
+    const s = Object.assign(v ? JSON.parse(v) : {}, { theme: 'light', photos: 'any', asked: ['articles', 'streams', 'hint_monastery', 'hint_article'], ownDevice: true });
     await P.set({ key: 'settings', value: JSON.stringify(s) }); return 'ok'; })()" > /dev/null
   launch
   # cloud_40 (A-129, C1): THE device's own layout numbers for the browser frames 04 / 05 - the safe-area insets (env), the root text size

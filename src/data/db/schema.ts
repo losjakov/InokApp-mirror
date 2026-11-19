@@ -68,6 +68,12 @@ CREATE TABLE IF NOT EXISTS article(id INTEGER NOT NULL, lang TEXT NOT NULL, kind
 CREATE INDEX IF NOT EXISTS ix_article_date ON article(lang, published_at);
 CREATE TABLE IF NOT EXISTS article_rating(id INTEGER PRIMARY KEY, value INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS comment_hidden(id INTEGER PRIMARY KEY, hidden_at INTEGER NOT NULL);
+-- cloud_42 (A-141): the person's saved articles (stored WHOLE: the item's JSON as shown) and the reading places of the last 50 articles;
+-- LOCAL only, new tables beside «Обрані» (no existing table changes), never touched by an import or a reset (KEPT_TABLES)
+CREATE TABLE IF NOT EXISTS saved_article(id INTEGER PRIMARY KEY, lang TEXT NOT NULL, json TEXT NOT NULL, saved_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS reading(id INTEGER PRIMARY KEY, kind TEXT NOT NULL, snap TEXT NOT NULL, anchor INTEGER NOT NULL DEFAULT 0,
+  frac REAL NOT NULL DEFAULT 0, pct INTEGER NOT NULL DEFAULT 0, started INTEGER NOT NULL DEFAULT 0, finished INTEGER NOT NULL DEFAULT 0,
+  dismissed INTEGER NOT NULL DEFAULT 0, opened_at INTEGER NOT NULL);
 `;
 
 const FTS_COLUMNS = 'code UNINDEXED, name, town, eparchy, oblast, head, address';

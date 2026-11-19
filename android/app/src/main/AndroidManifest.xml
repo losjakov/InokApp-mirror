@@ -35,7 +35,7 @@
             <!-- cloud_41 (A-133 C1): the four quick actions on the icon (res/xml/shortcuts.xml) -->
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
 
-            <!-- A-76 App Links: an inok.info ARTICLE or MONASTERY link opens here (the site's /.well-known/assetlinks.json, R-7); the ONE
+            <!-- A-76 App Links (+ A-138: the LIST pages and /dioceses/ too): an inok.info ARTICLE, MONASTERY or EPARCHY link opens here (the site's /.well-known/assetlinks.json, R-7); the ONE
                  router (src/data/links/router.ts) opens an article / a card and sends any other path these prefixes let in to the browser -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -47,6 +47,7 @@
                 <data android:pathPrefix="/articles/video/" />
                 <data android:pathPrefix="/articles/news/" />
                 <data android:pathPrefix="/monasteries/" />
+                <data android:pathPrefix="/dioceses/" />
             </intent-filter>
 
         </activity>

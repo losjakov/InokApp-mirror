@@ -68,6 +68,8 @@ describe('A-111 the selection rule (census cloud_34)', () => {
       'components/Gallery.tsx: CLEAR', 'components/HtmlLite.tsx: CLEAR', 'components/MonasteryRow.tsx: KEEP',
       'components/PhotoViewer.tsx: CLEAR', 'components/PhotoViewer.tsx: CLEAR', 'components/StreamRow.tsx: KEEP',
       'data/repo/articles.ts: KEEP', // the row's cover keeps, the rest clears (keep: url === cover)
+      'data/repo/articles.ts: KEEP', // cloud_42 (A-141 (1)): a SAVED article keeps ALL its pictures (keepSavedPictures)
+      'components/ContinueReading.tsx: KEEP', // A-141 (3): the continue card's cover = the row's kept cover
       'pages/ArticleView.tsx: CLEAR', 'pages/Eparchies.tsx: KEEP', 'pages/Eparchies.tsx: KEEP', 'pages/MonasteryCard.tsx: CLEAR',
     ].map((s) => s.replace('pages/ArticleView', 'components/ArticleView')).sort());
   });

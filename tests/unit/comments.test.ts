@@ -94,6 +94,8 @@ describe('A-34: comment votes (R-27)', () => {
     await bar.press(1);
     expect(out.at(-1)).toEqual([V(1, 0, 0), 'closed']);
     expect(castMessage('closed', 'vote')).toBe('cast.closed_vote');
+    // REVIEW cloud_41 Q1 (cloud_42): the closed vote's line names no store - the same words on Android and iOS
+    for (const l of ['uk', 'ru', 'en']) expect(JSON.parse(readFileSync(`src/i18n/${l}.json`, 'utf8'))['cast.closed_vote']).not.toMatch(/Google|Play|App Store/);
   });
   it('comments are asked with the install id, kept, and read back offline', async () => {
     const { db } = await freshDb();

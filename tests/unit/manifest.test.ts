@@ -37,12 +37,12 @@ describe('Android manifest - the phone name (A-69) and the permissions (N5)', ()
     expect([...f.matchAll(/android:scheme="([^"]+)"/g)].map((m) => m[1])).toEqual(['https']);
     expect([...f.matchAll(/android:host="([^"]+)"/g)].map((m) => m[1])).toEqual(['inok.info']);
     const prefixes = [...f.matchAll(/android:pathPrefix="([^"]+)"/g)].map((m) => m[1]);
-    expect(prefixes).toEqual([...Object.values(ARTICLE_SECTIONS).map((x) => `/${x}`), '/monasteries/']); // one source: the router's sections
+    expect(prefixes).toEqual([...Object.values(ARTICLE_SECTIONS).map((x) => `/${x}`), '/monasteries/', '/dioceses/']); // one source: the router's sections
     expect(f).not.toMatch(/android:path(Pattern)?=/);
-    // each prefix: its item form opens in the app, its bare list goes to the browser
+    // each prefix: its item form AND (A-138) its bare list open in the app - nothing the filter lets in by its bare prefix lands in the browser
     for (const p of prefixes) {
       expect(linkTarget(`https://inok.info${p}1832/`), p).not.toBeNull();
-      expect(linkTarget(`https://inok.info${p}`), p).toBeNull();
+      expect(linkTarget(`https://inok.info${p}`)?.kind, p).toBe('list');
     }
   });
 });

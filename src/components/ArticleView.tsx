@@ -26,6 +26,8 @@ import { ScrollArrows } from './ScrollArrows';
 import { Spoken } from './Spoken';
 import { useApp } from '@/state/AppContext';
 import { consumedArticles } from '@/native/push';
+import { PILL_MS, useReadingPlace } from './ReadingPlace';
+import { getSaved, refreshSaved } from '@/data/repo/reading';
 
 /** R-29 (D52): a read's fresh numbers onto the shown article (stars, votes, «Коментарі · N»). */
 const fresh = (r: CommentsRead) => (cur: Article | null | undefined) => (cur ? withCounts(cur, r) : cur);
@@ -41,6 +43,7 @@ export function ArticleView({ id }: { id: number }) {
   const [commentsFail, setCommentsFail] = useState<unknown>(null);
   const [fail, setFail] = useState<NetFailure | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [gone, setGone] = useState(false); // A-141 (1): the site removed a SAVED article - its copy shows with a quiet note
   const toast = useToast();
   const root = useRef<HTMLElement>(null);
   const eye = useViewsEye({ kind: 'article', id }, root); // A-65: beside the date, as on the site; one view by the site's rules
@@ -62,7 +65,8 @@ export function ArticleView({ id }: { id: number }) {
       let err: unknown = null;
       const srv = await fetchArticle(db, id, lang).catch((e: unknown) => { err = e; return undefined; });
       if (!on) return;
-      if (srv) { show(srv); if (!x) comments(srv); setFail(null); }
+      if (srv) { show(srv); if (!x) comments(srv); setFail(null); void refreshSaved(db, srv, lang); }
+      else if (srv === null && x && (await getSaved(db, id))) { if (on) setGone(true); }
       // A-125 (cloud_38): no copy and no answer = WHY in place with «Повторити» (1.0.11: an endless spinner on a cold start offline, else a
       // false «not found»); a real 404 (null) stays «not found»
       else if (!x && err) { const f = await netFailure(err); if (on) { setFail(f); setA(null); } }
@@ -70,6 +74,8 @@ export function ArticleView({ id }: { id: number }) {
     })();
     return () => { on = false; };
   }, [db, id, lang, articlesVersion, attempt]);
+  // A-141 (2): the place (hooks before any early return)
+  const place = useReadingPlace(a, root, settings.articleScale);
   if (a === undefined) return <div className="empty"><Busy /></div>;
   if (!a && fail) return <div className="empty"><NetNotice failure={fail} onRetry={() => { setFail(null); setA(undefined); setAttempt((n) => n + 1); }} testId="article-net" /></div>;
   if (!a) return <div className="empty" data-testid="article-missing">{t('articles.not_found')}</div>;
@@ -89,6 +95,7 @@ export function ArticleView({ id }: { id: number }) {
     <article ref={root} className="aview arrows-host" data-testid="article" style={articleScaleStyle(settings.articleScale)} data-scale={settings.articleScale}>
       {header && <CoverImage code={`a${a.id}`} url={header.url} alt={a.title} className="aview__cover" full openable />}
       <h1 className="card__title">{a.title}</h1>
+      {gone && <p className="aview__gone" role="note" data-testid="article-gone">{t('articles.saved_gone')}</p>}
       {a.subtitle && <p className="aview__subtitle">{a.subtitle}</p>}
       <MetaLine className="card__sub" groups={[t(`kind1.${a.kind}`), longDate(a.published_at, lang), eye]} stickyLast />
       <LoadAllPhotos />
@@ -120,6 +127,21 @@ export function ArticleView({ id }: { id: number }) {
     {a.kind === 'news' && <ReadAlso a={a} />}{/* A-130 (1): a news item's «Читайте також» after «Поділитися» */}
     <SoftAsk kind="articles" />
     <ScrollArrows root={root} />
+    {place.resumed && <ResumePill onStart={place.fromStart} />}
     </PhotoScope>
+  );
+}
+
+/** A-141 (2): «↺ Продовжено з місця зупинки · З початку» - over the text after a jump to the place; it fades after a few seconds (polite:
+ *  the reader hears it once); «З початку» = the top of the article. */
+function ResumePill({ onStart }: { onStart: () => void }) {
+  const { t } = useApp();
+  const [gone, setGone] = useState(false);
+  useEffect(() => { const h = window.setTimeout(() => setGone(true), PILL_MS); return () => window.clearTimeout(h); }, []);
+  return (
+    <div className={`resume-pill${gone ? ' resume-pill--gone' : ''}`} role="status" data-testid="resume-pill" aria-hidden={gone ? 'true' : undefined}>
+      <span><span aria-hidden="true">↺ </span>{t('reading.resumed')}</span><span aria-hidden="true">·</span>
+      <button type="button" className="resume-pill__btn" onClick={onStart} tabIndex={gone ? -1 : undefined} data-testid="resume-start">{t('reading.from_start')}</button>
+    </div>
   );
 }

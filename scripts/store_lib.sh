@@ -14,14 +14,14 @@ frames() { grep "^$1|" "$ROOT/scripts/store_frames.txt" | cut -d'|' -f2- | sed "
   | { if [ -n "${STORE_SKIP:-}" ]; then grep -vE "^[^|]*(${STORE_SKIP})"; else cat; fi; } | { if [ -n "${STORE_ONLY:-}" ]; then grep -E "^[^|]*(${STORE_ONLY})"; else cat; fi; }; }
 
 set_lang() {
-  nav go /more/language; sleep 2; nav click "[data-testid=\"lang-$1\"]"; sleep 3
+  nav go /more/language; nav wait "[data-testid=\"lang-$1\"]"; nav click "[data-testid=\"lang-$1\"]"; sleep 3
   [ "$(check lang)" = "$1" ] || echo "LANG FAIL $1" >> "$S/nav.txt"
 }
 set_theme() { # light | dark
   # cloud_40 (ios run 2, App Store iPhone): ONE tap lost to the remote hand's relay (connect ETIMEDOUT) left the theme dark - asked once more
   local d _
   for _ in 1 2; do
-    nav go /more; sleep 2; nav click "[data-testid=\"theme-$1\"]"; sleep 2
+    nav go /more; nav wait "[data-testid=\"theme-$1\"]"; nav click "[data-testid=\"theme-$1\"]"; sleep 2
     d=$(check theme); [ "$d" = "$1" ] && return 0
   done
   echo "THEME FAIL $1 ($d)" >> "$S/nav.txt"

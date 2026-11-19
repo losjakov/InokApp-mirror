@@ -126,6 +126,13 @@ for (const [profile, c] of Object.entries(profiles)) {
         await page.mouse.move(0, 0);
         await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
         await page.waitForTimeout(300);
+        // REVIEW cloud_41 NOTE 2: the door's column in the screen's middle on every profile (phone and tablet), never stretched wider than 30rem
+        if (await door(page).count()) {
+          const g = await door(page).evaluate((d) => { const r = d.querySelector('h1')!.closest('main')!.getBoundingClientRect(); const kids = Array.from(d.children).map((c) => c.getBoundingClientRect()).filter((b) => b.height > 0);
+            const top = Math.min(...kids.map((b) => b.top)), bottom = Math.max(...kids.map((b) => b.bottom)); return { mid: (top + bottom) / 2, vh: innerHeight, w: r.width, root: parseFloat(getComputedStyle(document.documentElement).fontSize) }; });
+          expect(Math.abs(g.mid - g.vh / 2), `the door's block in the middle (${JSON.stringify(g)})`).toBeLessThan(g.vh * 0.08);
+          expect(g.w).toBeLessThanOrEqual(30 * g.root + 1);
+        }
         await page.screenshot({ path: `${OUT}${s.name}__${profile}.png` });
         expect(errors).toEqual([]);
         if (A11Y_PROFILES.includes(profile)) expect(await axeScreen(page, s.name, profile), 'axe WCAG 2.1 A + AA').toEqual([]);

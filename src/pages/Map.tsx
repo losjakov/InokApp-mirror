@@ -8,13 +8,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { OPENED_FROM } from '@/app/nav';
 import { MonasteryRow } from '@/components/MonasteryRow';
+import { ParentLine } from '@/components/ParentLine';
 import { MetaLine } from '@/components/MetaLine';
 import { DirectionsSheet } from '@/components/DirectionsSheet';
 import { RADII_KM, parseAt, nearby, radiusBounds, radiusPolygon, splitLavras, LAVRA_TYPE } from '@/data/map/geojson';
 import { EMPTY, HOUSE_LAYERS, InokMap, PLACE_ZOOM, SOURCES, SRC, boundsOf, fitHouses, hasWebGL } from '@/data/map/inokMap';
 import { getMonastery, listByCodes, listMapPoints } from '@/data/repo/monasteries';
 import { eparchyTitle, getEparchy } from '@/data/repo/eparchies';
-import { field, type MapPoint, type MonasteryListRow as Row, type MonasteryRow as CardRow } from '@/data/repo/types';
+import { field, rowParts, type MapPoint, type MonasteryListRow as Row, type MonasteryRow as CardRow } from '@/data/repo/types';
 import { distanceKm, formatKm } from '@/data/search/geo';
 import { currentPosition, type Position } from '@/native/geolocation';
 import { useApp } from '@/state/AppContext';
@@ -141,6 +142,7 @@ export function MapPage() {
   const [selFull, setSelFull] = useState<CardRow | null>(null);
   useEffect(() => { let on = true; if (selected != null) void getMonastery(db, selected).then((r) => on && setSelFull(r)); return () => { on = false; }; }, [db, selected]);
   const selRow = selected != null && selFull?.code === selected ? selFull : null;
+  const placeOf = (r: CardRow) => { const p = rowParts(r, lang, dict); return [p.town, p.oblast].filter(Boolean).join(', '); }; // A-140 (3)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
@@ -267,7 +269,9 @@ export function MapPage() {
               <div className="map-card over-map" data-testid="map-card">
                 <IonButton fill="clear" size="small" className="map-card__close" onClick={() => setSelected(null)} aria-label={t('map.close')}><IonIcon slot="icon-only" icon={closeOutline} aria-hidden="true" /></IonButton>
                 <h2 className="map-card__title">{field(selRow, 'name', lang)}</h2>
-                <MetaLine className="map-card__sub" groups={[field(selRow, 'town', lang), selDist != null && t('card.distance', { km: formatKm(selDist) })]} />
+                {/* A-140 (3): «↳ <parent> ›» (-> the parent's card), then «<town>, <oblast>» for EVERY house (+ the distance when known) */}
+                <ParentLine row={selRow} onOpen={() => navigate(`/monasteries/${selRow.parent_code}`)} className="map-card__parent" />
+                <MetaLine className="map-card__sub" testId="map-card-place" groups={[placeOf(selRow), selDist != null && t('card.distance', { km: formatKm(selDist) })]} />
                 <div className="card__actions">
                   <IonButton size="small" onClick={() => navigate(`/monasteries/${selRow.code}`)} data-testid="map-card-details">{t('map.details')}</IonButton>
                   {selRow.lat != null && (

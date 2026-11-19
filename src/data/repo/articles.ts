@@ -9,6 +9,7 @@ import { cacheGet, cacheSet } from './cache';
 import { getMeta, setMeta } from '@/data/db/schema';
 import type { Lang } from '@/i18n';
 import { dropCached, photoSrc } from '@/native/covers';
+import { getSaved, savedIds } from './reading';
 import { bodyPictures } from '@/data/links/router';
 import { normalize, stripHtml } from '@/data/search/normalize';
 import type { PhotoMode } from '@/data/photos/policy';
@@ -71,7 +72,7 @@ export async function getArticle(db: Db, id: number, lang: Lang): Promise<Articl
     const a = (await cacheGet<Article[]>(db, blockKey(sort, lang)))?.value.find((x) => x.id === id);
     if (a) return a;
   }
-  return null;
+  return getSaved(db, id); // A-141 (1): a saved article opens offline whatever the feed cache holds now
 }
 
 /**
@@ -138,7 +139,8 @@ export async function fetchBlock(db: Db, lang: Lang, sort: ArticleSort): Promise
  */
 export async function fetchArticles(db: Db, lang: Lang, since: string | null = null, photos?: PhotoMode): Promise<{ next: string | null; count: number }> {
   const page = parseArticles(await dataSource().articles(lang, since));
-  await dropCached((await storeArticles(db, lang, page.items, !since)).map((id) => `a${id}`));
+  const saved = new Set(await savedIds(db)); // A-141 (1): a saved article's pictures stay when it leaves the 30-item cache
+  await dropCached((await storeArticles(db, lang, page.items, !since)).filter((id) => !saved.has(id)).map((id) => `a${id}`));
   if (photos && !since) void keepPictures(page.items, photos);
   await setMeta(db, `articles_next:${lang}`, page.next ?? ''); // where «Показати більше» continues ('' = the last page)
   return { next: page.next, count: page.items.length };
@@ -168,6 +170,11 @@ export const articlePictures = (a: Article): string[] => [...new Set([...(a.cove
 /** A-19: with the text, its pictures — through the ONE pipeline (the A-20 rule decides): the row's thumbnail is SMALL (any network,
  *  so the feed has its pictures offline), the header and body pictures are large (the setting; nothing large on a metered network).
  *  A-111: the row's cover is KEPT by «Очистити збережені фото», the header and body pictures are cleared (census, JOURNAL cloud_34). */
+/** A-141 (1): a SAVED article keeps all its pictures (the row's cover small, the header and body large - by «Автозавантаження фото»), in
+ *  the kept folder: «Очистити збережені фото» and reset_data leave them; what the setting holds back loads when it allows (the view asks). */
+export async function keepSavedPictures(a: Article, mode: PhotoMode): Promise<void> {
+  for (const url of articlePictures(a)) await photoSrc(`a${a.id}`, url, mode, { small: url === a.cover?.url, keep: true }).catch(() => undefined);
+}
 async function keepPictures(items: Article[], mode: PhotoMode): Promise<void> {
   for (const a of items.slice(0, CACHE_N)) for (const url of articlePictures(a)) await photoSrc(`a${a.id}`, url, mode, { small: url === a.cover?.url, keep: url === a.cover?.url }).catch(() => undefined);
 }

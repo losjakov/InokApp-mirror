@@ -51,7 +51,7 @@ adb emu geo fix 30.5571 50.4344 || true   # the Lavra: «Поруч» shows the 
 # into Preferences again before a restart did not hold in run 42453919479 (all 60 shots came out uk / light) - each switch is read back.
 adb shell am start -n $PKG/.MainActivity >/dev/null; sleep 8
 nav eval "(async () => { const P = Capacitor.Plugins.Preferences; const v = (await P.get({ key: 'settings' })).value;
-  const s = Object.assign(v ? JSON.parse(v) : {}, { lang: 'uk', theme: 'light', photos: 'any', asked: ['articles', 'streams'], ownDevice: true });
+  const s = Object.assign(v ? JSON.parse(v) : {}, { lang: 'uk', theme: 'light', photos: 'any', asked: ['articles', 'streams', 'hint_monastery', 'hint_article'], ownDevice: true });
   await P.set({ key: 'settings', value: JSON.stringify(s) }); return 'ok'; })()"
 adb shell am force-stop $PKG; sleep 3; adb shell am start -n $PKG/.MainActivity >/dev/null; sleep 12
 # N8: the status bar as SystemUI describes it (uiautomator content-desc): Wi-Fi full, battery 100, no mobile icon

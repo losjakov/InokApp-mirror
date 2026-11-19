@@ -10,6 +10,7 @@ import { scrollRoot, SplitContent, useListDetail } from '@/components/SplitConte
 import { sitePageUrl } from '@/data/links/sitePages';
 import { PageHeader } from '@/components/PageHeader';
 import { MonasteryRow } from '@/components/MonasteryRow';
+import { useQuickHint } from '@/components/QuickSheet';
 import { FilterSheet } from '@/components/FilterSheet';
 import { EMPTY_FILTERS, clearOne, listQueryOf, type FilterKey, type FilterState } from '@/data/repo/filterState';
 import { MonasteryCardView, MonasteryDetail } from '@/pages/MonasteryCard';
@@ -20,7 +21,7 @@ import { useApp } from '@/state/AppContext';
 import { sideRow } from '@/components/sideRow';
 import { useWide } from '@/state/useWide';
 import { tCount, type Lang } from '@/i18n';
-import { EPARCHIES_PATH } from '@/app/nav';
+import { EPARCHIES_PATH, useListEntry } from '@/app/nav';
 
 const PAGE = 30;
 /** PLAN 6: rows `from`…`from + PAGE` of the ordered keys, lean (one language), with the keys' distances */
@@ -55,6 +56,10 @@ export function MonasteriesPage() {
   const [pos, setPos] = useState<Position | null>(null);
   const [posError, setPosError] = useState(false);
   const debounce = useRef<number | undefined>(undefined);
+  // A-138: the site's list link (`/monasteries/`) = this tab as if just opened: no search, no filters, the default order, the top
+  const listTop = useRef<HTMLDivElement>(null);
+  useQuickHint('monastery', !!shown && shown.rows.length > 0); // A-142 (4)
+  useListEntry(() => { setQ(''); setFs(EMPTY_FILTERS); setSheet(false); listTop.current?.closest('ion-content')?.scrollToTop?.(0); });
 
   useEffect(() => {
     getFacets(db, fs.filters).then(setFacets); // the chips' names; the sheet counts its own draft (A-13)
@@ -109,7 +114,7 @@ export function MonasteriesPage() {
       {/* A-96 W-3: the count, «Єпархії» and the active filters = ONE block pinned under the header while only the rows scroll (`.list-pin`,
           the kind tabs' rule). D43: row 1 always «N обителей» … «Єпархії» (never wraps); row 2 only while filters are active: their
           chips, one line, scrolling sideways when they do not fit */}
-      <div className="list-pin" data-testid="filters-pin">
+      <div className="list-pin" data-testid="filters-pin" ref={listTop}>
       <div className="filters__row" data-testid="filters-row">
         <IonNote className="filters__count" data-testid="count" aria-live="polite">{shown ? tCount(t, lang, 'monasteries.count', shown.keys.length) : '\u00a0'}
           {/* A-133 (07:08): «· відвідано {n}» after the count, while anything is marked; the full «Відвідано {n} з {m}» for the screen reader */}
@@ -140,7 +145,7 @@ export function MonasteriesPage() {
         </div>
       ) : (
         <IonList data-testid="list">
-          {rows.map((r) => <MonasteryRow key={r.code} row={r} onSelect={open} selected={wide && r.code === selected} q={q} />)}
+          {rows.map((r) => <MonasteryRow key={r.code} row={r} onSelect={open} onPage={open} selected={wide && r.code === selected} q={q} />)}
         </IonList>
       )}
       {shown && shown.rows.length < shown.keys.length && (

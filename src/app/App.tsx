@@ -25,7 +25,9 @@ import { MonasteriesPage } from '@/pages/Monasteries';
 
 import { StreamsPage } from '@/pages/Streams';
 import { MorePage } from '@/pages/More';
-import { FavouritesPage, VisitedPage } from '@/pages/Favourites';
+import { FavouritesPage, UnfinishedPage, VisitedPage } from '@/pages/Favourites';
+import { ReadingProvider } from '@/state/reading';
+import { UNFINISHED_PATH } from '@/components/ContinueReading';
 import { LanguagePage } from '@/pages/Language';
 import { NotificationsPage } from '@/pages/Notifications';
 import { CommissionPage } from '@/pages/Commission';
@@ -94,6 +96,7 @@ function Tabs() {
         <Route path="/streams" element={<StreamsPage />} />
         <Route path="/more" element={<MorePage />} />
         <Route path="/articles" element={<ArticlesPage />} />
+        <Route path={UNFINISHED_PATH} element={<UnfinishedPage />} />
         <Route path="/more/articles" element={<Navigate to="/articles" replace />} />
         <Route path="/more/favourites" element={<FavouritesPage />} />
         <Route path="/more/visited" element={<VisitedPage />} />
@@ -148,11 +151,13 @@ export function App() {
       <AppProvider fallback={<Splash />}>
         {/* A-132: the reserve door renders INSTEAD of the app (never over it) - a hard door leaves no router to reach behind it */}
         <DoorGate fallback={<Splash />}>
+          <ReadingProvider>
           <IonReactRouter>
             <IonRouterOutlet>
               <Route path="/*" element={<><ScreenAnalytics /><Tabs /></>} />
             </IonRouterOutlet>
           </IonReactRouter>
+          </ReadingProvider>
         </DoorGate>
       </AppProvider>
     </IonApp>

@@ -1,8 +1,9 @@
-import { useCallback, useContext, useEffect, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { IonTabButton, NavContext } from '@ionic/react';
 import { App } from '@capacitor/app';
 import { isNative } from '@/native/platform';
+import type { ListEntry } from './linkRoute';
 
 /**
  * THE navigation module (A-15): the bottom tabs (A-27) and Back (A-25 #6) — one table of tab roots, one rule each.
@@ -100,7 +101,7 @@ function parentOf(path: string, q: URLSearchParams): string {
   if (path.startsWith(`${EPARCHIES_PATH}/`) || (path === EPARCHIES_PATH && q.get('id'))) return EPARCHIES_PATH; // PLAN 7 (+ F2: the tablet's `?id=`)
   if (path === '/more' || path.startsWith('/more/')) return '/more';
   if (path.startsWith('/monasteries/') || (path === '/monasteries' && q.get('code'))) return '/monasteries'; // F2: the tablet's `?code=`
-  if (path === '/articles' && q.get('id')) return '/articles';
+  if ((path === '/articles' && q.get('id')) || path.startsWith('/articles/')) return '/articles'; // A-141: «Недочитані»
   return '/home';
 }
 
@@ -130,4 +131,22 @@ export function useHardwareBack(): void {
     document.addEventListener('ionBackButton', onBack);
     return () => { document.removeEventListener('ionBackButton', onBack); void sub.then((s) => s.remove()); };
   }, [goBack]);
+}
+
+/**
+ * A-138: a site LIST link reached this list (src/app/linkRoute.ts `ListEntry` in the location's state) -> `apply` resets it as if just
+ * opened. Ionic keeps a tab's page mounted, so the reset is said by the entry's mark, once per mark (Back to the same entry: nothing again).
+ */
+export function useListEntry(apply: (e: ListEntry) => void): void {
+  const loc = useLocation();
+  const e = loc.state as Partial<ListEntry> | null;
+  const mark = typeof e?.reset === 'number' ? e.reset : null;
+  const seen = useRef<number | null>(null);
+  const latest = useRef(apply);
+  useEffect(() => { latest.current = apply; });
+  useEffect(() => {
+    if (mark == null || mark === seen.current) return;
+    seen.current = mark;
+    latest.current({ reset: mark, kind: e?.kind });
+  }, [mark, e?.kind]);
 }

@@ -1,6 +1,6 @@
 import { IonButton, IonContent, IonIcon, IonLabel, IonList, IonPage, IonSegment, IonSegmentButton, useIonActionSheet } from '@ionic/react';
 import { SearchField } from '@/components/SearchField';
-import { checkmark, searchOutline, swapVerticalOutline } from 'ionicons/icons';
+import { checkmark, searchOutline, star, swapVerticalOutline } from 'ionicons/icons';
 import { Busy } from '@/components/Busy';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -23,6 +23,14 @@ import { SplitContent } from '@/components/SplitContent';
 import { StatusNote } from '@/components/StatusNote';
 import { sitePageUrl } from '@/data/links/sitePages';
 import { useWide } from '@/state/useWide';
+import { useListEntry } from '@/app/nav';
+import { useReading } from '@/state/reading';
+import { ContinueReading } from '@/components/ContinueReading';
+import { ArticleStar } from '@/components/FavMark';
+import { useQuickHint } from '@/components/QuickSheet';
+
+/** A-141 (1): the 5th segment = the saved articles («★», named «Обрані»), newest-saved first, from the phone only */
+export const SAVED = 'saved';
 
 /** A-97: the order chosen for ALL tabs, kept while the app runs (the page may be rebuilt), the default after a restart («Не запоминать») */
 let sessionSort: ArticleSort = 'published';
@@ -48,6 +56,7 @@ const entrySortOf = (v: string | null, sorts: ArticleSort[]): ArticleSort | null
 
 export function ArticlesPage() {
   const { db, t, lang, articlesVersion, refreshArticles, config } = useApp();
+  const { saved, savedList } = useReading();
   const wide = useWide();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -81,16 +90,17 @@ export function ArticlesPage() {
   // R-19: a kind tab pages the server's section list; the cache of that kind shows first (and offline)
   const [server, setServer] = useState<{ kind: string; items: Article[]; next: string | null } | null>(null);
   useEffect(() => {
-    if (kind === 'all') return;
+    if (kind === 'all' || kind === SAVED) return;
     let on = true;
     fetchKind(lang, kind as ArticleKind, null).then((p) => on && setServer({ kind, ...p }), () => on && setOffline(true));
     return () => { on = false; };
   }, [lang, kind]);
   useEffect(() => {
     let on = true;
-    Promise.all([listArticles(db, lang, kind === 'all' ? null : kind), nextCursor(db, lang)]).then(([i, n]) => { if (on) { setItems(i); setNext(n); } });
+    if (kind === SAVED) void savedList().then((i) => { if (on) { setItems(i); setNext(null); } });
+    else Promise.all([listArticles(db, lang, kind === 'all' ? null : kind), nextCursor(db, lang)]).then(([i, n]) => { if (on) { setItems(i); setNext(n); } });
     return () => { on = false; };
-  }, [db, lang, kind, articlesVersion]);
+  }, [db, lang, kind, articlesVersion, savedList, saved]);
   const refresh = useRefresh(useCallback(async () => { setOffline(!(await refreshArticles())); }, [refreshArticles]));
   const searchbar = useRef<HTMLIonSearchbarElement>(null);
   useEffect(() => { const h = window.setTimeout(() => setQ(queryText(typed)), typed ? QUERY_DEBOUNCE_MS : 0); return () => window.clearTimeout(h); }, [typed]);
@@ -103,6 +113,10 @@ export function ArticlesPage() {
     if (!active) return;
     const c = new AbortController(); // a newer query / sort / tab cancels this one
     let on = true;
+    if (kind === SAVED) { // the saved ones are searched and ordered on the phone (they are all here)
+      void savedList().then((base) => { if (on) setFound({ key: qKey, items: localQuery(base, q, sort), next: null, local: false }); });
+      return () => { on = false; };
+    }
     const k = kind === 'all' ? null : (kind as ArticleKind);
     fetchQuery(db, lang, k, q, sort, null, c.signal)
       .then((p) => { if (on) setFound({ key: qKey, items: p.items, next: p.next, local: false }); })
@@ -112,7 +126,7 @@ export function ArticlesPage() {
         if (on) setFound({ key: qKey, items: localQuery(base, q, sort), next: null, local: true });
       });
     return () => { on = false; c.abort(); };
-  }, [active, qKey, db, lang, kind, q, sort]);
+  }, [active, qKey, db, lang, kind, q, sort, savedList]);
   const [sheet] = useIonActionSheet();
   const openSort = () => void sheet({
     header: t('articles.sort'), cssClass: 'sort-sheet',
@@ -121,6 +135,9 @@ export function ArticlesPage() {
     { text: t('common.cancel'), role: 'cancel' }],
   });
   const closeSearch = () => { setSearching(false); setTyped(''); setQ(''); };
+  // A-138 (amendment): a site section link (`/articles/publications|video|news/`) = its kind tab as if just opened: no search, the default
+  // order (A-97: the order is kept only while the app runs), no home-block entry, the top of the list
+  useListEntry((e) => { closeSearch(); sessionSort = 'published'; setSortS('published'); setEntryView(null); setOwnKind(e.kind ?? ENTRY_KIND); });
   const tab = server && server.kind === kind ? server : null;
   const loadMore = async () => {
     setMore(true);
@@ -141,15 +158,20 @@ export function ArticlesPage() {
   // an article opened inside a block's entry keeps the entry in its address: Back returns to the same list (its tab, its order)
   const open = (a: number) => navigate(entry ? `/articles?sort=${entrySort}&id=${a}` : `/articles?id=${a}`, entry ? { state: { entry: entry.mark } } : undefined);
   const shown = active ? (fv ? fv.items : null) : tab ? tab.items : items && [...items, ...(older?.items ?? []).filter((a) => (kind === 'all' || a.kind === kind) && !items.some((b) => b.id === a.id))];
+  useQuickHint('article', !!shown && shown.length > 0); // A-142 (4)
   const hasMore = active ? !!fv?.next : tab ? !!tab.next : older ? !!older.next : !!next;
   const list = (
     <>
       <IonSegment value={kind} onIonChange={(e) => setKind(String(e.detail.value))} scrollable className="kinds list-pin" data-testid="kinds" data-query={fv ? qKey : undefined}>
         {['all', ...ARTICLE_KINDS].map((k) => <IonSegmentButton key={k} value={k} data-testid={`kind-tab-${k}`}><IonLabel>{t(k === 'all' ? 'articles.all' : `kind.${k}`)}</IonLabel></IonSegmentButton>)}
+        <IonSegmentButton value={SAVED} data-testid={`kind-tab-${SAVED}`} aria-label={t('articles.saved_tab')} className="kinds__saved">
+          <IonIcon icon={star} aria-hidden="true" />
+        </IonSegmentButton>
       </IonSegment>
+      {kind !== SAVED && !active && <ContinueReading />}
       <StatusNote text={fv?.local ? t('articles.query_offline') : offline && !active && t('articles.offline')} testId="articles-offline" />
       {shown === null ? <div className="empty"><Busy /></div> : shown.length === 0
-        ? <div className="empty" data-testid="articles-empty" role={active ? 'status' : undefined}>{t(active ? 'articles.nothing' : 'articles.empty')}</div> : (
+        ? <div className="empty" data-testid="articles-empty" role={active ? 'status' : undefined}>{t(active ? 'articles.nothing' : kind === SAVED ? 'articles.saved_empty' : 'articles.empty')}</div> : (
         <IonList data-testid="articles">
           {shown.map((a) => <ArticleRow key={a.id} a={a} onSelect={open} selected={wide && a.id === id} q={active ? q : undefined} />)}
         </IonList>
@@ -158,13 +180,13 @@ export function ArticlesPage() {
         <MoreButton label={t('articles.more')} busy={more} onClick={loadMore} testId="articles-more" />
       )}
       <NetNotice failure={moreFailNow} onRetry={() => void loadMore()} testId="articles-more-net" />
-      {shown && <ShareFooter title={t('articles.title')} url={sitePageUrl('/articles', lang, kind as ArticleKind | 'all')} />}
+      {shown && <ShareFooter title={t('articles.title')} url={sitePageUrl('/articles', lang, kind === SAVED ? 'all' : (kind as ArticleKind | 'all'))} />}
     </>
   );
   if (id != null && !wide)
     return (
       <IonPage>
-        <PageHeader title={t('articles.title')} fit end={<TextSizeButtons />} />
+        <PageHeader title={t('articles.title')} fit end={<><TextSizeButtons /><ArticleStar id={id} /></>} />
         <IonContent><ArticleView key={id} id={id} /></IonContent>
       </IonPage>
     );
@@ -181,7 +203,7 @@ export function ArticlesPage() {
           onIonInput={(e) => setTyped(e.detail.value ?? '')} onIonClear={closeSearch} data-testid="articles-search" />} />
     : <PageHeader title={t('articles.title')} fit end={<>
         {canQuery && <IonButton onClick={() => setSearching(true)} aria-label={t('articles.search_open')} data-testid="search-open"><IonIcon slot="icon-only" icon={searchOutline} aria-hidden="true" /></IonButton>}
-        {sortBtn}{refresh.button}{wide && id != null && <TextSizeButtons />}</>} />;
+        {sortBtn}{refresh.button}{wide && id != null && <><TextSizeButtons /><ArticleStar id={id} /></>}</>} />;
   return (
     <IonPage>
       {header}

@@ -1,23 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { linkTarget } from '@/data/links/router';
-import { getMonastery } from '@/data/repo/monasteries';
 import { openLink } from '@/native/intents';
 import { launchUrl, onUrlOpen } from '@/native/appLinks';
 import { useApp } from '@/state/AppContext';
-import { quickRoute } from './quickActions';
-import type { Db } from '@/data/db/types';
-
-/** THE in-app screen of a site link (A-21(а), R-39, A-76): a card in the DB -> the card; an article -> `/articles?id=` (the app's language;
- *  the screen asks the server for an id its cache lacks, R-35); anything else -> null = the browser. */
-async function linkRoute(db: Db, href: string): Promise<string | null> {
-  const quick = quickRoute(href); // cloud_41 (A-133 C1): a quick action on the app icon = its tab
-  if (quick) return quick;
-  const to = linkTarget(href);
-  if (to?.kind === 'card' && (await getMonastery(db, to.code))) return `/monasteries/${to.code}`;
-  if (to?.kind === 'article') return `/articles?id=${to.id}`;
-  return null;
-}
+import { linkRoute } from './linkRoute';
 
 /** THE follow of a site link (one rule for html-lite taps and App Links): its in-app screen, else the browser. Never a dead screen. */
 export function useFollowLink(): (href: string) => Promise<void> {
@@ -25,7 +11,7 @@ export function useFollowLink(): (href: string) => Promise<void> {
   const navigate = useNavigate();
   return useCallback(async (href: string) => {
     const to = await linkRoute(db, href);
-    if (to) navigate(to);
+    if (to) navigate(to.to, to.entry ? { state: to.entry } : undefined);
     else await openLink(href, lang);
   }, [db, lang, navigate]);
 }
@@ -47,7 +33,7 @@ export function StartRoute(): null {
     started = true;
     void launchUrl().then(async (u) => {
       const to = u ? await linkRoute(db, u) : null;
-      navigate(to ?? '/home', { replace: true, state: to ? START : undefined });
+      navigate(to?.to ?? '/home', { replace: true, state: to ? { ...START, ...to.entry } : undefined });
       if (u && !to) await openLink(u, lang);
     });
   }, [db, lang, navigate]);

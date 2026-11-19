@@ -16,12 +16,13 @@ export const CARD_ONLY = ['head_document', 'founded', 'revival', 'parent_divisio
   .concat(['links_json', 'history_sources_json', 'norm_all']);
 // the list row shows «town · oblast · eparchy» (REVIEW cloud_02 D5, owner 31.10): the names ride along, no second query per row
 const NAMES = `e.name_uk AS eparchy_uk, e.name_ru AS eparchy_ru, e.name_en AS eparchy_en,
-  o.name_uk AS oblast_uk, o.name_ru AS oblast_ru, o.name_en AS oblast_en`;
+  o.name_uk AS oblast_uk, o.name_ru AS oblast_ru, o.name_en AS oblast_en,
+  p.name_uk AS parent_uk, p.name_ru AS parent_ru, p.name_en AS parent_en`; // A-140: «↳ <parent>» in every list row, the card head, the map card
 const prefixed = (cols: string[]) => cols.map((c) => `m.${c}`).join(', ');
 const LIST_COLS = COLS.split(',').map((c) => c.trim());
 const ROW = `${prefixed(LIST_COLS)}, ${NAMES}`;
 const CARD_ROW = `${prefixed([...LIST_COLS, ...CARD_ONLY])}, ${NAMES}`;
-const FROM = 'FROM monastery m LEFT JOIN eparchy e ON e.id = m.eparchy_id LEFT JOIN oblast o ON o.id = m.oblast_id';
+const FROM = 'FROM monastery m LEFT JOIN eparchy e ON e.id = m.eparchy_id LEFT JOIN oblast o ON o.id = m.oblast_id LEFT JOIN monastery p ON p.code = m.parent_code';
 
 function whereOf(f: Filters): { sql: string; params: (string | number)[] } {
   const w: string[] = [];
@@ -128,10 +129,10 @@ export async function listMapPoints(db: Db, filters: Filters = {}): Promise<MapP
 /** PLAN 6: what THE list row shows (MonasteryRow without a search), in ONE language: each text = the first filled of [lang, uk, ru, en]
  *  (the rule of `field`), under the `<name>_<lang>` key `field` reads first. A search's rows stay full (its «found in …» reads every language). */
 export type LeanRow = Pick<MonasteryListRow, 'code' | 'type' | 'object_type' | 'subordination' | 'eparchy_id' | 'oblast_id' | 'lat' | 'lon' | 'has_stream'
-  | 'thumb_url' | 'thumb_sha256'> & Partial<MonasteryListRow>;
+  | 'thumb_url' | 'thumb_sha256' | 'parent_code' | 'phones_json'> & Partial<MonasteryListRow>;
 const LEAN_TEXT: [string, string][] = ['name', 'town', 'address', 'head', 'head_role', 'head_born'].map((c): [string, string] => [`m.${c}`, c])
-  .concat([['e.name', 'eparchy'], ['o.name', 'oblast']]);
-const lean = (lang: Lang) => ['m.code, m.type, m.object_type, m.subordination, m.eparchy_id, m.oblast_id, m.lat, m.lon, m.has_stream, m.thumb_url, m.thumb_sha256',
+  .concat([['e.name', 'eparchy'], ['o.name', 'oblast'], ['p.name', 'parent']]);
+const lean = (lang: Lang) => ['m.code, m.type, m.object_type, m.subordination, m.eparchy_id, m.oblast_id, m.lat, m.lon, m.has_stream, m.thumb_url, m.thumb_sha256, m.parent_code, m.phones_json',
   ...LEAN_TEXT.map(([src, as]) => `COALESCE(${[...new Set([lang, 'uk', 'ru', 'en'])].map((l) => `NULLIF(${src}_${l}, '')`).join(', ')}) AS ${as}_${lang}`)].join(', ');
 
 /** List rows of the given houses, in the given order (the map's «near me» list: only the houses inside the ring cross the bridge);

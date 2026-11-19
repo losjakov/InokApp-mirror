@@ -98,7 +98,6 @@ ion-tab-button { position: relative; }
 .mrow ion-label { white-space: normal; margin: 6px 0; min-width: 0; overflow-wrap: break-word; } /* cloud_20 font 200 %: a word longer than the row breaks inside the row (min-width 0: the label never grows past it) */
 .item ion-label > .mrow__title { line-height: 1.25; margin: 0 0 2px; white-space: normal; }
 .mrow__cover { --size: 56px; width: 56px; height: 40px; margin-inline-end: 12px; flex: none; border-radius: 6px; overflow: hidden; background: var(--inok-cover-bg); }
-.mrow__type { display: inline-block; margin-inline-end: 6px; padding: 0 5px; border-radius: 4px; font-size: var(--inok-type-caption); font-weight: 600; line-height: 1.5; background: var(--inok-tile-bg); color: var(--ion-color-primary); vertical-align: 1px; }
 .mrow__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* A-29: the house rows show the site's square list picture; «no photo» = the app's own sign on the same square */
 .mrow__cover--square { height: 56px; }
@@ -110,6 +109,20 @@ ion-tab-button { position: relative; }
 .meta__stick { white-space: nowrap; } /* N7 (REVIEW cloud_22): «· 👁 N» - the dot and the last group of a MetaLine `stickyLast` in one box */
 .mrow__sub { font-size: var(--inok-type-secondary); color: var(--ion-color-medium); white-space: normal; }
 .mrow__eparchy { color: var(--ion-color-primary); }
+/* A-140 (1): the house row - thumbnail + (name, «↳ parent», eparchy) on top, the rest under it at full width. The thumbnail's top = the cap
+   line of the name's first line: (title line height - cap height) / 2 in the TITLE's em (font-size set on the thumb), cap height of the system
+   face: Roboto 0.711 em (Android), SF Pro 0.705 em (iOS) - at 100-200 % the em follows the scale. No lh / cap units: the old floor (Chrome 89). */
+:root { --inok-cap: 0.711; --inok-title-lh: 1.25; }
+[data-os="ios"] { --inok-cap: 0.705; }
+.hrow ion-label.hrow__label { margin: 8px 0; }
+.hrow__top { display: flex; align-items: flex-start; }
+.hrow__thumb { font-size: var(--inok-type-title); margin-top: calc((var(--inok-title-lh) - var(--inok-cap)) / 2 * 1em); }
+.hrow__main { flex: 1 1 auto; min-width: 0; }
+.item ion-label .hrow__title { font-size: var(--inok-type-title); font-weight: 500; line-height: var(--inok-title-lh); margin: 0 0 2px; white-space: normal; }
+.hrow__main > .mrow__sub { margin: 2px 0 0; }
+.item ion-label > .hrow__wide { margin: 4px 0 0; }
+.parent-line { color: var(--ion-color-primary); }
+.parent-line--link { display: flex; align-items: center; flex-wrap: wrap; background: none; border: 0; padding: 4px 0; min-height: 32px; text-align: start; font: inherit; font-size: var(--inok-type-secondary); text-decoration: underline; color: var(--ion-color-primary); }
 .item ion-label > .mrow__dist { font-size: var(--inok-type-secondary); color: var(--ion-color-primary); font-weight: 500; }
 
 /* two-pane (≥600 dp): list left, card right */
@@ -179,6 +192,8 @@ ion-tab-button { position: relative; }
 .card__site { margin: 0 0 16px; }
 .card__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card__title { margin: 12px 16px 4px; font-size: var(--inok-type-heading); font-weight: 700; line-height: 1.25; }
+.card__parent { display: flex; align-items: center; min-height: 48px; margin: -12px 16px -10px; } /* A-140 (2): a 48 dp target under the h1, its air shared with the lines around */
+.map-card__parent { margin: 0 36px 2px 0; min-height: 44px; }
 .card__sub { margin: 0 16px 8px; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); }
 /* the monastery card (owner 12.11.2026): the place line + the eye at the right edge, bottoms (= baselines: one font size) on its last line */
 .card__subrow { display: flex; align-items: flex-end; gap: 12px; margin: 0 16px 8px; font-size: var(--inok-type-secondary); }
@@ -215,6 +230,8 @@ ion-tab-button { position: relative; }
 .al-c { text-align: center; }
 .sources, .links { padding: 0 0 8px; }
 .first-run { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; gap: 12px; text-align: center; }
+/* REVIEW cloud_41 NOTE 2: the door stands in the MIDDLE of any screen (phone and tablet alike) in a reading-width column */
+.door { min-height: calc(100vh - 32px - var(--inok-safe-top, 0px) - var(--inok-safe-bottom, 0px)); max-width: 30rem; margin: 0 auto; }
 .first-run__icon { font-size: 4rem; color: var(--ion-color-medium); }
 .first-run h1 { font-size: var(--inok-type-heading); }
 .first-run ion-button { align-self: stretch; }
@@ -573,3 +590,30 @@ ion-searchbar .searchbar-clear-button { min-width: 24px; }
 .mark-toggle--fav.mark-toggle--on ion-icon { color: var(--ion-color-secondary); }
 .card__marks .mark-toggle--visited.mark-toggle--on ion-icon { color: var(--inok-visited); }
 .card__marks { margin: -4px -8px 0 4px; }
+
+/* A-141 (cloud_42): «Продовжити читання» - one card over the «Публікації» list and on «Головна»; the reading bar of a row */
+.continue { margin: 8px 16px 4px; }
+.continue__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.continue__h { margin: 0 0 6px; font-size: var(--inok-type-secondary); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ion-color-primary); }
+.continue__more { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font-size: var(--inok-type-secondary); color: var(--ion-color-primary); text-decoration: none; }
+.continue__card { display: flex; align-items: center; border: 1px solid var(--inok-tile-border, rgba(13,92,122,.25)); border-radius: 12px; background: var(--inok-tile-bg); }
+.continue__open { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 0 10px 12px; background: none; border: 0; text-align: start; font: inherit; color: var(--ion-text-color); }
+.continue__cover { --size: 56px; width: 56px; height: 56px; flex: none; border-radius: 8px; overflow: hidden; background: var(--inok-cover-bg); }
+.continue__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.continue__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.continue__title { font-size: var(--inok-type-title); line-height: 1.25; overflow-wrap: break-word; }
+.continue__x { flex: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ion-color-medium); font-size: 1.5rem; }
+.readbar { display: flex; flex-direction: column; gap: 2px; }
+.readbar__track { display: block; height: 4px; border-radius: 2px; background: var(--inok-readbar-bg, rgba(127,127,127,.25)); overflow: hidden; max-width: 340px; }
+.readbar__fill { display: block; height: 100%; background: var(--inok-star); }
+.readbar__words { font-size: var(--inok-type-secondary); color: var(--ion-color-medium); }
+.arow__read { margin-top: 4px; }
+.arow__done { color: var(--inok-visited); font-size: var(--inok-type-secondary); }
+.arow__saved { color: var(--inok-star); margin-inline-end: 4px; }
+.resume-pill { position: fixed; left: 16px; right: 16px; margin: 0 auto; width: fit-content; top: calc(var(--inok-safe-top, 0px) + 64px); z-index: 20; display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; padding: 4px 6px 4px 14px; border-radius: 20px; background: rgba(30, 40, 48, .92); color: #fff; font-size: var(--inok-type-secondary);
+  transition: opacity .4s; }
+.resume-pill--gone { opacity: 0; pointer-events: none; }
+.resume-pill__btn { min-height: 40px; padding: 0 8px; background: none; border: 0; color: #9fd8f0; text-decoration: underline; font: inherit; }
+.aview__gone { margin: 0 16px 8px; padding: 8px 12px; border-radius: 8px; background: var(--inok-tile-bg); font-size: var(--inok-type-secondary); color: var(--ion-text-color); }
+/* A-142: a held finger on a row is the quick-actions sheet on BOTH platforms - not iOS's text callout / selection, nor Android's */
+.mrow { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
