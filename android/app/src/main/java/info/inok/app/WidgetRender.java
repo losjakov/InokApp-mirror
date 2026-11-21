@@ -21,6 +21,7 @@ final class WidgetRender {
 
     static final int[] ROW = { R.id.w_row1, R.id.w_row2, R.id.w_row3 };
     static final int[] ROW_IMG = { R.id.w_row1_img, R.id.w_row2_img, R.id.w_row3_img };
+    static final int[] ROW_PIC = { R.id.w_row1_pic, R.id.w_row2_pic, R.id.w_row3_pic };
     static final int[] ROW_DOT = { R.id.w_row1_dot, R.id.w_row2_dot, R.id.w_row3_dot };
     static final int[] ROW_TITLE = { R.id.w_row1_title, R.id.w_row2_title, R.id.w_row3_title };
     static final int[] ROW_SUB = { R.id.w_row1_sub, R.id.w_row2_sub, R.id.w_row3_sub };
@@ -83,6 +84,8 @@ final class WidgetRender {
             Bitmap b = r.image == null || small ? null : avatar(c, r.image); // a small widget gives its width to the words (emulator 44917561352)
             if (b != null) { v.setImageViewBitmap(ROW_IMG[i], b); v.setViewVisibility(ROW_IMG[i], View.VISIBLE); }
             else v.setViewVisibility(ROW_IMG[i], kind.equals(WidgetModel.NEW) || small ? View.GONE : View.VISIBLE);
+            // the picture's 34 dp box itself goes in a small widget and in «Нове на сайті» (emulator 44928369145: «С / ан-Франциського» cut mid-word)
+            v.setViewVisibility(ROW_PIC[i], kind.equals(WidgetModel.NEW) || small ? View.GONE : View.VISIBLE);
             v.setContentDescription(ROW[i], r.say);
             v.setOnClickPendingIntent(ROW[i], open(c, id * 10 + i, r.url));
         }

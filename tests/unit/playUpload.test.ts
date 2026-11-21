@@ -14,10 +14,10 @@ describe('Google Play upload (scripts/play_upload.py)', () => {
     expect(body.releases[0].versionCodes).toEqual([String(x * 10000 + y * 100 + z)]);
     expect(body.releases[0].name).toBe(`${x * 10000 + y * 100 + z} (${APP_VERSION})`);
   });
-  it('the notes = the three sections of store/release_notes/<version>.md', () => {
-    const s = readFileSync(`store/release_notes/${APP_VERSION}.md`, 'utf8');
-    const sec = (l: string) => new RegExp(`## ${l}\\n([\\s\\S]*?)(?=\\n## |\\n# |$)`).exec(s)![1].trim();
-    expect(body.releases[0].releaseNotes).toEqual([{ language: 'uk', text: sec('uk') }, { language: 'ru-RU', text: sec('ru') }, { language: 'en-US', text: sec('en') }]);
+  it('the notes = the Google Play texts of store/release_notes/<version>.md (the App Store line left out, A-156)', () => {
+    const t = JSON.parse(execFileSync('python3', ['-I', 'scripts/play_upload.py', 'texts', 'package.json', 'store/release_notes'], { encoding: 'utf8' }));
+    expect(body.releases[0].releaseNotes).toEqual([{ language: 'uk', text: t.play.uk }, { language: 'ru-RU', text: t.play.ru }, { language: 'en-US', text: t.play.en }]);
+    for (const n of body.releases[0].releaseNotes) expect(n.text).not.toContain('App Store');
   });
   it('the workflow: the tag run only, after the AAB artifact, skipped without the secret', () => {
     const wf = readFileSync('.github/workflows/build.yml', 'utf8');

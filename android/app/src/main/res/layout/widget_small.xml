@@ -14,7 +14,7 @@
         android:textSize="26sp" android:textStyle="bold" android:visibility="gone" />
     <LinearLayout android:id="@+id/w_row1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal"
         android:gravity="center_vertical" android:paddingTop="2dp" android:paddingBottom="2dp" android:minHeight="38dp">
-        <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_marginEnd="8dp">
+        <FrameLayout android:id="@+id/w_row1_pic" android:layout_width="34dp" android:layout_height="34dp" android:layout_marginEnd="8dp">
             <ImageView android:id="@+id/w_row1_img" android:layout_width="34dp" android:layout_height="34dp" android:src="@mipmap/ic_launcher_round" android:importantForAccessibility="no" />
             <ImageView android:id="@+id/w_row1_dot" android:layout_width="10dp" android:layout_height="10dp" android:layout_gravity="top|end" android:src="@drawable/widget_dot" android:visibility="gone" android:importantForAccessibility="no" />
         </FrameLayout>
