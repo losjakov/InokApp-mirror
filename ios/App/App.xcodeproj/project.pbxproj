@@ -24,6 +24,19 @@
 		1C0A11000000000000000013 /* InokBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000012 /* InokBridgeViewController.swift */; };
 		1C0A11000000000000000015 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000014 /* Localizable.strings */; };
 		1C0A11000000000000000021 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 1C0A11000000000000000020 /* FirebaseMessaging */; };
+		1C0A11430000000000000005 /* InokWidgetsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000004 /* InokWidgetsPlugin.swift */; };
+		1C0A11430000000000000006 /* InokShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000002 /* InokShared.swift */; };
+		1C0A11430000000000000018 /* InokWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000010 /* InokWidgetsBundle.swift */; };
+		1C0A11430000000000000019 /* InokShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000002 /* InokShared.swift */; };
+		1C0A1143000000000000001A /* WidgetCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000003 /* WidgetCore.swift */; };
+		1C0A1143000000000000001B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000013 /* PrivacyInfo.xcprivacy */; };
+		1C0A1143000000000000001C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000014 /* Localizable.strings */; };
+		1C0A1143000000000000002A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000026 /* NotificationService.swift */; };
+		1C0A1143000000000000002B /* InokShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000002 /* InokShared.swift */; };
+		1C0A1143000000000000002C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000029 /* PrivacyInfo.xcprivacy */; };
+		1C0A1143000000000000002E /* InokWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000008 /* InokWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1C0A1143000000000000002F /* InokNotifications.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1C0A1143000000000000001E /* InokNotifications.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1C0A1143000000000000FF01 /* WidgetCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000003 /* WidgetCore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +63,22 @@
 		1C0A11000000000000000016 /* uk */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = uk; path = uk.lproj/Localizable.strings; sourceTree = "<group>"; };
 		1C0A11000000000000000017 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		1C0A11000000000000000018 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		1C0A11430000000000000002 /* InokShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokShared.swift; sourceTree = "<group>"; };
+		1C0A11430000000000000003 /* WidgetCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetCore.swift; sourceTree = "<group>"; };
+		1C0A11430000000000000004 /* InokWidgetsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokWidgetsPlugin.swift; sourceTree = "<group>"; };
+		1C0A11430000000000000010 /* InokWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokWidgetsBundle.swift; sourceTree = "<group>"; };
+		1C0A11430000000000000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1C0A11430000000000000012 /* InokWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = InokWidgets.entitlements; sourceTree = "<group>"; };
+		1C0A11430000000000000013 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1C0A11430000000000000008 /* InokWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = InokWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C0A11430000000000000015 /* uk */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = uk; path = uk.lproj/Localizable.strings; sourceTree = "<group>"; };
+		1C0A11430000000000000016 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
+		1C0A11430000000000000017 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		1C0A11430000000000000026 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		1C0A11430000000000000027 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1C0A11430000000000000028 /* InokNotifications.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = InokNotifications.entitlements; sourceTree = "<group>"; };
+		1C0A11430000000000000029 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1C0A1143000000000000001E /* InokNotifications.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = InokNotifications.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,12 +91,29 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		1C0A1143000000000000000B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1C0A11430000000000000021 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
+				1C0A1143000000000000001D /* InokNotifications */,
+				1C0A11430000000000000007 /* InokWidgets */,
+				1C0A11430000000000000001 /* Shared */,
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
@@ -77,6 +123,8 @@
 		504EC3051FED79650016851F /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				1C0A1143000000000000001E /* InokNotifications.appex */,
+				1C0A11430000000000000008 /* InokWidgets.appex */,
 				504EC3041FED79650016851F /* App.app */,
 			);
 			name = Products;
@@ -85,6 +133,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				1C0A11430000000000000004 /* InokWidgetsPlugin.swift */,
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
@@ -106,6 +155,38 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		1C0A11430000000000000001 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				1C0A11430000000000000002 /* InokShared.swift */,
+				1C0A11430000000000000003 /* WidgetCore.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		1C0A11430000000000000007 /* InokWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				1C0A11430000000000000010 /* InokWidgetsBundle.swift */,
+				1C0A11430000000000000011 /* Info.plist */,
+				1C0A11430000000000000012 /* InokWidgets.entitlements */,
+				1C0A11430000000000000013 /* PrivacyInfo.xcprivacy */,
+				1C0A11430000000000000014 /* Localizable.strings */,
+			);
+			path = InokWidgets;
+			sourceTree = "<group>";
+		};
+		1C0A1143000000000000001D /* InokNotifications */ = {
+			isa = PBXGroup;
+			children = (
+				1C0A11430000000000000026 /* NotificationService.swift */,
+				1C0A11430000000000000027 /* Info.plist */,
+				1C0A11430000000000000028 /* InokNotifications.entitlements */,
+				1C0A11430000000000000029 /* PrivacyInfo.xcprivacy */,
+			);
+			path = InokNotifications;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -116,11 +197,14 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				1C0A1143000000000000002D /* Embed Foundation Extensions */,
 				1C0A11000000000000000030 /* GoogleService-Info.plist from the CI */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1C0A11430000000000000033 /* PBXTargetDependency */,
+				1C0A11430000000000000031 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -131,6 +215,40 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		1C0A11430000000000000009 /* InokWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1C0A1143000000000000000D /* Build configuration list for PBXNativeTarget "InokWidgets" */;
+			buildPhases = (
+				1C0A1143000000000000000A /* Sources */,
+				1C0A1143000000000000000B /* Frameworks */,
+				1C0A1143000000000000000C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = InokWidgets;
+			productName = InokWidgets;
+			productReference = 1C0A11430000000000000008 /* InokWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		1C0A1143000000000000001F /* InokNotifications */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1C0A11430000000000000023 /* Build configuration list for PBXNativeTarget "InokNotifications" */;
+			buildPhases = (
+				1C0A11430000000000000020 /* Sources */,
+				1C0A11430000000000000021 /* Frameworks */,
+				1C0A11430000000000000022 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = InokNotifications;
+			productName = InokNotifications;
+			productReference = 1C0A1143000000000000001E /* InokNotifications.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -140,6 +258,12 @@
 				LastSwiftUpdateCheck = 0920;
 				LastUpgradeCheck = 0920;
 				TargetAttributes = {
+					1C0A11430000000000000009 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					1C0A1143000000000000001F = {
+						CreatedOnToolsVersion = 26.0;
+					};
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
@@ -166,6 +290,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				1C0A1143000000000000001F /* InokNotifications */,
+				1C0A11430000000000000009 /* InokWidgets */,
 				504EC3031FED79650016851F /* App */,
 			);
 		};
@@ -185,6 +311,23 @@
 				1C0A11000000000000000002 /* PrivacyInfo.xcprivacy in Resources */,
 				1C0A11000000000000000005 /* InfoPlist.strings in Resources */,
 				1C0A11000000000000000015 /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1C0A1143000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C0A1143000000000000001B /* PrivacyInfo.xcprivacy in Resources */,
+				1C0A1143000000000000001C /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1C0A11430000000000000022 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C0A1143000000000000002C /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -213,12 +356,34 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1C0A1143000000000000FF01 /* WidgetCore.swift in Sources */,
+				1C0A11430000000000000006 /* InokShared.swift in Sources */,
+				1C0A11430000000000000005 /* InokWidgetsPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				1C0A11000000000000000011 /* FcmTopicsPlugin.swift in Sources */,
 				1C0A11000000000000000041 /* AppAttestPlugin.swift in Sources */,
 				1C0A11000000000000000051 /* InAppReviewPlugin.swift in Sources */,
 				1C0A11000000000000000013 /* InokBridgeViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1C0A1143000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C0A11430000000000000018 /* InokWidgetsBundle.swift in Sources */,
+				1C0A11430000000000000019 /* InokShared.swift in Sources */,
+				1C0A1143000000000000001A /* WidgetCore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1C0A11430000000000000020 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C0A1143000000000000002A /* NotificationService.swift in Sources */,
+				1C0A1143000000000000002B /* InokShared.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -261,7 +426,62 @@
 			name = Localizable.strings;
 			sourceTree = "<group>";
 		};
+		1C0A11430000000000000014 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				1C0A11430000000000000015 /* uk */,
+				1C0A11430000000000000016 /* ru */,
+				1C0A11430000000000000017 /* en */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
 /* End PBXVariantGroup section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1C0A1143000000000000002D /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1C0A1143000000000000002E /* InokWidgets.appex in Embed Foundation Extensions */,
+				1C0A1143000000000000002F /* InokNotifications.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXContainerItemProxy section */
+		1C0A11430000000000000030 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1C0A11430000000000000009;
+			remoteInfo = InokWidgets;
+		};
+		1C0A11430000000000000032 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1C0A1143000000000000001F;
+			remoteInfo = InokNotifications;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		1C0A11430000000000000031 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1C0A11430000000000000009 /* InokWidgets */;
+			targetProxy = 1C0A11430000000000000030 /* PBXContainerItemProxy */;
+		};
+		1C0A11430000000000000033 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1C0A1143000000000000001F /* InokNotifications */;
+			targetProxy = 1C0A11430000000000000032 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		504EC3141FED79650016851F /* Debug */ = {
@@ -419,6 +639,104 @@
 			};
 			name = Release;
 		};
+		1C0A1143000000000000000E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = InokWidgets/InokWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = InokWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = info.inok.app.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1C0A1143000000000000000F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = InokWidgets/InokWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = InokWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = info.inok.app.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		1C0A11430000000000000024 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = InokNotifications/InokNotifications.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = InokNotifications/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = info.inok.app.notifications;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1C0A11430000000000000025 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = InokNotifications/InokNotifications.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = InokNotifications/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = info.inok.app.notifications;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -436,6 +754,24 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1C0A1143000000000000000D /* Build configuration list for PBXNativeTarget "InokWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1C0A1143000000000000000E /* Debug */,
+				1C0A1143000000000000000F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1C0A11430000000000000023 /* Build configuration list for PBXNativeTarget "InokNotifications" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1C0A11430000000000000024 /* Debug */,
+				1C0A11430000000000000025 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

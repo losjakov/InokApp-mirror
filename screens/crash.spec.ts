@@ -21,7 +21,9 @@ const BREAK_LONG_DATES = () => {
   const Orig = Intl.DateTimeFormat;
   const Fake = function (this: unknown, locale?: string | string[], opts?: Intl.DateTimeFormatOptions) {
     const f = new Orig(locale, opts);
-    if (opts && opts.month === 'long') return { format: () => { throw new RangeError('probe: long month format'); }, resolvedOptions: () => f.resolvedOptions() } as unknown as Intl.DateTimeFormat;
+    // cloud_43 (A-147): Home's article rows print the SHORT date (month 2-digit, formatToParts) - the probe breaks both forms
+    const boom = () => { throw new RangeError('probe: long month format'); };
+    if (opts && (opts.month === 'long' || opts.month === '2-digit')) return { format: boom, formatToParts: boom, resolvedOptions: () => f.resolvedOptions() } as unknown as Intl.DateTimeFormat;
     return f;
   } as unknown as typeof Intl.DateTimeFormat;
   Object.assign(Fake, { supportedLocalesOf: Orig.supportedLocalesOf });

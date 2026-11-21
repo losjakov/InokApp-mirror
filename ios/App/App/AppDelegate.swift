@@ -2,6 +2,7 @@ import UIKit
 import Capacitor
 import FirebaseCore
 import FirebaseMessaging
+import WidgetKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -20,6 +21,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         if FirebaseApp.app() != nil { Messaging.messaging().apnsToken = deviceToken }
         NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    /// T13 (A-155 (2), cloud_43): a BACKGROUND push (`stream_ended`: apns-push-type background, content-available 1, contract §4 ruling 405)
+    /// wakes the app (unless force-quit): the widgets' live data changes at once + the widgets reload.
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        let changed = InokShared.applyStreamPush(userInfo)
+        if changed, #available(iOS 14.0, *) { WidgetCenter.shared.reloadAllTimelines() }
+        completionHandler(changed ? .newData : .noData)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {

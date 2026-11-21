@@ -13,5 +13,5 @@ for u in junit/junit/4.13.2/junit-4.13.2.jar org/hamcrest/hamcrest-core/1.3/hamc
 done
 O="$(mktemp -d)"; trap 'rm -rf "$O"' EXIT
 P=android/app/src/main/java/info/inok/app; T=android/app/src/test/java/info/inok/app
-javac -d "$O" -cp "$J/junit-4.13.2.jar" $P/Notifier.java $P/NavOverlap.java $T/NotifierTest.java $T/NavOverlapTest.java 2>&1 | grep -v JAVA_TOOL_OPTIONS || true
-java -cp "$O:$J/junit-4.13.2.jar:$J/hamcrest-core-1.3.jar" org.junit.runner.JUnitCore info.inok.app.NotifierTest info.inok.app.NavOverlapTest 2>&1 | grep -v JAVA_TOOL_OPTIONS | grep -E '^(OK|FAILURES|Tests run|[0-9]+\))' 
+javac -d "$O" -cp "$J/junit-4.13.2.jar" $P/Notifier.java $P/NavOverlap.java $P/WidgetModel.java $T/NotifierTest.java $T/NavOverlapTest.java $T/WidgetModelTest.java 2>&1 | grep -v JAVA_TOOL_OPTIONS || true
+java -cp "$O:$J/junit-4.13.2.jar:$J/hamcrest-core-1.3.jar" org.junit.runner.JUnitCore info.inok.app.NotifierTest info.inok.app.NavOverlapTest info.inok.app.WidgetModelTest 2>&1 | grep -v JAVA_TOOL_OPTIONS | grep -E '^(OK|FAILURES|Tests run|[0-9]+\))' 

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- T9 style B (A-153 (2)): light; values-night = the phone's dark theme. Accent = the app's primary #0c6486; muted >= 4.5:1 on its background -->
+<resources>
+    <color name="widget_bg">#FFFFFFFF</color>
+    <color name="widget_text">#FF1B1F23</color>
+    <color name="widget_muted">#FF5B6570</color>
+    <color name="widget_accent">#FF0C6486</color>
+    <color name="widget_live">#FFC62828</color>
+</resources>

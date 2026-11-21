@@ -402,5 +402,21 @@
   "remind.cancelled": "Нагадування скасовано",
   "remind.title": "Через 10 хв: {title}",
   "remind.body": "{channel} · {time}",
-  "remind.channel": "Нагадування"
+  "remind.channel": "Нагадування",
+  "widget.live_title": "Зараз в ефірі · {n}",
+  "widget.live_small": "В ефірі · {n}",
+  "widget.upcoming_title": "Найближчі трансляції",
+  "widget.nearest": "Найближча",
+  "widget.new_title": "Нове на сайті",
+  "widget.more": "+{n} ще",
+  "widget.updated": "оновлено {time}",
+  "widget.none_live": "Зараз немає трансляцій",
+  "widget.none_upcoming": "Наступних трансляцій ще не оголошено",
+  "widget.none_new": "Нових публікацій поки немає",
+  "widget.tomorrow": "завтра",
+  "widget.remind": "нагадаю о {time}",
+  "widget.news": "Новини",
+  "widget.say_live": "{name}, в ефірі",
+  "widget.say_planned": "{name}, о {time}",
+  "widget.only_one": "Інші канали ще не оголосили наступну трансляцію"
 }

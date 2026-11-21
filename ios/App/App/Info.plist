@@ -119,5 +119,22 @@
 			<string>newspaper</string>
 		</dict>
 	</array>
+	<!-- cloud_43 (A-155 (2)): `stream_ended` arrives as a background push (content-available) - the widgets' live data changes at once -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<!-- cloud_43 (T9): a widget's tap opens the app with inokapp://tab/<id> (THE router, src/app/quickActions.ts) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>info.inok.app.tab</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>inokapp</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

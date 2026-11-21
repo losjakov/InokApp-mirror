@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- cloud_43 (A-153 (2), A-155 (4)): the App Group shared with the app (registered on all three App IDs by CD S328 / S329) -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.info.inok.app</string>
+	</array>
+</dict>
+</plist>

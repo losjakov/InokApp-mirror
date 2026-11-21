@@ -18,4 +18,12 @@
     <string name="shortcut_monasteries">Монастирі</string>
     <string name="shortcut_map">Карта</string>
     <string name="shortcut_articles">Публікації</string>
+    <!-- T9 (A-156 (1)): the three widgets' names = «Що нового» 1.0.17 (x3), the picker's description, the first-add line -->
+    <string name="widget_live">Зараз в ефірі</string>
+    <string name="widget_upcoming">Найближчі трансляції</string>
+    <string name="widget_new">Нове на сайті</string>
+    <string name="widget_live_desc">Трансляції обителей, що йдуть просто зараз</string>
+    <string name="widget_upcoming_desc">Найближчі оголошені трансляції та ваші нагадування</string>
+    <string name="widget_new_desc">Найновіші публікації та новини inok.info</string>
+    <string name="widget_open_app">Відкрийте застосунок, щоб завантажити дані</string>
 </resources>

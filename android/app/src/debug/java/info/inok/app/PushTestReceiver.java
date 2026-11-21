@@ -28,6 +28,8 @@ public class PushTestReceiver extends BroadcastReceiver {
             Map<String, String> data = new HashMap<>();
             for (Iterator<String> k = o.keys(); k.hasNext(); ) { String key = k.next(); data.put(key, o.getString(key)); }
             InokNotifications.of(ctx).onData(data, InokMessagingService.isForeground(ctx), "test-" + System.currentTimeMillis(), System.currentTimeMillis());
+            String type = data.get("type"); // T9: the same widget hook as InokMessagingService
+            if ("stream_live".equals(type) || "stream_ended".equals(type)) WidgetPush.onStream(ctx, data);
             Log.i("InokNotifyTest", String.valueOf(data.get("type")));
         } catch (Exception e) {
             Log.w("InokNotifyTest", "bad payload " + e);

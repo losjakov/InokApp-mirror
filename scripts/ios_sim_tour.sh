@@ -153,6 +153,12 @@ a3_walk() {
   case "$v" in *UNIMPLEMENTED*|*'not implemented'*|*REJECT*) a3 "local plugins answer (A1)" FAIL "$v";;
     'AppAttest={'*'"supported":'*'; FcmTopics='*) a3 "local plugins answer (A1)" PASS "$v";;
     *) a3 "local plugins answer (A1)" FAIL "${v:-no answer}";; esac
+  # cloud_43 (T9, A-156 (3)): the widgets' REVIEW snapshots - the SAME WidgetBody the extension draws, from the App Group data the app wrote
+  # (InokWidgets.set), rendered in the app (ImageRenderer, iOS 16+) and copied out of its container; informational (the REPORT's frames)
+  v=$(ev "Capacitor.Plugins.InokWidgets.snapshot().then((x) => JSON.stringify(x)).catch((e) => 'REJECT ' + String((e && e.message) || e))")
+  local wc wd; wc="$(xcrun simctl get_app_container "$U" "$BUNDLE" data 2>/dev/null || true)"; wd="$OUT/widgets-$TAG"; mkdir -p "$wd"
+  [ -n "$wc" ] && cp "$wc"/Documents/widgets/*.png "$wd/" 2>/dev/null
+  if [ "$(find "$wd" -name '*.png' | wc -l | tr -d ' ')" -ge 12 ]; then a3 "widgets snapshot (T9)" PASS "$v"; else a3 "widgets snapshot (T9)" NOT-PROVABLE "${v:-no answer}"; fi
   # 0b cloud_40 (A1 g): «Про застосунок» - «Перевірка Apple: …» on a simulator = «not supported by this device» (Apple's own answer), never
   # «the call failed» (= the plugin not in the bridge); «Скопіювати подробиці» shows the text (no key id / install id in it)
   nav go /more/about; sleep 3

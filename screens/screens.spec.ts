@@ -2206,7 +2206,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('article')).toContainText('Обитель дитячої радості');
       // F1 (A-79 3): `2026-10-28T22:00:00Z` = the site's 29 October (Kyiv); 1.0.3 printed the device's (UTC) 28th - here and in its list row
       await expect(p.getByTestId('article').locator('.card__sub').first()).toContainText(/29 (жовтня|октября) 2026|October 29, 2026/);
-      if ((p.viewportSize()?.width ?? 0) >= 600) await expect(p.getByTestId('arow-2869')).toContainText(/29 (жовтня|октября)|October 29/);
+      if ((p.viewportSize()?.width ?? 0) >= 600) await expect(p.getByTestId('arow-2869')).toContainText('29.10.2026'); // A-147: the row's date in digits
       await expect(p.getByTestId('rating')).toBeVisible();
       await leadShown(p);
     } },

@@ -471,8 +471,11 @@ if [ "$WV" -ge "$FLOOR" ]; then
   LINKS=n/a; case "$API" in 26*) ;; *) bash "$ROOT/scripts/emu_links.sh" "$OUT" || true; LINKS="$(tail -1 "$OUT/links.txt" 2>/dev/null | sed 's/^links //' || true)";; esac
   # cloud_13 item 3: the Play screenshots from the live export, once, on the required image (scripts/emu_store.sh)
   STORE=n/a; case "$API" in 34-default*) bash "$ROOT/scripts/emu_store.sh" "$OUT" || true; STORE="$(grep -E '^store screenshots: [A-Z]+|^(missing|maps|pictures|anything|gallery|«Публікації»|language|unit words|status bar|colours|lavras|article top|on air)|^launcher label|STOPPED' "$OUT/store/sizes.txt" 2>/dev/null | sed 's/ (rules:.*//' | tr '\n' ';' || true)";; esac
-  native_paths; quick_actions; edge_shots; a11y_dumps; r8_scan; notify_proof; offline_first
-  echo "FULL offline=[$OFFLINE] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
+  native_paths; quick_actions; edge_shots; a11y_dumps; r8_scan; notify_proof
+  # T9 (cloud_43): the widgets' review snapshots + the push path (debug APK installed by notify_proof; informational - the verdict in widgets.txt)
+  bash "$ROOT/scripts/emu_widgets.sh" "$OUT" || true; WIDGETS="$(tail -1 "$OUT/widgets.txt" 2>/dev/null | sed 's/^widgets //' || true)"
+  offline_first
+  echo "FULL offline=[$OFFLINE] widgets=[$WIDGETS] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
 else
   sleep 20
   shot "$OUT/home.png"

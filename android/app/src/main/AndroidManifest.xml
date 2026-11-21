@@ -55,6 +55,20 @@
 
         </activity>
 
+        <!-- T9 (cloud_43, A-153 (2)): the three home-screen widgets (WidgetRender / WidgetStore / WidgetWorker) -->
+        <receiver android:name=".LiveWidget" android:exported="false" android:label="@string/widget_live">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_live_info" />
+        </receiver>
+        <receiver android:name=".UpcomingWidget" android:exported="false" android:label="@string/widget_upcoming">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_upcoming_info" />
+        </receiver>
+        <receiver android:name=".NewWidget" android:exported="false" android:label="@string/widget_new">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_new_info" />
+        </receiver>
+
         <!-- stage 3 push: data messages become notifications in the app's language; priority 1 wins over the plugin's service -->
         <service android:name=".InokMessagingService" android:exported="false">
             <intent-filter android:priority="1">

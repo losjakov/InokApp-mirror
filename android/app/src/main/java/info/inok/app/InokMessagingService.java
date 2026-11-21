@@ -27,6 +27,9 @@ public class InokMessagingService extends MessagingService {
         if (msg.getNotification() == null && !data.isEmpty()) {
             String id = msg.getMessageId() == null ? String.valueOf(System.currentTimeMillis()) : msg.getMessageId();
             InokNotifications.of(this).onData(data, isForeground(this), id, System.currentTimeMillis());
+            // T9 (A-153 (2)): a stream push changes «Зараз в ефірі» AT ONCE - the payload into the widgets' own data now, the fetch right after
+            String type = data.get("type");
+            if ("stream_live".equals(type) || "stream_ended".equals(type)) WidgetPush.onStream(this, data);
         }
         super.onMessageReceived(msg); // the plugin's foreground event (pushNotificationReceived)
     }

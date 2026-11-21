@@ -163,9 +163,19 @@ jobs:
             APP="$RUNNER_TEMP/x/Payload/App.app"
             codesign -dvv "$APP" 2>&1 | grep -E '^Authority=' | head -2 | tee -a "$GITHUB_STEP_SUMMARY"
             codesign -d --entitlements :- "$APP" 2>/dev/null > "$RUNNER_TEMP/ent.plist" || true
-            for k in aps-environment com.apple.developer.associated-domains com.apple.developer.devicecheck.appattest-environment; do
+            for k in aps-environment com.apple.developer.associated-domains com.apple.developer.devicecheck.appattest-environment com.apple.security.application-groups; do
               /usr/libexec/PlistBuddy -c "Print :$k" "$RUNNER_TEMP/ent.plist" > /dev/null 2>&1 && echo "entitlement $k: present" | tee -a "$GITHUB_STEP_SUMMARY" \
                 || { echo "::error::entitlement $k LOST in the App Store signature ($HOW archive)"; rc=1; }
+            done
+            # cloud_43 (A-155 (4)): THREE targets signed - each extension present, App Store-signed, with the App Group (the widgets / the NSE)
+            for x in InokWidgets InokNotifications; do
+              X="$APP/PlugIns/$x.appex"
+              if [ ! -d "$X" ]; then echo "::error::$x.appex missing from the IPA"; rc=1; continue; fi
+              codesign -d --entitlements :- "$X" 2>/dev/null > "$RUNNER_TEMP/ent-$x.plist" || true
+              G=$(/usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$RUNNER_TEMP/ent-$x.plist" 2>/dev/null || true)
+              A=$(codesign -dvv "$X" 2>&1 | grep -m1 '^Authority=' || true)
+              if [ "$G" = group.info.inok.app ]; then echo "extension $x: signed ($A), App Group $G" | tee -a "$GITHUB_STEP_SUMMARY"
+              else echo "::error::extension $x: no App Group in its signature ($A)"; rc=1; fi
             done
             echo "SIGNED IPA: $(stat -f%z "$RUNNER_TEMP/export-export/App.ipa") b" | tee -a "$GITHUB_STEP_SUMMARY"
           fi

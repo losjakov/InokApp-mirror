@@ -15,11 +15,11 @@ describe('iOS project', () => {
   const info = read('ios/App/App/Info.plist');
   it('the deployment target = THE iOS engine floor (package.json `ios_saf >= N`), in the project and in the plugins package', () => {
     expect(iosFloor(['chrome >= 89', 'ios_saf >= 15'])).toBe(15);
-    expect([...pbx.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([\d.]+);/g)].map((m) => m[1])).toEqual(Array(4).fill(`${IOS_FLOOR}.0`));
+    expect([...pbx.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([\d.]+);/g)].map((m) => m[1])).toEqual(Array(8).fill(`${IOS_FLOOR}.0`)); // project x2, app x2, widgets x2, NSE x2 (cloud_43)
     expect(read('ios/App/CapApp-SPM/Package.swift')).toContain(`.iOS(.v${IOS_FLOOR})`);
   });
   it('iPhone AND iPad (A-115); the bundle id = the Android appId; the version comes from the build (package.json), never typed here', () => {
-    expect(pbx.match(/TARGETED_DEVICE_FAMILY = "1,2";/g)).toHaveLength(2);
+    expect(pbx.match(/TARGETED_DEVICE_FAMILY = "1,2";/g)).toHaveLength(6); // the app + its two extensions (cloud_43)
     expect(pbx.match(/PRODUCT_BUNDLE_IDENTIFIER = info\.inok\.app;/g)).toHaveLength(2);
     expect(plistValue(info, 'CFBundleShortVersionString')?.[2]).toBe('$(MARKETING_VERSION)');
     expect(plistValue(info, 'CFBundleVersion')?.[2]).toBe('$(CURRENT_PROJECT_VERSION)');
@@ -181,5 +181,25 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     expect(read('scripts/mirror_paths.txt').split('\n')).toContain('ios/');
     expect(read('scripts/mirror_snapshot.py')).toMatch(/NEVER_SUFFIX = \([^)]*'\.p8'/);
     expect(read('.gitignore').split('\n')).toEqual(expect.arrayContaining(['*.p8', 'GoogleService-Info.plist']));
+  });
+  // cloud_43 (T9 / T13, A-153 (2), A-155 (2), (4), (5)): THREE targets - the app, the widgets, the notification service - one App Group, 15.0,
+  // each with its PrivacyInfo 1C8F.1; the app embeds both extensions; one shared store file in all three (DRY)
+  it('three targets: bundle ids, the App Group on every one, embedded, PrivacyInfo 1C8F.1 x3, the shared store in all three', () => {
+    const pbx = read('ios/App/App.xcodeproj/project.pbxproj'); const info = read('ios/App/App/Info.plist');
+    for (const id of ['info.inok.app.widgets', 'info.inok.app.notifications']) expect(pbx.match(new RegExp(`PRODUCT_BUNDLE_IDENTIFIER = ${id.replace(/\./g, '\\.')};`, 'g'))).toHaveLength(2);
+    expect(pbx).toMatch(/productType = "com\.apple\.product-type\.app-extension";[\s\S]*productType = "com\.apple\.product-type\.app-extension";/);
+    expect(pbx).toMatch(/dstSubfolderSpec = 13;[\s\S]*InokWidgets\.appex in Embed[\s\S]*InokNotifications\.appex in Embed/);
+    for (const e of ['ios/App/App/App.entitlements', 'ios/App/InokWidgets/InokWidgets.entitlements', 'ios/App/InokNotifications/InokNotifications.entitlements'])
+      expect(read(e), e).toMatch(/com\.apple\.security\.application-groups<\/key>\s*<array>\s*<string>group\.info\.inok\.app<\/string>/);
+    for (const f of ['ios/App/App/PrivacyInfo.xcprivacy', 'ios/App/InokWidgets/PrivacyInfo.xcprivacy', 'ios/App/InokNotifications/PrivacyInfo.xcprivacy']) expect(read(f), f).toContain('<string>1C8F.1</string>');
+    expect(pbx.match(/InokShared\.swift in Sources/g)).toHaveLength(6); // 3 build files (app, widgets, NSE) x (object + phase line)
+    expect(read('ios/App/InokNotifications/Info.plist')).toContain('com.apple.usernotifications.service');
+    expect(read('ios/App/InokWidgets/Info.plist')).toContain('com.apple.widgetkit-extension');
+    expect(plistArray(info, 'UIBackgroundModes')).toEqual(['remote-notification']);
+    // the NSE delivers the ORIGINAL content on every path (P5 of the pre-mortem)
+    const nse = read('ios/App/InokNotifications/NotificationService.swift');
+    expect(nse).toMatch(/h\(c\) \/\/ the very content that arrived/);
+    expect(nse).not.toMatch(/mutableCopy|bestAttemptContent\.(title|body|sound)\s*=/);
+    expect(read('ios/App/App/InokBridgeViewController.swift')).toContain('registerPluginInstance(InokWidgetsPlugin())');
   });
 });

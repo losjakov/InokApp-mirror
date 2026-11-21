@@ -4,5 +4,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <receiver android:name=".PushTestReceiver" android:exported="true" />
+        <!-- T9 (cloud_43): the widgets' review snapshots (scripts/emu_widgets.sh) - debug only -->
+        <activity android:name=".WidgetPreviewActivity" android:exported="true" android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
     </application>
 </manifest>

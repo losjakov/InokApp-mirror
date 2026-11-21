@@ -402,5 +402,21 @@
   "remind.cancelled": "Напоминание отменено",
   "remind.title": "Через 10 мин: {title}",
   "remind.body": "{channel} · {time}",
-  "remind.channel": "Напоминания"
+  "remind.channel": "Напоминания",
+  "widget.live_title": "Сейчас в эфире · {n}",
+  "widget.live_small": "В эфире · {n}",
+  "widget.upcoming_title": "Ближайшие трансляции",
+  "widget.nearest": "Ближайшая",
+  "widget.new_title": "Новое на сайте",
+  "widget.more": "+{n} ещё",
+  "widget.updated": "обновлено {time}",
+  "widget.none_live": "Сейчас нет трансляций",
+  "widget.none_upcoming": "Следующие трансляции ещё не объявлены",
+  "widget.none_new": "Новых публикаций пока нет",
+  "widget.tomorrow": "завтра",
+  "widget.remind": "напомню в {time}",
+  "widget.news": "Новости",
+  "widget.say_live": "{name}, в эфире",
+  "widget.say_planned": "{name}, в {time}",
+  "widget.only_one": "Другие каналы ещё не объявили следующую трансляцию"
 }

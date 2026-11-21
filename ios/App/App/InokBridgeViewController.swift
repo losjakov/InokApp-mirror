@@ -8,5 +8,6 @@ class InokBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(FcmTopicsPlugin())
         bridge?.registerPluginInstance(AppAttestPlugin()) // cloud_39: App Attest for iOS casts (A-127, R-53)
         bridge?.registerPluginInstance(InAppReviewPlugin()) // cloud_41: the store's own rating window (A-133 C2)
+        bridge?.registerPluginInstance(InokWidgetsPlugin()) // cloud_43: the home-screen widgets' data (A-153 (2))
     }
 }

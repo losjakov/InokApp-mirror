@@ -45,6 +45,8 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
+				<!-- cloud_43: the App Group defaults shared with the widget and notification extensions (InokShared) -->
+				<string>1C8F.1</string>
 			</array>
 		</dict>
 		<dict>

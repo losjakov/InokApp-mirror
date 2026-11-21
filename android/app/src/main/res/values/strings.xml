@@ -20,4 +20,12 @@
     <string name="shortcut_monasteries">Monasteries</string>
     <string name="shortcut_map">Map</string>
     <string name="shortcut_articles">Publications</string>
+    <!-- T9 (A-156 (1)): the three widgets' names = «Що нового» 1.0.17 (x3), the picker's description, the first-add line -->
+    <string name="widget_live">Live now</string>
+    <string name="widget_upcoming">Upcoming streams</string>
+    <string name="widget_new">New on the site</string>
+    <string name="widget_live_desc">Monasteries’ broadcasts live right now</string>
+    <string name="widget_upcoming_desc">The next announced broadcasts and your reminders</string>
+    <string name="widget_new_desc">The newest publications and news of inok.info</string>
+    <string name="widget_open_app">Open the app to load the data</string>
 </resources>

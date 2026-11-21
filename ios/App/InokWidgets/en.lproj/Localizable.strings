@@ -1,0 +1,8 @@
+/* T9 (A-156 (1)): the widgets' names = «Що нового» 1.0.17, = Android's res strings (unit widgets) */
+"widget_live" = "Live now";
+"widget_upcoming" = "Upcoming streams";
+"widget_new" = "New on the site";
+"widget_live_desc" = "Monasteries’ broadcasts live right now";
+"widget_upcoming_desc" = "The next announced broadcasts and your reminders";
+"widget_new_desc" = "The newest publications and news of inok.info";
+"widget_open_app" = "Open the app to load the data";
