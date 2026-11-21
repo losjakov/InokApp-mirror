@@ -121,4 +121,7 @@
          allowWhileIdle) - the owner's «без лишних разрешений»: no exact-alarm permission in the merged manifest (build.yml greps it) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" tools:node="remove" />
+    <!-- T9 (cloud_43): androidx.work declares FOREGROUND_SERVICE for its SystemForegroundService; WidgetWorker never runs in the foreground
+         (no setForeground) - the owner's «без лишних разрешений»: removed (build 44907976662 listed it) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
 </manifest>

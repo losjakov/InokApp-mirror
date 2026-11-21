@@ -14,8 +14,13 @@ frames() { grep "^$1|" "$ROOT/scripts/store_frames.txt" | cut -d'|' -f2- | sed "
   | { if [ -n "${STORE_SKIP:-}" ]; then grep -vE "^[^|]*(${STORE_SKIP})"; else cat; fi; } | { if [ -n "${STORE_ONLY:-}" ]; then grep -E "^[^|]*(${STORE_ONLY})"; else cat; fi; }; }
 
 set_lang() {
-  nav go /more/language; nav wait "[data-testid=\"lang-$1\"]"; nav click "[data-testid=\"lang-$1\"]"; sleep 3
-  [ "$(check lang)" = "$1" ] || echo "LANG FAIL $1" >> "$S/nav.txt"
+  # cloud_43 (T14; ios 44907976664 iphone63: «LANG FAIL ru» after a fixed 3 s): the switch is WAITED for (polled), the tap asked once more
+  local _
+  for _ in 1 2; do
+    nav go /more/language; nav wait "[data-testid=\"lang-$1\"]"; nav click "[data-testid=\"lang-$1\"]"
+    waitcheck lang "$1" 8 > /dev/null && return 0
+  done
+  echo "LANG FAIL $1" >> "$S/nav.txt"
 }
 set_theme() { # light | dark
   # cloud_40 (ios run 2, App Store iPhone): ONE tap lost to the remote hand's relay (connect ETIMEDOUT) left the theme dark - asked once more

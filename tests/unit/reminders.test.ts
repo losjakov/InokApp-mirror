@@ -84,6 +84,7 @@ describe('the plugin call (Android: inexact, no settings jump)', () => {
     const man = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
     expect(man).toMatch(/<uses-permission android:name="android\.permission\.SCHEDULE_EXACT_ALARM" tools:node="remove" \/>/);
     expect(man).toMatch(/<uses-permission android:name="android\.permission\.USE_EXACT_ALARM" tools:node="remove" \/>/);
+    expect(man).toMatch(/<uses-permission android:name="android\.permission\.FOREGROUND_SERVICE" tools:node="remove" \/>/); // WorkManager's, unused
     expect(readFileSync('.github/workflows/build.yml', 'utf8')).toMatch(/SCHEDULE_EXACT_ALARM\|USE_EXACT_ALARM/);
   });
 });

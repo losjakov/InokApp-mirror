@@ -1721,7 +1721,10 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(pend[0].idle, 'allowWhileIdle').toBe(true);
       const at = await p.evaluate(() => { const j = (window as any).__inokReminders[0]; return j.at; });
       const start = await p.evaluate(() => Date.now());
-      expect(Math.round((at - start) / 60_000), 'the start - 10 min').toBeGreaterThan(60);
+      const ahead = Math.round((at - start) / 60_000); // the start is 1-2 h ahead (rounded to the hour) - the reminder 10 min before it
+      expect(ahead, 'the start - 10 min').toBeGreaterThanOrEqual(49);
+      expect(ahead).toBeLessThanOrEqual(111);
+      expect(new Date(at).getUTCMinutes(), 'xx:50 = the hour start - 10 min').toBe(50);
       expect(pend[0].title).toMatch(/^(Через 10 хв|Через 10 мин|In 10 min): /);
       await expect(pill).toHaveAccessibleName(/^(Нагадаю о|Напомню в|Reminder at) \d\d:\d\d · (Скасувати|Отменить|Cancel)$/);
       await expect(p.locator('ion-toast:not(.overlay-hidden)')).toHaveCount(0, { timeout: 6_000 });
@@ -2199,7 +2202,10 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.getByTestId('kind-tab-news').click();
       await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7);
       expect(await noLeads(p, '[data-testid="articles"]')).toBe(7);
-      await hyphenated(p, '[data-testid="articles"] [data-testid^="arow-"] ion-label', false); // NOTE 5 (A-154 (6)): list rows never hyphenate, even at 200 %
+      // NOTE 5 (A-154 (6)): at 200 % (the large scale measured) the list rows still never hyphenate; the article text does (below)
+      await expect.poll(() => p.evaluate(() => document.documentElement.dataset.textLarge), 'A-56: the measured text scale').toBe('1');
+      expect(await p.locator('[data-testid="articles"] [data-testid^="arow-"] ion-label').locator('visible=true').evaluateAll((es) => es.filter((e) => {
+        const c = getComputedStyle(e) as CSSStyleDeclaration & { webkitHyphens?: string }; return (c.hyphens || c.webkitHyphens) === 'auto'; }).length), 'rows hyphenated').toBe(0);
       expect(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll').toBe(true);
     } },
   { name: 'article', path: '/articles?id=2869', ready: async (p) => {

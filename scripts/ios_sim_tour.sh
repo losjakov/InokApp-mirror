@@ -329,9 +329,11 @@ a3_walk() {
   nav scroll '[data-testid^="vote-up-"]'; sleep 2
   ev "window.__inokLastCast = null, 'ok'" > /dev/null
   v0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none'")
-  nav click '[data-testid^="vote-up-"]'; sleep 3   # the vote's status line lives 6 s (CommentsBlock): read inside it
+  nav click '[data-testid^="vote-up-"]'
+  # cloud_43 (T14; ios 44907976664 newest iPhone: the status read EMPTY at a fixed +3 s): the status line (it lives 6 s) is WAITED for
+  local _; vs=''; for _ in 1 2 3 4 5 6 7 8 9 10; do sleep 0.5
+    vs=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=vote-status]')||{}).textContent || ''"); [ -n "$vs" ] && break; done
   v1=$(ev "((document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid^=vote-up-]')||{}).dataset?.mine || 'none') + '; server ' + (window.__inokLastCast || 'ok')")
-  vs=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=vote-status]')||{}).textContent || ''")
   shot "$OUT/a3-like__$TAG.png"
   case "$v0|$v1|$(honest "$vs")" in "n|n; server 403 integrity_required|yes") a3 "comment like (A1)" PASS "mine $v0 -> $v1; the honest line «${vs}»";;
     *) a3 "comment like (A1)" FAIL "mine $v0 -> $v1; «${vs}»";; esac
