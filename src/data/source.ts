@@ -88,13 +88,15 @@ const post = (body: object): FetchOptions => ({ method: 'POST', body, ...('asser
 
 /** A-144: the bundled pair is a file of the app itself (a RELATIVE address: the WebView serves it from the APK / the app bundle; Capacitor's
  *  http patch leaves relative addresses alone). Absent (a build without the step, the browser ring) = null; a bad sha = an error. */
+/** Android's asset packer unpacks `*.gz` assets and drops the suffix - the bundled gzip carries `.bin` (scripts/bundle_export.mjs) */
+export const BUNDLED_SUFFIX = '.bin';
 async function bundledPair(prefix: string): Promise<{ man: Manifest; dir: Directory } | null> {
   const r = await fetch(`${prefix}bundled/manifest.json`).catch(() => null);
   if (!r || !r.ok) return null;
   let man: Manifest;
   try { man = (await r.json()) as Manifest; } catch { return null; } // a dev server's index.html for a missing file
   const f = manifestFile(man);
-  const g = await fetch(`${prefix}bundled/${f.name}`);
+  const g = await fetch(`${prefix}bundled/${f.name}${BUNDLED_SUFFIX}`);
   if (!g.ok) return null;
   return { man, dir: await decodeExport(new Uint8Array(await g.arrayBuffer()), f.sha256) };
 }

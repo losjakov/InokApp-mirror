@@ -10,14 +10,13 @@ import java.util.Map;
 /**
  * T9 (A-153 (2)): Android refreshes the widgets AT ONCE on a stream push (InokMessagingService runs natively in the background): the
  * payload (channel_id, video_id, title) goes into the widgets' own live data at once, the widgets are redrawn, and WidgetWorker fetches the
- * whole live-status right after (network allowing). No widget placed = nothing at all.
+ * whole live-status right after (network allowing). No widget placed = the data kept, nothing drawn or fetched.
  */
 final class WidgetPush {
     private WidgetPush() { }
 
     static void onStream(Context c, Map<String, String> data) {
         try {
-            if (!WidgetRender.anyWidget(c)) return;
             int ch = Integer.parseInt(data.get("channel_id") == null ? "-1" : data.get("channel_id"));
             JSONObject own = WidgetStore.own(c, WidgetStore.LIVE_KEY);
             JSONObject app = WidgetStore.app(c);
@@ -36,6 +35,7 @@ final class WidgetPush {
             }
             status.put("live", kept);
             WidgetStore.putOwn(c, WidgetStore.LIVE_KEY, new JSONObject().put("at", System.currentTimeMillis()).put("status", status));
+            if (!WidgetRender.anyWidget(c)) return; // the data is kept (a widget added later starts fresh); no draw / fetch without one
             WidgetRender.updateAll(c);
             WidgetWorker.now(c);
         } catch (Exception e) {

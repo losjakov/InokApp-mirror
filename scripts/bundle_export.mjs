@@ -12,6 +12,9 @@ export const SITE = 'https://inok.info/api/app/v1/export/';
 export const MIRROR = 'https://losjakov.github.io/inok-app-data/export/'; // = MIRROR_BASE of src/data/api/client.ts (unit `bundleExport` pins both)
 export const APP_KEY = 'eb741a6e64315c8aff6281ad13c21378'; // public (contract §1) - = APP_KEY of src/data/api/client.ts
 const FILE = 'directory_v1.json.gz';
+/** the name INSIDE the app: Android's asset packer unpacks a `*.gz` asset and drops the suffix (emulator 44917561352: the APK held an 8.5 MB
+ *  `directory_v1.json`) - the same gzip bytes under a name it leaves alone (src/data/source.ts BUNDLED_SUFFIX) */
+export const BUNDLED_SUFFIX = '.bin';
 
 /** One host: the pair, verified, or a thrown Error naming what failed (never a key in the message). */
 export async function fetchPair(base, fetchFn = fetch) {
@@ -43,7 +46,7 @@ export async function bundle(out = 'public/bundled', fetchFn = fetch, log = cons
       const p = await fetchPair(base, fetchFn);
       await mkdir(out, { recursive: true });
       await writeFile(`${out}/manifest.json`, p.manText);
-      await writeFile(`${out}/${FILE}`, p.gz);
+      await writeFile(`${out}/${FILE}${BUNDLED_SUFFIX}`, p.gz);
       log(`bundled export ${p.man.export_version} from the ${name}: ${p.houses} houses, ${p.gz.length} b, sha256 ${p.man.files.find((x) => x.name === FILE).sha256.slice(0, 12)}`);
       return { from: name, ...p };
     } catch (e) {

@@ -51,7 +51,7 @@ runs:
         # cloud_43 (T14): the LIVE export in place of the sample (this job's checkout only; nothing is committed) = the pair the bundle step
         # already fetched for this build (public/bundled/, sha checked: scripts/bundle_export.mjs - the site with the PUBLIC X-Inok-App key,
         # contract §1; without the key the site answered 403, QUESTIONS cloud_42 5) - one fetch, one source (DRY)
-        if [ -s public/bundled/manifest.json ] && cp public/bundled/manifest.json fixtures/manifest.json && cp public/bundled/directory_v1.json.gz fixtures/directory_v1.json.gz; then
+        if [ -s public/bundled/manifest.json ] && cp public/bundled/manifest.json fixtures/manifest.json && cp public/bundled/directory_v1.json.gz.bin fixtures/directory_v1.json.gz; then
           echo "LIVE export: $(python3 -c 'import json;print(json.load(open("fixtures/manifest.json"))["export_version"])')" | tee -a "$L"
         else echo "LIVE 04/05: SKIPPED - no bundled live export in this job (public/bundled/)" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; fi
         npx playwright install chromium > /dev/null 2>&1

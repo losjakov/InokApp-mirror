@@ -10,7 +10,7 @@ describe('the appstore job\'s live 04 / 05 step', () => {
   it('never fails the job', () => { expect(step).toMatch(/set \+e/); expect(step.match(/exit (\d)/g)?.every((e) => e === 'exit 0')).toBe(true); });
   // cloud_43 (T14): the live pair = the one the bundle step fetched for this build (the site WITH the public key, sha checked) - no second fetch
   it('takes the bundled live export (one fetch, one source); no curl of its own', () => {
-    expect(step).toMatch(/cp public\/bundled\/manifest\.json fixtures\/manifest\.json && cp public\/bundled\/directory_v1\.json\.gz fixtures\/directory_v1\.json\.gz/);
+    expect(step).toMatch(/cp public\/bundled\/manifest\.json fixtures\/manifest\.json && cp public\/bundled\/directory_v1\.json\.gz\.bin fixtures\/directory_v1\.json\.gz/);
     expect(step).not.toMatch(/curl /);
     expect(readFileSync('.github/actions/ios-setup/action.yml', 'utf8')).toMatch(/node scripts\/bundle_export\.mjs && npm run build/);
   });

@@ -5,8 +5,9 @@ import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // @ts-expect-error - a plain .mjs build script (no types)
-import { APP_KEY as KEY_IN_SCRIPT, MIRROR, SITE, bundle } from '../../scripts/bundle_export.mjs';
+import { APP_KEY as KEY_IN_SCRIPT, BUNDLED_SUFFIX as SUFFIX_IN_SCRIPT, MIRROR, SITE, bundle } from '../../scripts/bundle_export.mjs';
 import { API_BASE, APP_KEY, MIRROR_BASE } from '@/data/api/client';
+import { BUNDLED_SUFFIX } from '@/data/source';
 
 // A-144 (1): THE release-build step - the LIVE pair, sha-checked, into public/bundled/; nothing good -> the build is red
 const dir = { export_version: '2026-11-21T09:10:10Z', contract_version: 1, monasteries: [{ code: 1 }] };
@@ -27,7 +28,8 @@ describe('bundle_export.mjs', () => {
     const o = out(); const seen: { url: string; key?: string }[] = [];
     const r = await bundle(o, fetcher({ man: man(), gz }, {}, seen), () => undefined);
     expect(r.from).toBe('site');
-    expect(readFileSync(join(o, 'directory_v1.json.gz')).equals(gz)).toBe(true);
+    expect(readFileSync(join(o, `directory_v1.json.gz${BUNDLED_SUFFIX}`)).equals(gz)).toBe(true); // never «.gz» last: Android unpacks those
+    expect(BUNDLED_SUFFIX).toBe('.bin');
     expect(JSON.parse(readFileSync(join(o, 'manifest.json'), 'utf8')).export_version).toBe(dir.export_version);
     expect(seen.every((x) => x.key === APP_KEY)).toBe(true);
   });
@@ -47,5 +49,6 @@ describe('bundle_export.mjs', () => {
     expect(SITE).toBe(`${API_BASE}export/`);
     expect(MIRROR).toBe(MIRROR_BASE);
     expect(KEY_IN_SCRIPT).toBe(APP_KEY);
+    expect(SUFFIX_IN_SCRIPT).toBe(BUNDLED_SUFFIX);
   });
 });
