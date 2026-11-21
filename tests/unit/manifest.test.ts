@@ -38,7 +38,10 @@ describe('Android manifest - the phone name (A-69) and the permissions (N5)', ()
     expect([...f.matchAll(/android:host="([^"]+)"/g)].map((m) => m[1])).toEqual(['inok.info']);
     const prefixes = [...f.matchAll(/android:pathPrefix="([^"]+)"/g)].map((m) => m[1]);
     expect(prefixes).toEqual([...Object.values(ARTICLE_SECTIONS).map((x) => `/${x}`), '/monasteries/', '/dioceses/', '/live/']); // one source: the router's sections
-    expect(f).not.toMatch(/android:path(Pattern)?=/);
+    expect(f).not.toMatch(/android:pathPattern=/);
+    // T4 (cloud_43): the umbrella /articles/ is ONE exact path (not a prefix) and opens «Публікації» «Усі»
+    expect([...f.matchAll(/android:path="([^"]+)"/g)].map((m) => m[1])).toEqual(['/articles/']);
+    expect(linkTarget('https://inok.info/articles/')).toEqual({ kind: 'list', list: 'all' });
     // each prefix: its item form AND (A-138) its bare list open in the app - nothing the filter lets in by its bare prefix lands in the browser
     for (const p of prefixes) {
       if (p !== '/live/') expect(linkTarget(`https://inok.info${p}1832/`), p).not.toBeNull(); // /live/ has no item form in the app (A-143 (5))

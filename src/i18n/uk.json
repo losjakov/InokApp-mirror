@@ -372,7 +372,7 @@
   "reading.pct_a11y_few": "прочитано {n} відсотки",
   "reading.done": "прочитано",
   "reading.dismiss": "Прибрати з «Продовжити читання»",
-  "reading.resumed": "Продовжено з місця зупинки",
+  "reading.resumed": "Продовжено",
   "reading.from_start": "З початку",
   "reading.unfinished": "Недочитані",
   "reading.unfinished_empty": "Недочитаних публікацій немає.",
@@ -390,5 +390,17 @@
   "sheet.restart": "Почати спочатку",
   "sheet.mark_read": "Позначити як прочитане",
   "sheet.mark_unread": "Позначити як непрочитане",
-  "sheet.hint": "Утримуйте палець на рядку — швидкі дії"
+  "sheet.hint": "Утримуйте палець на рядку — швидкі дії",
+  "share.copied": "Посилання скопійовано",
+  "share.failed": "Не вдалося поділитися",
+  "calendar.source": "Джерело: ",
+  "reading.resumed_full": "Продовжено з місця зупинки",
+  "remind.pill": "Нагадати за 10 хв",
+  "remind.on": "Нагадаю о {time} · Скасувати",
+  "remind.a11y_off": "Нагадати за 10 хв: {title}",
+  "remind.toast": "Нагадаю о {time} — за 10 хв до початку",
+  "remind.cancelled": "Нагадування скасовано",
+  "remind.title": "Через 10 хв: {title}",
+  "remind.body": "{channel} · {time}",
+  "remind.channel": "Нагадування"
 }

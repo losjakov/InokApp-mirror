@@ -2,6 +2,7 @@ import { Component, type ReactNode } from 'react';
 import { warningOutline } from 'ionicons/icons';
 import { defineCustomElement as defineIonIcon } from 'ionicons/components/ion-icon.js';
 import { langFromTag, LANGS, makeT, type Lang } from '@/i18n';
+import { isUserCancel } from './userCancel';
 
 /**
  * A-48 (a): the app NEVER dies white. ONE place for every fatal path of the page:
@@ -103,7 +104,11 @@ export function reportCrash(err: unknown, src: CrashSource, dead = true): void {
 /** Once, first thing in main.tsx: the global handlers, the native renderer hook, and the crash kept from the last launch. */
 export function installCrashGuard(): void {
   window.addEventListener('error', (e) => { if (e.error) reportCrash(e.error, 'error'); });
-  window.addEventListener('unhandledrejection', (e) => reportCrash((e as PromiseRejectionEvent).reason, 'promise'));
+  window.addEventListener('unhandledrejection', (e) => {
+    const why = (e as PromiseRejectionEvent).reason;
+    if (isUserCancel(why)) { console.warn('InokBoot: a user cancel, not a crash'); return; } // T2: a closed share sheet is no crash
+    reportCrash(why, 'promise');
+  });
   (window as { inokNativeCrash?: (code: string) => void }).inokNativeCrash = (code) => {
     const c: Crash = { code, line: '', where: '', at: new Date().toISOString() };
     console.error(`InokBoot: error ${code}`);

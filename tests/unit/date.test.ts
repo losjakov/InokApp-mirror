@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { longDate } from '@/i18n/date';
+import { longDate, shortDate } from '@/i18n/date';
 
 // N3 (REVIEW cloud_21): «25 жовтня 2026 р.» - the year mark never wraps alone (tablet, 200 % font).
 describe('longDate (the ONE long-date formatter)', () => {
@@ -40,8 +40,19 @@ describe('site dates in Kyiv time (F1)', () => {
     expect(longDate(at1832, 'en', 'UTC')).toBe('May 23, 2026');
   });
   it('no site-date caller overrides the zone (only refresh.ts passes DEVICE_TZ)', () => {
-    const callers = ['src/components/ArticleRow.tsx', 'src/components/ArticleView.tsx', 'src/components/CommentsBlock.tsx', 'src/pages/MonasteryCard.tsx'];
+    expect(readFileSync('src/components/ArticleRow.tsx', 'utf8')).toMatch(/shortDate\(a\.published_at\)/); // A-147: the row's digits, Kyiv zone
+    const callers = ['src/components/ArticleView.tsx', 'src/components/CommentsBlock.tsx', 'src/pages/MonasteryCard.tsx'];
     for (const f of callers) expect(readFileSync(f, 'utf8')).toMatch(/longDate\([^,()]+(\([^)]*\))?[^,()]*, lang\)/);
     expect(readFileSync('src/data/refresh.ts', 'utf8')).toMatch(/longDate\(d, lang, DEVICE_TZ\)/);
+  });
+});
+
+// A-147 (cloud_43): THE short date of every article row - the Kyiv day in digits, the same in uk / ru / en
+describe('shortDate (A-147)', () => {
+  it('the Kyiv day at the boundary (UTC+2 in November)', () => {
+    expect(shortDate('2026-11-20T22:30:00Z')).toBe('21.11.2026');
+    expect(shortDate('2026-11-20T21:30:00Z')).toBe('20.11.2026');
+    expect(shortDate('2026-05-23T21:00:00Z')).toBe('24.05.2026'); // summer UTC+3 (1832, as the site prints it)
+    expect(shortDate('not a date')).toBe('not a date');
   });
 });

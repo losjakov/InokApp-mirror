@@ -25,7 +25,7 @@ describe('html-lite link router', () => {
   });
   it('A-76: every other path the App Links filter lets in names nothing of the app → the browser', () => {
     for (const h of ['https://inok.info/monasteries/table/', 'https://inok.info/monasteries/table/?oblast=3', 'https://inok.info/monasteries/242/photos/',
-      'https://inok.info/articles/publications/abc/', 'https://inok.info/articles/2869/', 'https://inok.info/articles/', 'https://inok.info/dioceses/5/map/',
+      'https://inok.info/articles/publications/abc/', 'https://inok.info/articles/2869/', 'https://inok.info/articles/x/', 'https://inok.info/dioceses/5/map/',
       'https://inok.info/articles/other/12/', 'https://inok.info/live/12/', 'https://inok.info/donate/', 'https://inok.info/', 'https://example.com/articles/publications/1832/',
       'https://example.com/monasteries/', 'https://inok.info/monasteriesx/', 'https://example.com/dioceses/5/'])
       expect(linkTarget(h), h).toBeNull();
@@ -33,9 +33,10 @@ describe('html-lite link router', () => {
   it('A-138 (+ amendment): a site LIST page in every form (any ?lang=, any query, with or without the slash / www / a language prefix) -> its list', () => {
     const forms = (path: string) => [`https://inok.info/${path}`, `https://inok.info/${path}?lang=ru`, `https://inok.info/${path}?lang=en`, `https://www.inok.info/${path}`,
       `http://inok.info/${path.replace(/\/$/, '')}`, `/${path}`, `https://inok.info/${path}?page=2&lang=uk`, `https://inok.info/${path}#top`];
-    const table = [['monasteries/', 'monasteries'], ['dioceses/', 'eparchies'], ['live/', 'streams'], ['articles/publications/', 'publication'], ['articles/video/', 'video'], ['articles/news/', 'news']] as const;
+    const table = [['monasteries/', 'monasteries'], ['dioceses/', 'eparchies'], ['live/', 'streams'], ['articles/publications/', 'publication'], ['articles/video/', 'video'], ['articles/news/', 'news'], ['articles/', 'all']] as const;
     for (const [path, list] of table) for (const h of forms(path)) expect(linkTarget(h), h).toEqual({ kind: 'list', list });
     expect(linkTarget('https://inok.info/ru/monasteries/')).toEqual({ kind: 'list', list: 'monasteries' });
+    expect(linkTarget('https://inok.info/uk/articles/')).toEqual({ kind: 'list', list: 'all' }); // T4
   });
   it('A-138 (backlog 13:57): an eparchy link `/dioceses/<id>/` (the article text\'s `{diocese}` token, any ?lang=) -> its page', () => {
     for (const h of ['https://inok.info/dioceses/5/', 'https://inok.info/dioceses/5/?lang=ru', 'https://inok.info/dioceses/5?lang=en', '/dioceses/5/', 'https://www.inok.info/dioceses/5/#x'])

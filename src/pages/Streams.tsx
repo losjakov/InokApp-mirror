@@ -1,7 +1,9 @@
 import { IonContent, IonList, IonPage, useIonViewDidEnter, useIonViewWillLeave } from '@ionic/react';
 import { ListHeading } from '@/components/ListHeading';
 import { StatusNote } from '@/components/StatusNote';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { RemindPill } from '@/components/RemindPill';
+import { field } from '@/data/repo/types';
 import { addCircleOutline } from 'ionicons/icons';
 import { SiteFormButton } from '@/components/SiteFormButton';
 import { openOnSite } from '@/native/intents';
@@ -57,7 +59,13 @@ export function StreamsPage() {
             {groups.online.length > 0 && header('streams.online', groups.online.length)}
             {groups.online.map(({ channel, live: l }) => <StreamRow key={channel.id} channel={channel} second={streamTitle(pickLang(l.title, lang))} live />)}
             {groups.scheduled.length > 0 && header('streams.scheduled', groups.scheduled.length)}
-            {groups.scheduled.map(({ channel, at, title }) => <StreamRow key={channel.id} channel={channel} second={[t('streams.starts', { time: timeOf(at, lang) }), streamTitle(pickLang(title, lang))].filter(Boolean).join(' · ')} />)}
+            {groups.scheduled.map(({ channel, at, title, video_id }) => (
+              <Fragment key={channel.id}>
+                <StreamRow channel={channel} lines="none" second={[t('streams.starts', { time: timeOf(at, lang) }), streamTitle(pickLang(title, lang))].filter(Boolean).join(' · ')} />
+                {/* T8 (A-153 (1)): «Нагадати за 10 хв» under the row */}
+                <RemindPill channel_id={channel.id} channel={field(channel, 'title', lang)} video_id={video_id} at={at} title={streamTitle(pickLang(title, lang)) || undefined} />
+              </Fragment>
+            ))}
             {groups.offline.length > 0 && header('streams.offline', groups.offline.length)}
             {groups.offline.map((c) => <StreamRow key={c.id} channel={c} />)}
           </IonList>

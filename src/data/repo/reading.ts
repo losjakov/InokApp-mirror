@@ -64,6 +64,11 @@ export const continueList = (places: Place[], now: number = Date.now()): Place[]
   places.filter((p) => p.started && !p.finished && !p.dismissed && keepsPlace(p.kind) && now - p.opened_at <= CONTINUE_DAYS * DAY)
     .sort((a, b) => b.opened_at - a.opened_at);
 
+/** T1 (cloud_43, remark 1): WHERE the continue card stands over «Публікації» - every kind tab, any order, any entry (tab bar, a Home block
+ *  with ?sort=, a site link); not on «★» (`saved`) and not while a search text is typed. */
+export const SAVED = 'saved'; // the «★» tab's value (Articles.tsx)
+export const continueOver = (kind: string, q: string): boolean => kind !== SAVED && q.trim() === '';
+
 /** A-141 (2): the started article shows its place on reopening; a finished / never started one opens at the top */
 export const resumeOf = (p: Place | null): { anchor: number; frac: number } | null => (p && p.started && !p.finished && keepsPlace(p.kind) ? { anchor: p.anchor, frac: p.frac } : null);
 

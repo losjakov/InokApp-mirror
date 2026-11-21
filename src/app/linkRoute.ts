@@ -8,11 +8,11 @@ import { quickRoute } from './quickActions';
 /** A-138: the mark a site LIST link puts on its screen's entry: the list resets (filters, search, order, its kind tab) as if just opened -
  *  also when that screen was already open with filters. `reset` = a fresh number per link (a new link = a new reset; Back to the same entry
  *  resets nothing again); `kind` = the article tab of an article section link. */
-export type ListEntry = { reset: number; kind?: ArticleKind };
+export type ListEntry = { reset: number; kind?: ArticleKind | 'all' };
 export type LinkRoute = { to: string; entry?: ListEntry };
 
 const LIST_ROUTES: Record<SiteList, LinkRoute['to']> = {
-  monasteries: '/monasteries', eparchies: '/more/eparchies', streams: '/streams', publication: '/articles', video: '/articles', news: '/articles',
+  monasteries: '/monasteries', eparchies: '/more/eparchies', streams: '/streams', publication: '/articles', video: '/articles', news: '/articles', all: '/articles',
 };
 
 /** THE in-app screen of a site link (A-21(а), R-39, A-76, A-138): a card / an eparchy in the DB -> its page; an article -> `/articles?id=`

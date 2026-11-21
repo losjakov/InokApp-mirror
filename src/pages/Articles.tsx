@@ -26,11 +26,12 @@ import { useWide } from '@/state/useWide';
 import { useListEntry } from '@/app/nav';
 import { useReading } from '@/state/reading';
 import { ContinueReading } from '@/components/ContinueReading';
+import { continueOver, SAVED } from '@/data/repo/reading';
 import { ArticleStar } from '@/components/FavMark';
 import { useQuickHint } from '@/components/QuickSheet';
 
 /** A-141 (1): the 5th segment = the saved articles («★», named «Обрані»), newest-saved first, from the phone only */
-export const SAVED = 'saved';
+export { SAVED };
 
 /** A-97: the order chosen for ALL tabs, kept while the app runs (the page may be rebuilt), the default after a restart («Не запоминать») */
 let sessionSort: ArticleSort = 'published';
@@ -168,12 +169,12 @@ export function ArticlesPage() {
           <IonIcon icon={star} aria-hidden="true" />
         </IonSegmentButton>
       </IonSegment>
-      {kind !== SAVED && !active && <ContinueReading />}
+      {continueOver(kind, q) && <ContinueReading />}
       <StatusNote text={fv?.local ? t('articles.query_offline') : offline && !active && t('articles.offline')} testId="articles-offline" />
       {shown === null ? <div className="empty"><Busy /></div> : shown.length === 0
         ? <div className="empty" data-testid="articles-empty" role={active ? 'status' : undefined}>{t(active ? 'articles.nothing' : kind === SAVED ? 'articles.saved_empty' : 'articles.empty')}</div> : (
         <IonList data-testid="articles">
-          {shown.map((a) => <ArticleRow key={a.id} a={a} onSelect={open} selected={wide && a.id === id} q={active ? q : undefined} />)}
+          {shown.map((a) => <ArticleRow key={a.id} a={a} onSelect={open} selected={wide && a.id === id} q={active ? q : undefined} mixed={kind === 'all' || kind === SAVED} />)}
         </IonList>
       )}
       {shown && shown.length > 0 && hasMore && (

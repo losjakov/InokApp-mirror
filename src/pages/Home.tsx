@@ -174,7 +174,7 @@ function ArticleBlock({ sort, title, testId }: { sort: ArticleSort; title: strin
   return (
     <>
       <HomeHeading label={title} to={entry.to} state={entry.state} testId={testId} />
-      {!empty ? rows.map((a) => <ArticleRow key={a.id} a={a} onSelect={(id) => navigate(`/articles?id=${id}`)} />)
+      {!empty ? rows.map((a) => <ArticleRow key={a.id} a={a} onSelect={(id) => navigate(`/articles?id=${id}`)} mixed />)
         : busy ? <ListBox><div className="empty empty--row"><Busy /></div></ListBox>
           : !fail && rows ? <IonItem lines="none"><IonLabel className="home__quiet">{t('articles.empty')}</IonLabel></IonItem> : null}
       <div role="listitem" data-testid={`${testId}-block`} data-fetched={fetched ? '1' : '0'} data-rows={rows?.length ?? 0}>

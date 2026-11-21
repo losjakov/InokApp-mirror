@@ -27,6 +27,9 @@ import { StreamsPage } from '@/pages/Streams';
 import { MorePage } from '@/pages/More';
 import { FavouritesPage, UnfinishedPage, VisitedPage } from '@/pages/Favourites';
 import { ReadingProvider } from '@/state/reading';
+import { RemindersProvider } from '@/state/reminders';
+import { onReminderTap } from '@/native/reminders';
+import { channelUrl } from '@/data/live/streams';
 import { UNFINISHED_PATH } from '@/components/ContinueReading';
 import { LanguagePage } from '@/pages/Language';
 import { NotificationsPage } from '@/pages/Notifications';
@@ -83,6 +86,14 @@ function Tabs() {
     clearPushTap();
     if (r?.kind === 'youtube') { navigate('/streams'); void openVideo(r.url); } else if (r?.kind === 'navigate') navigate(r.to);
   }, [pushTap, clearPushTap, navigate, live]);
+  // T8: a tapped reminder -> «Трансляції»; the stream itself when it is live by then (the row's own action, A-37)
+  const liveRef = useRef(live);
+  useEffect(() => { liveRef.current = live; }, [live]);
+  useEffect(() => onReminderTap((x) => {
+    navigate('/streams');
+    const st = liveRef.current?.status;
+    if (x.channel_id != null && st?.live.some((l) => l.channel_id === x.channel_id)) void openVideo(channelUrl({ id: x.channel_id, youtube_url: '' }, st));
+  }), [navigate]);
   return (
     <>
     <UpdateOffer />
@@ -152,11 +163,13 @@ export function App() {
         {/* A-132: the reserve door renders INSTEAD of the app (never over it) - a hard door leaves no router to reach behind it */}
         <DoorGate fallback={<Splash />}>
           <ReadingProvider>
+          <RemindersProvider>
           <IonReactRouter>
             <IonRouterOutlet>
               <Route path="/*" element={<><ScreenAnalytics /><Tabs /></>} />
             </IonRouterOutlet>
           </IonReactRouter>
+          </RemindersProvider>
           </ReadingProvider>
         </DoorGate>
       </AppProvider>

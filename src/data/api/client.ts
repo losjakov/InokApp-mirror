@@ -8,6 +8,9 @@ export const SITE_URL = 'https://inok.info/';
 /** The site's hosts (www answers 301 to the bare host) - THE test «is this address inok.info» (router, `siteUrl`). */
 export const SITE_HOSTS: ReadonlySet<string> = new Set([new URL(SITE_URL).host, `www.${new URL(SITE_URL).host}`]);
 export const API_BASE = `${SITE_URL}api/app/v1/`;
+/** A-144 (cloud_43): THE second host of the DIRECTORY only (manifest + directory_v1.json.gz, the site's own files republished on GitHub Pages;
+ *  the gz is checked against THAT host's manifest). Articles, live, comments, ratings, pictures: the site only. */
+export const MIRROR_BASE = 'https://losjakov.github.io/inok-app-data/export/';
 export const APP_KEY = 'eb741a6e64315c8aff6281ad13c21378';
 
 export class ApiError extends Error {

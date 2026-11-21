@@ -3,7 +3,7 @@ import { churchOutline } from './icons';
 import { CoverImage } from './CoverImage';
 import { Hl } from './Hl';
 import { ParentLine, parentName } from './ParentLine';
-import { field, headLine, rowParts, withoutPostcode } from '@/data/repo/types';
+import { field, headLine, headPerson, rowParts, withoutPostcode } from '@/data/repo/types';
 import type { LeanRow as Row } from '@/data/repo/monasteries';
 import { formatKm } from '@/data/search/geo';
 import { hiddenMatch } from '@/data/search/highlight';
@@ -37,7 +37,7 @@ export function MonasteryRow({ row, onSelect, selected, q, noParent, onPage }: {
   const parent = noParent ? '' : parentName(row, lang);
   // D27: when a word of the query marks nothing on the row, say which field the search found it in
   const why = q && q.trim() ? hiddenMatch(
-    [name, parent, parts.eparchy, address, head ? [head.role, head.person, head.rest].join(' ') : ''],
+    [name, parent, parts.eparchy, address, head ? [head.role, head.person].join(' ') : ''], // A-145: no see in the haystack
     [
       { label: t('card.official'), text: field(row, 'official', lang) },
       { label: t('search.f_name'), text: field(row, 'short', lang) },
@@ -47,7 +47,7 @@ export function MonasteryRow({ row, onSelect, selected, q, noParent, onPage }: {
           { label: `${t('search.f_name')} · ${L}`, text: r[`name_${l}`] },
           { label: `${t('card.official')} · ${L}`, text: r[`official_${l}`] },
           { label: `${dict.label_address ?? ''} · ${L}`, text: r[`address_${l}`] },
-          { label: `${dict.label_head ?? ''} · ${L}`, text: r[`head_${l}`] },
+          { label: `${dict.label_head ?? ''} · ${L}`, text: r[`head_${l}`] && headPerson(r[`head_${l}`]!) },
         ];
       }),
     ], q) : null;
@@ -67,7 +67,8 @@ export function MonasteryRow({ row, onSelect, selected, q, noParent, onPage }: {
         {address && <p className="mrow__sub hrow__wide" data-testid="row-address"><Hl text={address} q={q} /></p>}
         {head && (
           <p className="mrow__sub mrow__head hrow__wide" data-testid="row-head">
-            {head.role && <>{head.role} - </>}<strong><Hl text={head.person} q={q} /></strong>{head.rest && <>, <Hl text={head.rest} q={q} /></>}{head.born && <>, <span data-testid="row-born">{head.born}</span></>}
+            {/* A-145 (cloud_43): a LIST shows «<role> - <person>» only - no bishop's see, no birth date (the card keeps both) */}
+            {head.role && <>{head.role} - </>}<strong><Hl text={head.person} q={q} /></strong>
           </p>
         )}
         {why && <p className="mrow__sub mrow__why hrow__wide" data-testid="row-why">{t('search.match')} · {why.label}: <Hl text={why.text} q={q} /></p>}

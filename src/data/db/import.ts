@@ -1,5 +1,6 @@
 import type { Db, SqlValue } from './types';
 import { CONTRACT_VERSION, type Directory, type Monastery } from '@/data/api/types';
+import { headPerson } from '@/data/repo/types';
 import { normalize, stripHtml } from '@/data/search/normalize';
 import { pickLang, type Lang } from '@/i18n';
 import { DIRECTORY_TABLES, MONASTERY_INDEXES, directoryDdl, ftsDdl, setMeta, type FtsMode } from './schema';
@@ -77,7 +78,8 @@ export async function importDirectory(db: Db, dir: Directory, fts: FtsMode): Pro
       const nTown = normAll(m.town);
       const nEp = normAll(ep);
       const nOb = normAll(ob);
-      const nHead = normAll(m.head);
+      // A-145 (cloud_43): the list search finds a head by the PERSON only - never by a bishop's see (the card still shows the see)
+      const nHead = normAll(m.head && Object.fromEntries(Object.entries(m.head).map(([l, h]) => [l, h ? headPerson(h) : h])));
       const nAddr = normAll(m.address); // A-23 #4: the list searches the address it shows
       const nAll = [nName, nTown, nEp, nOb, nHead, nAddr].join(' ').replace(/\s+/g, ' ').trim();
       await db.run(

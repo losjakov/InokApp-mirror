@@ -1,4 +1,4 @@
-import { ApiError, apiBytes, apiJson, readJson, type FetchOptions } from './api/client';
+import { ApiError, apiBytes, apiJson, MIRROR_BASE, readJson, type FetchOptions } from './api/client';
 import { decodeExport, manifestFile } from './api/exportLoader';
 import type { AppConfig, Article, ArticlesPage, Comment, Comments, Directory, LiveStatus, Manifest, MonasteryPhotos, RatingAnswer, ReportAnswer, ViewsAnswer, VoteAnswer, VoteValue } from './api/types';
 import type { Lang } from '@/i18n';
@@ -16,6 +16,11 @@ export type CastBody = { install_id: string; integrity_token?: string; platform?
 export type DataSource = {
   manifest(): Promise<Manifest>;
   directory(m: Manifest): Promise<Directory>;
+  /** A-144: the same pair from the GitHub mirror (the site failed); the gz checked against the MIRROR's manifest */
+  mirrorManifest(): Promise<Manifest>;
+  mirrorDirectory(m: Manifest): Promise<Directory>;
+  /** A-144: the pair the release build put INTO the app (`public/bundled/`, scripts/bundle_export.mjs); null = this build carries none */
+  bundled(): Promise<{ man: Manifest; dir: Directory } | null>;
   config(): Promise<AppConfig>;
   liveStatus(): Promise<LiveStatus>;
   /** the feed (no filter), a card's block (R-17: monastery + kind, 5 per page); R-44: `q` / `sort`; `signal` cancels it (A-97) */
@@ -81,12 +86,31 @@ const mode = (): 'live' | 'fixtures' => {
 /** A POST of the API. An App Attest assertion is single-use (its counter): such a cast is sent ONCE - the cast code retries with a new one. */
 const post = (body: object): FetchOptions => ({ method: 'POST', body, ...('assertion' in body ? { once: true } : {}) });
 
+/** A-144: the bundled pair is a file of the app itself (a RELATIVE address: the WebView serves it from the APK / the app bundle; Capacitor's
+ *  http patch leaves relative addresses alone). Absent (a build without the step, the browser ring) = null; a bad sha = an error. */
+async function bundledPair(prefix: string): Promise<{ man: Manifest; dir: Directory } | null> {
+  const r = await fetch(`${prefix}bundled/manifest.json`).catch(() => null);
+  if (!r || !r.ok) return null;
+  let man: Manifest;
+  try { man = (await r.json()) as Manifest; } catch { return null; } // a dev server's index.html for a missing file
+  const f = manifestFile(man);
+  const g = await fetch(`${prefix}bundled/${f.name}`);
+  if (!g.ok) return null;
+  return { man, dir: await decodeExport(new Uint8Array(await g.arrayBuffer()), f.sha256) };
+}
+
 const live: DataSource = {
   manifest: () => apiJson<Manifest>('export/manifest.json'),
   async directory(m) {
     const f = manifestFile(m);
     return decodeExport(await apiBytes(`export/${f.name}`), f.sha256);
   },
+  mirrorManifest: () => apiJson<Manifest>(`${MIRROR_BASE}manifest.json`),
+  async mirrorDirectory(m) {
+    const f = manifestFile(m);
+    return decodeExport(await apiBytes(`${MIRROR_BASE}${f.name}`), f.sha256);
+  },
+  bundled: () => bundledPair(''),
   config: () => apiJson<AppConfig>('config'),
   liveStatus: () => apiJson<LiveStatus>('live-status'),
   articles: (lang, since, f, signal) => apiJson<ArticlesPage>(articlesQuery(lang, since, f), signal ? { signal } : undefined),
@@ -133,6 +157,12 @@ const fixtures: DataSource = {
     const r = await fetch('/fixtures/directory_v1.json.gz');
     return decodeExport(new Uint8Array(await r.arrayBuffer()), manifestFile(m).sha256);
   },
+  mirrorManifest: () => fx<Manifest>('manifest.json'),
+  async mirrorDirectory(m) {
+    const r = await fetch('/fixtures/directory_v1.json.gz');
+    return decodeExport(new Uint8Array(await r.arrayBuffer()), manifestFile(m).sha256);
+  },
+  bundled: () => bundledPair('/'),
   config: async () => ({
     contract_version: 1,
     min_app_version: '0.0.0',

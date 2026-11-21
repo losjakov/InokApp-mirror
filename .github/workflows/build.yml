@@ -40,6 +40,8 @@ jobs:
         env:
           VITE_PUSH_TEST: ${{ startsWith(github.ref, 'refs/tags/v') && '0' || '1' }}
         run: |
+          # A-144 (cloud_43): the LIVE directory INTO the app (site, else the GitHub mirror; sha checked) - no good export = this build is RED
+          bash scripts/ci_step.sh "bundled export" net -- node scripts/bundle_export.mjs
           npm run build
           # cloud_21 (5г): measured on the BUILT bundle - PUSH_TEST_MARK (src/native/push.ts) exists only where the `test` branch survived
           if grep -lq 'InokPush-test-topic-on' dist/assets/*.js; then has=1; else has=0; fi
@@ -128,6 +130,9 @@ jobs:
           grep -n 'adid_collection_enabled' "$M" || { echo "::error::google_analytics_adid_collection_enabled missing from the merged manifest"; exit 1; }
           if grep -n 'AD_ID' "$M"; then echo "::error::AD_ID permission present in the merged manifest (R-9)"; exit 1; fi
           if grep -nE 'USE_BIOMETRIC|USE_FINGERPRINT' "$M" | grep -v 'tools:node'; then echo "::error::a biometric permission in the merged manifest (N5)"; exit 1; fi
+          # T8 (A-153 (1), A-156 (4)): «Нагадати» is inexact - no exact-alarm permission may survive the merge; the permission list for the REPORT
+          if grep -nE 'SCHEDULE_EXACT_ALARM|USE_EXACT_ALARM' "$M" | grep -v 'tools:node'; then echo "::error::an exact-alarm permission in the merged manifest (A-153)"; exit 1; fi
+          echo "permissions ($V): $(grep -oE 'uses-permission[^>]*android:name="[^"]+"' "$M" | sed 's/.*name="//; s/"$//' | sort -u | tr '\n' ' ')" | tee -a "$INOK_SUMMARY"
           echo "R-9 ok ($V): no AD_ID permission; adid collection disabled" | tee -a "$INOK_SUMMARY"
           grep -n 'android:name="asset_statements"' "$M" | tee -a "$INOK_SUMMARY" || { echo "::error::A-92 asset_statements missing from the merged $V manifest"; exit 1; }
           grep -n 'MESSAGING_EVENT' -B3 "$M" | tee -a "$INOK_SUMMARY"

@@ -286,10 +286,19 @@ ion-tab-button { position: relative; }
 .cal__body p { margin: 0 0 4px; }
 .cal__body p:last-child { margin-bottom: 0; }
 .cal .more-btn { padding: 8px 0 2px; } /* D41: THE more button inside the calendar's tile */
+.cal__source { margin: 6px 0 0; text-align: right; font-size: 13px; color: var(--ion-color-step-650, var(--ion-color-medium-shade)); } /* A-152: >= 4.5:1 light and dark (axe) */
+.cal__source a { color: inherit; text-decoration: underline; }
 .cal__note { margin: 0 0 4px; font-size: var(--inok-type-caption); color: var(--ion-color-medium); }
 .srow__group { --color: var(--ion-color-medium); font-size: var(--inok-type-caption); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; min-height: 32px; padding-top: 6px; }
 .srow__group ion-label { margin: 0; }
 .srow ion-label { white-space: normal; margin: 6px 0; }
+/* T8 (A-153 (1), variant B): «🔔 Нагадати за 10 хв» under a «Заплановані» row - aligned with the row's text, 48 dp tall target; on = filled */
+.remind { padding: 0 16px 8px 68px; border-bottom: 1px solid var(--ion-item-border-color, var(--ion-border-color, rgba(0,0,0,.13))); }
+.remind:empty { padding: 0; }
+.remind__pill { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 4px 14px; border-radius: 24px; border: 1.5px solid var(--ion-color-primary);
+  background: transparent; color: var(--ion-color-primary); font: inherit; font-size: var(--inok-type-secondary); text-align: start; }
+.remind__pill ion-icon { font-size: 1.15em; flex: none; }
+.remind__pill--on { background: var(--ion-color-primary); color: var(--ion-color-primary-contrast); }
 .item ion-label > .srow__second { color: var(--ion-text-color, #000); opacity: 0.85; margin: 0 0 2px; }
 .item ion-label > .srow__place { font-size: var(--inok-type-caption); color: var(--ion-color-medium); margin: 0; }
 /* the channel avatar (A-17): round, live = red ring + red dot at the top-right; one size everywhere */
@@ -348,6 +357,12 @@ ion-tab-button { position: relative; }
 .list-pin { position: sticky; top: 0; z-index: 2; background: var(--ion-background-color, #fff); }
 .kinds { padding: 4px 8px 0; }
 .kinds ion-segment-button { min-width: auto; text-transform: none; }
+/* NOTE 3 (A-154 (5), cloud_43): a tablet's list pane (7": 251 px, 10": 335 px) - natural-width tabs with 6 px sides, one step smaller type:
+   all five whole with «★» selected; phones (< 600 px) unchanged */
+@media (min-width: 600px) {
+  .kinds { padding-left: 2px; padding-right: 2px; }
+  .kinds ion-segment-button { flex: 0 0 auto; --padding-start: 6px; --padding-end: 6px; font-size: 13px; }
+}
 .item ion-label > .arow__subtitle { font-size: var(--inok-type-secondary); color: var(--ion-text-color); opacity: 0.85; margin: 0 0 2px; white-space: normal; }
 .arow__cover { height: 56px; }
 .aview { padding-bottom: 16px; }
@@ -466,7 +481,8 @@ mark.hl { background: var(--inok-highlight); color: #000; font-weight: 700; bord
 .aview .aview__subtitle, .aview .aview__lead { font-size: calc(var(--inok-type-body) * var(--inok-article-scale)); }
 /* A-56: at a LARGE system text scale (state/textScale.ts) a long word breaks WITH a hyphen where the engine has the language's dictionary
    (the document `lang` = the interface language, AppContext); without one the cloud_20 break (overflow-wrap) stays; normal scale: as before. */
-[data-text-large="1"] .mrow ion-label, [data-text-large="1"] .aview .aview__subtitle, [data-text-large="1"] .aview .aview__lead,
+/* NOTE 5 (A-154 (6), cloud_43): list rows (`.mrow`) are NEVER hyphenated - a word moves whole; only a word wider than the line breaks (overflow-wrap) */
+[data-text-large="1"] .aview .aview__subtitle, [data-text-large="1"] .aview .aview__lead,
 [data-text-large="1"] .aview .aview__body { -webkit-hyphens: auto; hyphens: auto; }
 
 /* R-21 «Контакти»: a multi-line value (the hours) = one line per item; the page's closing line, muted */
@@ -610,7 +626,7 @@ ion-searchbar .searchbar-clear-button { min-width: 24px; }
 .arow__read { margin-top: 4px; }
 .arow__done { color: var(--inok-visited); font-size: var(--inok-type-secondary); }
 .arow__saved { color: var(--ion-color-primary); /* owner 19.11 (cloud_42 mock-up fav_star_colors, B): HIS mark in the app colour, the readers rating stays gold */ margin-inline-end: 4px; }
-.resume-pill { position: fixed; left: 16px; right: 16px; margin: 0 auto; width: fit-content; top: calc(var(--inok-safe-top, 0px) + 64px); z-index: 20; display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; padding: 4px 6px 4px 14px; border-radius: 20px; background: rgba(30, 40, 48, .92); color: #fff; font-size: var(--inok-type-secondary);
+.resume-pill { white-space: nowrap; position: fixed; left: 16px; right: 16px; margin: 0 auto; width: fit-content; top: calc(var(--inok-safe-top, 0px) + 64px); z-index: 20; display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; padding: 4px 6px 4px 14px; border-radius: 20px; background: rgba(30, 40, 48, .92); color: #fff; font-size: var(--inok-type-secondary);
   transition: opacity .4s; }
 .resume-pill--gone { opacity: 0; pointer-events: none; }
 .resume-pill__btn { min-height: 40px; padding: 0 8px; background: none; border: 0; color: #9fd8f0; text-decoration: underline; font: inherit; }

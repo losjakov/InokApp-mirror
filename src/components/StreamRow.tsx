@@ -29,12 +29,14 @@ export function ChannelAvatar({ channel, live }: { channel: ChannelRow; live?: b
 }
 
 /** One stream row (D7/D14/A-17): avatar · channel name / the stream's own title / «місто · область · єпархія». */
-export function StreamRow({ channel, second, live, place = true, testId }: { channel: ChannelRow; second?: string | null; live?: boolean; place?: boolean; testId?: string }) {
+export function StreamRow({ channel, second, live, place = true, testId, lines }: { channel: ChannelRow; second?: string | null; live?: boolean; place?: boolean; testId?: string;
+  /** T8: «none» when a line under the row carries the separator (the reminder pill) */
+  lines?: 'none' }) {
   const { lang, dict } = useApp();
   const open = useOpenChannel();
   const where = place ? rowSubtitle(channel, lang, dict) : '';
   return (
-    <IonItem button detail={false} onClick={() => open(channel)} className="srow" data-testid={testId ?? `srow-${channel.id}`}>
+    <IonItem button detail={false} onClick={() => open(channel)} className="srow" data-testid={testId ?? `srow-${channel.id}`} lines={lines}>
       <ChannelAvatar channel={channel} live={live} />
       <IonLabel>
         <h2>{field(channel, 'title', lang)}</h2>

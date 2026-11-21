@@ -10,9 +10,9 @@ runs:
   steps:
     - uses: actions/setup-node@v7
       with: { node-version: 22, cache: npm }
-    - name: Install, build the web (the release bundle never listens to the push topic `test`), copy it into the iOS project
+    - name: Install, the bundled live directory (A-144; none = RED), build the web (the release bundle never listens to the push topic `test`), copy it into the iOS project
       shell: bash
-      run: npm ci && npm run build && npx cap sync ios
+      run: npm ci && node scripts/bundle_export.mjs && npm run build && npx cap sync ios
     - name: Xcode and the version (package.json -> MARKETING_VERSION / CURRENT_PROJECT_VERSION, THE rule of scripts/app_version.py)
       shell: bash
       run: |

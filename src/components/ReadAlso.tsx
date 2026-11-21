@@ -38,7 +38,7 @@ export function ReadAlso({ a }: { a: Pick<Article, 'id' | 'kind'> }) {
     <section className={`read-also read-also--${a.kind === 'news' ? 'rows' : 'list'}`} data-testid="read-also" data-kind={a.kind} aria-label={title}>
       <h2 className="inok-heading">{title}</h2>
       {a.kind === 'news'
-        ? <IonList>{items.map((x) => <ArticleRow key={x.id} a={x} onSelect={open} />)}</IonList>
+        ? <IonList>{items.map((x) => <ArticleRow key={x.id} a={x} onSelect={open} mixed />)}</IonList>
         : <ul className="read-also__list">{items.map((x) => (
           <li key={x.id}>
             <a href={`/articles?id=${x.id}`} className="read-also__link" data-testid={`read-also-${x.id}`} onClick={(e) => { e.preventDefault(); open(x.id); }}>

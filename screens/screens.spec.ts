@@ -1050,7 +1050,9 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(unmarked, 'rows with nothing marked').toEqual([]);
       // A-140: a unit's match on its parent's name is now SEEN on the row («↳ … Лавра» marked) - no hidden «Збіг» line is needed for it
       await expect(p.getByTestId('mrow-110').getByTestId('row-parent').locator('mark.hl')).toHaveText(/^Лавр$/);
-      await expect(p.getByTestId('mrow-242').getByTestId('row-born')).toHaveText(/^19\.04\.1961 (р\. н\.|г\. р\.)$/); // R-22
+      // A-145 (cloud_43): a LIST row shows no birth date and no bishop's see (R-22's date and the see stay on the card - unit houseRow)
+      await expect(p.getByTestId('mrow-242').getByTestId('row-born')).toHaveCount(0);
+      await expect(p.getByTestId('mrow-242').getByTestId('row-head')).not.toContainText(/Вишгород|Вышгород|Vyshhorod/);
       const bg = await p.locator('mark.hl').first().evaluate((e) => getComputedStyle(e).backgroundColor);
       expect(bg).toBe('rgb(255, 255, 0)'); // the site's span.highlight colour
     } },
@@ -1669,6 +1671,80 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await onShown(p, 'visited').click();
       await expect(onShown(p, 'visited')).toHaveAttribute('data-on', '1');
       for (const id of ['visited', 'fav']) { const b = await onShown(p, id).boundingBox(); expect(b!.x).toBeGreaterThanOrEqual(0); expect(b!.x + b!.width).toBeLessThanOrEqual(p.viewportSize()!.width + 0.5); }
+    } },
+  // A-152 (cloud_43, variant A): «Джерело: blagovist.info» ONLY under the EXPANDED calendar (Home and «Трансляції»): right, small, muted;
+  // the link through THE external opener; folded = no line. axe judges the contrast in light and dark. Red before: no line at all.
+  ...(['/streams', '/home'] as const).map((path) => ({ name: `calendar-source${path === '/home' ? '-home' : ''}`, only: path === '/home' ? ['phone-light'] : UK, path, before: recordOpens, ready: async (p: Page) => {
+      const cal = onShown(p, 'calendar');
+      await expect(cal).toBeVisible({ timeout: 20_000 });
+      await expect(cal.getByTestId('calendar-source'), 'folded: no source line').toHaveCount(0);
+      await cal.getByTestId('calendar-toggle').click();
+      const src = cal.getByTestId('calendar-source');
+      await expect(src).toBeVisible();
+      await expect(src).toHaveText(/^(Джерело|Источник|Source): blagovist\.info$/);
+      await expect(cal.getByTestId('calendar-source-link')).toHaveAttribute('href', 'https://blagovist.info/');
+      await expect(cal.getByTestId('calendar-source-link')).toHaveAccessibleName(/^(Джерело|Источник|Source): blagovist\.info$/);
+      expect(await src.evaluate((e) => getComputedStyle(e).textAlign)).toBe('right');
+      const [sb, tb] = await Promise.all([src.boundingBox(), cal.getByTestId('calendar-toggle').boundingBox()]);
+      expect(sb!.y + sb!.height, 'above «Згорнути»').toBeLessThanOrEqual(tb!.y + 1);
+      await cal.getByTestId('calendar-source-link').click();
+      await expect.poll(() => p.evaluate(() => (window as any).__opened)).toEqual(['https://blagovist.info/']);
+      await src.scrollIntoViewIfNeeded();
+    } })),
+  // T8 (A-153 (1), variant B): «🔔 Нагадати за 10 хв» under a «Заплановані» row starting >= 10 min from now (none under one starting sooner);
+  // tap -> scheduled at the start - 10 min, INEXACT + allowWhileIdle (window.__inokReminders = the browser's stand-in of the plugin), the
+  // pill «🔔 Нагадаю о HH:MM · Скасувати» + a toast; tap again -> cancelled. Red before: no pill at all.
+  ...(['remind-pill', 'remind-pill-on'] as const).map((name) => ({ name, only: name === 'remind-pill' ? [...UK, 'phone-ru'] : UK, path: '/streams', before: async (p: Page) => {
+      await p.addInitScript(() => { try { localStorage.setItem('inok.push', 'granted'); } catch { /* none */ } });
+      await p.route('**/fixtures/live-status.json', async (r) => {
+        const j = JSON.parse(readFileSync('fixtures/live-status.json', 'utf8'));
+        const soon = new Date(Date.now() + 2 * 3600_000); soon.setUTCMinutes(0, 0, 0);
+        j.scheduled = [{ ...j.scheduled[0], scheduled_at: soon.toISOString() }, { ...j.scheduled[0], channel_id: 1686, video_id: 'nearNow1234', scheduled_at: new Date(Date.now() + 5 * 60_000).toISOString() }];
+        j.live = j.live.filter((l: { channel_id: number }) => l.channel_id !== 1686);
+        await r.fulfill({ json: j });
+      });
+    }, ready: async (p: Page) => {
+      const pill = onShown(p, 'remind-1692');
+      await expect(pill).toBeVisible({ timeout: 20_000 });
+      await expect(onShown(p, 'remind-1686'), 'starts in 5 min: no pill').toHaveCount(0);
+      await expect(pill).toHaveAttribute('data-on', '0');
+      await expect(pill).toHaveAccessibleName(/^(Нагадати за 10 хв|Напомнить за 10 мин|Remind me 10 min before): .+/);
+      const box = (await pill.boundingBox())!;
+      expect(box.height, '48 dp').toBeGreaterThanOrEqual(47);
+      if (name === 'remind-pill') { await pill.scrollIntoViewIfNeeded(); await p.evaluate(() => window.scrollBy(0, 0)); return; } // the frame: the pill OFF
+      await pill.click();
+      await expect(pill).toHaveAttribute('data-on', '1');
+      await expect(p.locator('ion-toast[data-testid="remind-toast"]:not(.overlay-hidden)')).toBeVisible();
+      const pend = await p.evaluate(() => (window as any).__inokReminders);
+      expect(pend).toHaveLength(1);
+      expect(pend[0].exact, 'inexact (no exact-alarm permission)').toBe(false);
+      expect(pend[0].idle, 'allowWhileIdle').toBe(true);
+      const at = await p.evaluate(() => { const j = (window as any).__inokReminders[0]; return j.at; });
+      const start = await p.evaluate(() => Date.now());
+      expect(Math.round((at - start) / 60_000), 'the start - 10 min').toBeGreaterThan(60);
+      expect(pend[0].title).toMatch(/^(Через 10 хв|Через 10 мин|In 10 min): /);
+      await expect(pill).toHaveAccessibleName(/^(Нагадаю о|Напомню в|Reminder at) \d\d:\d\d · (Скасувати|Отменить|Cancel)$/);
+      await expect(p.locator('ion-toast:not(.overlay-hidden)')).toHaveCount(0, { timeout: 6_000 });
+      // the frame: the pill ON; a reload keeps it (Preferences)
+      await p.reload();
+      await expect(onShown(p, 'remind-1692')).toHaveAttribute('data-on', '1', { timeout: 20_000 });
+      await onShown(p, 'remind-1692').scrollIntoViewIfNeeded();
+    } })),
+  { name: 'remind-cancel-denied', only: ['phone-light'], path: '/streams', before: async (p: Page) => {
+      await p.addInitScript(() => { try { localStorage.setItem('inok.push', 'denied'); } catch { /* none */ } });
+      await p.route('**/fixtures/live-status.json', async (r) => {
+        const j = JSON.parse(readFileSync('fixtures/live-status.json', 'utf8'));
+        j.scheduled = [{ ...j.scheduled[0], scheduled_at: new Date(Date.now() + 3 * 3600_000).toISOString() }];
+        await r.fulfill({ json: j });
+      });
+    }, ready: async (p: Page) => {
+      const pill = onShown(p, 'remind-1692');
+      await expect(pill).toBeVisible({ timeout: 20_000 });
+      await pill.click();
+      const [denied] = await words(p, ['notifications.denied']);
+      await expect(p.locator('ion-toast[data-testid="remind-toast"]:not(.overlay-hidden)')).toContainText(denied);
+      await expect(pill).toHaveAttribute('data-on', '0');
+      expect(await p.evaluate(() => (window as any).__inokReminders ?? [])).toEqual([]);
     } },
   { name: 'streams', path: '/streams', ready: async (p) => { await expect(p.getByTestId('channels')).toBeVisible(); await expect(p.getByTestId('calendar')).toBeVisible(); await avatarsLoaded(p); } },
   // A-85 (1): «Додайте свій канал» at the end of the streams' content -> the site's /live/ with the «add a channel» anchor in the in-app tab
@@ -3065,16 +3141,32 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(Math.abs(body - line), 'the verse ends at the right edge').toBeLessThan(4);
       await right.first().scrollIntoViewIfNeeded();
     } },
-  // A-53: in EVERY article list the badges (★ rating, 💬 comments) are line 2 under «kind · date»; no line 2 when neither is there
-  { name: 'articles-badges', only: UK, path: '/articles', ready: async (p) => {
+  // A-146 / A-147 (cloud_43; A-53's line 2 withdrawn): ONE meta line «[Новина - a news row of a MIXED list] · DD.MM.YYYY · ★ v (n) · 💬 N»;
+  // a one-kind tab names no kind; «Усі» names only news; the date is the Kyiv day in digits. Red before: «Стаття · 29 жовтня 2026 р.» + line 2.
+  { name: 'article-rows', only: [...UK, 'phone-ru'], path: '/articles', ready: async (p) => {
       const row = (id: number) => onShown(p, `arow-${id}`);
-      await expect(row(2869).getByTestId('abadges-2869')).toHaveText('★ 5 (7) · 💬 4');
-      await starColours(p, 'ion-tabs .ion-page:not(.ion-page-hidden) [data-testid="abadges-2869"] .star-mark', 1); // A-78 3: the row's «★» = the stars' token
-      await expect(row(2871).locator('.arow__badges')).toHaveCount(0);
-      const [date, badges] = await Promise.all([row(2869).locator('.mrow__sub:not(.arow__badges)').boundingBox(), row(2869).locator('.arow__badges').boundingBox()]);
-      expect(badges!.y, 'line 2 under line 1').toBeGreaterThanOrEqual(date!.y + date!.height - 1);
-      const [c1, c2] = await Promise.all(['.mrow__sub:not(.arow__badges)', '.arow__badges'].map((q) => row(2869).locator(q).evaluate((e) => { const c = getComputedStyle(e); return `${c.fontSize} ${c.color}`; })));
-      expect(c2, 'the same size and colour').toBe(c1);
+      await expect(onShown(p, 'kind-tab-publication')).toHaveClass(/segment-button-checked/);
+      await expect(row(2869).getByTestId('ameta-2869')).toHaveText('29.10.2026 · ★ 5 (7) · 💬 4'); // 2026-10-28T22:00Z = 29.10 in Kyiv
+      await starColours(p, 'ion-tabs .ion-page:not(.ion-page-hidden) [data-testid="ameta-2869"] .star-mark', 1); // A-78 3: the row's «★» = the stars' token
+      await expect(row(2869).locator('.arow__badges')).toHaveCount(0);
+      const lines = async (id: number) => row(id).getByTestId(`ameta-${id}`).evaluate((e) => { const r = document.createRange(); r.selectNodeContents(e);
+        const tops = Array.from(r.getClientRects()).filter((x) => x.width > 1).map((x) => x.top); return Math.max(...tops) - Math.min(...tops); });
+      expect(await lines(2869), 'one line (the boxes\' tops within a few px)').toBeLessThan(8);
+      await onShown(p, 'kind-tab-news').click();
+      await expect(row(2871).getByTestId('ameta-2871')).toHaveText('26.10.2026');
+      await expect(row(2871).getByTestId('akind-2871'), 'a one-kind tab names no kind').toHaveCount(0);
+      await onShown(p, 'kind-tab-all').click();
+      await expect(row(2871).getByTestId('akind-2871')).toHaveText(/^(Новина|Новость|News)$/);
+      await expect(row(2869).getByTestId('akind-2869'), '«Усі»: only news is named').toHaveCount(0);
+      await expect(row(2871).getByTestId('ameta-2871')).toHaveText(/^(Новина|Новость|News) · 26\.10\.2026$/);
+    } },
+  // A-147 at 200 % on 360 px: the meta line wraps ONLY between groups (« · »), never inside «★ 5 (7)» or the date
+  { name: 'article-rows-font200', only: ['phone-light'], path: '/articles', font: 200, ready: async (p) => {
+      const meta = onShown(p, 'ameta-2869');
+      await expect(meta).toBeVisible({ timeout: 15_000 });
+      const split = await meta.evaluate((e) => Array.from(e.querySelectorAll('.meta__g')).filter((g) => { const r = document.createRange(); r.selectNodeContents(g);
+        const tops = Array.from(r.getClientRects()).filter((x) => x.width > 1).map((x) => x.top); return Math.max(...tops) - Math.min(...tops) > 8; }).length);
+      expect(split, 'no group broken inside').toBe(0);
     } },
   // A-31 (owner 02.11.2026): the header picture of a card and of an article opens THE viewer of the body pictures — one wrapper, a corner sign
   { name: 'monastery-cover-open', path: '/monasteries/37', ready: async (p) => {
@@ -3834,8 +3926,12 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(new URL(p.url()).pathname, 'the hold did not open the card too').toMatch(/^\/(monasteries|more\/eparchies\/1)$/);
       if (name === 'sheet-monastery-near') return;
       const [added] = await words(p, ['card.favourite_added']);
+      // NOTE 2 (A-154 (4)): the sheet closes FIRST, then the toast at its usual place - never a toast over an open sheet
+      await p.evaluate(() => { (window as any).__toastOverSheet = false; new MutationObserver(() => { const t = document.querySelector('ion-toast:not(.overlay-hidden)');
+        if (t && document.querySelector('ion-action-sheet:not(.overlay-hidden)')) (window as any).__toastOverSheet = true; }).observe(document.body, { subtree: true, childList: true, attributes: true }); });
       await sheet.getByTestId('qs-fav').click();
       await expect(p.locator('ion-toast[data-testid="fav-toast"]:not(.overlay-hidden)').first()).toContainText(added);
+      expect(await p.evaluate(() => (window as any).__toastOverSheet), 'a toast over the open sheet').toBe(false);
       await longPress(p, onShown(p, 'mrow-37'));
       const again = p.locator('ion-action-sheet[data-testid="quick-sheet-m"]:not(.overlay-hidden)');
       await expect(again.getByTestId('qs-fav')).toContainText((await words(p, ['sheet.fav_remove']))[0]);
@@ -3854,7 +3950,35 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await longPress(p, onShown(p, 'arow-2869'));
       await p.locator('ion-action-sheet[data-testid="quick-sheet-a"]:not(.overlay-hidden)').getByTestId('qs-fav').click();
       await expect(onShown(p, 'asaved-2869')).toBeVisible();
-      await expect(p.locator('ion-action-sheet:not(.overlay-hidden)')).toHaveCount(0); // the shot without the sheet's backdrop (the live dot's pixel)
+      await expect(p.locator('ion-action-sheet:not(.overlay-hidden)')).toHaveCount(0);
+      await expect(p.locator('ion-toast[data-testid="fav-toast"]:not(.overlay-hidden)').first()).toBeVisible();
+      await expect(p.locator('ion-toast:not(.overlay-hidden)')).toHaveCount(0, { timeout: 6_000 });
+      // NOTE 1 (REVIEW cloud_42): the frame = the article sheet OPEN (its subject), shot once it has settled
+      await longPress(p, onShown(p, 'arow-2869'));
+      await expect(p.locator('ion-action-sheet[data-testid="quick-sheet-a"]:not(.overlay-hidden)').getByTestId('qs-fav')).toBeVisible();
+      await p.waitForTimeout(600);
+    } },
+  // NOTE 3 (A-154 (5), cloud_43): the «Публікації» tabs WHOLE in a tablet's list pane with «★» selected - 7" (600 x 960) and 10" (800 x 1280).
+  // Red before: «сі | Статті …» cut on the left, «… Новини ★» on the right (the segment scrolled).
+  ...([600, 800] as const).map((w) => ({ name: `tabs-tablet-w${w}`, only: ['tablet'], width: w, tall: w === 600 ? 960 : 1280, path: '/articles', ready: async (p: Page) => {
+      await expect(onShown(p, 'kinds')).toBeVisible({ timeout: 15_000 });
+      await onShown(p, 'kind-tab-saved').click();
+      await expect(onShown(p, 'kind-tab-saved')).toHaveClass(/segment-button-checked/);
+      await p.waitForTimeout(400);
+      const m = await onShown(p, 'kinds').evaluate((e) => { const seg = e as HTMLElement; const box = seg.getBoundingClientRect();
+        const cut = Array.from(seg.querySelectorAll('ion-segment-button')).filter((b) => { const r = b.getBoundingClientRect(); return r.left < box.left - 0.5 || r.right > box.right + 0.5; }).length;
+        return { sw: seg.scrollWidth, cw: seg.clientWidth, cut }; });
+      expect(m.sw, 'scrollWidth <= clientWidth').toBeLessThanOrEqual(m.cw);
+      expect(m.cut, 'no tab cut').toBe(0);
+    } })),
+  // NOTE 5 (A-154 (6), cloud_43): at 200 % a list row never hyphenates a name («Фео-досія»); the article text keeps its hyphenation
+  { name: 'rows-font200-nohyphen', only: ['phone-light'], path: '/monasteries', font: 200, ready: async (p) => {
+      await expect(onShown(p, 'list')).toBeVisible();
+      await p.getByTestId('search').locator('input').fill('Феодосія');
+      const row = onShown(p, 'mrow-110');
+      await expect(row).toBeVisible({ timeout: 15_000 });
+      expect(await row.locator('ion-label').evaluate((e) => getComputedStyle(e).hyphens)).not.toBe('auto');
+      expect(await row.locator('.mrow__title').evaluate((e) => getComputedStyle(e).hyphens)).not.toBe('auto');
     } },
   // P4: a finger that moves (a scroll) opens no sheet; a short tap opens the row as always
   { name: 'sheet-not-on-scroll', only: ['phone-light'], path: '/monasteries', ready: async (p) => {
@@ -3970,6 +4094,45 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.locator('[data-testid="text-smaller"]:visible').click();
       await p.waitForTimeout(500);
       await expect(onShown(p, 'resume-start')).toBeVisible();
+    } })),
+  // T1 (cloud_43, remark 1): the continue card stays for ANY order and any entry (a Home block's ?sort=); only a typed search and «★» hide it.
+  // Red before: Articles.tsx hid it for every non-default order.
+  { name: 'continue-list-sorted', only: ['phone-light', 'tablet'], path: '/articles?id=2869', before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      await readTo(p, 0.45); await p.clock.fastForward(21_000); await p.waitForTimeout(1500);
+      if (p.viewportSize()!.width < 600) { await settled(p); await onShown(p, 'back').click(); }
+      await expect(onShown(p, 'continue')).toBeVisible({ timeout: 10_000 });
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-rating"]').click();
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', 'rating');
+      await expect(onShown(p, 'continue'), 'another order: the card stays').toBeVisible();
+      await onShown(p, 'kind-tab-news').click();
+      await expect(onShown(p, 'continue'), 'another tab: the card stays').toBeVisible();
+      await onShown(p, 'kind-tab-saved').click();
+      await expect(onShown(p, 'continue'), '«★»: no card').toHaveCount(0);
+      await onShown(p, 'kind-tab-all').click();
+      await expect(onShown(p, 'continue')).toBeVisible();
+      await p.getByTestId('search-open').click();
+      await p.getByTestId('articles-search').locator('input').fill('Лавра');
+      await expect(onShown(p, 'continue'), 'a typed search: no card').toHaveCount(0, { timeout: 5_000 });
+    } },
+  // NOTE 4 (A-154 (3), cloud_43): the resume pill «↺ Продовжено · З початку» on ONE line at 360 / 390 px, never over the cover's full-screen
+  // sign; the reader hears the full old sentence. Red before: «… з місця зупинки ·» / «З початку» on two lines at 360 px.
+  ...([360, 390] as const).map((w) => ({ name: `resume-pill-w${w}`, only: ['phone-light'], width: w, path: '/articles?id=2869', before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
+      await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
+      await readTo(p, 0.45); await p.clock.fastForward(21_000); await p.waitForTimeout(1500);
+      await settled(p); await onShown(p, 'back').click();
+      await onShown(p, 'continue-open').click();
+      const pill = onShown(p, 'resume-pill');
+      await expect(pill).toBeVisible({ timeout: 10_000 });
+      const g = await pill.evaluate((e) => { const kids = Array.from(e.children).map((c) => c.getBoundingClientRect()).filter((r) => r.width > 1);
+        const pb = e.getBoundingClientRect(); const hint = document.querySelector('ion-tabs .ion-page:not(.ion-page-hidden) .aview__cover .photo-open__hint, ion-tabs .ion-page:not(.ion-page-hidden) .photo-open__hint');
+        const h = hint ? hint.getBoundingClientRect() : null;
+        const mid = kids.map((r) => (r.top + r.bottom) / 2);
+        return { rows: Math.max(...mid) - Math.min(...mid), clash: !!h && h.width > 0 && pb.left < h.right && pb.right > h.left && pb.top < h.bottom && pb.bottom > h.top }; });
+      expect(g.rows, 'one line').toBeLessThan(8);
+      expect(g.clash, 'over the cover\'s full-screen sign').toBe(false);
+      await expect(onShown(p, 'resume-word')).toHaveText(/↺ (Продовжено|Продолжено|Resumed)(Продовжено з місця зупинки|Продолжено с места остановки|Resumed where you stopped)$/);
+      await expect(onShown(p, 'resume-word').locator('.sr-only')).toHaveText(/з місця зупинки|с места остановки|where you stopped/);
     } })),
   { name: 'article-from-start', only: ['phone-light'], path: '/articles?id=2869', before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
       await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });
@@ -4119,6 +4282,21 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('sort-open')).toHaveAttribute('data-sort', 'published');
       expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
     } },
+  // T4 (cloud_43): the site's «Публікації» umbrella /articles/ (any ?lang=) -> «Публікації», tab «Усі», reset: cold start AND the running app
+  // (on «Відео» with a search open and another order). Red before: /articles/ was null -> the in-app browser.
+  { name: 'link-articles-all', only: UK, path: '/', before: async (p) => { await recordOpens(p); await launchBy('https://inok.info/articles/?lang=ru', 0)(p); }, ready: async (p) => {
+      await expect(p).toHaveURL(/\/articles$/, { timeout: 30_000 });
+      await expect(onShown(p, 'kind-tab-all')).toHaveClass(/segment-button-checked/, { timeout: 20_000 });
+      await onShown(p, 'kind-tab-video').click();
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-rating"]').click();
+      await p.getByTestId('search-open').click();
+      await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/articles/' })));
+      await expect(onShown(p, 'kind-tab-all')).toHaveClass(/segment-button-checked/);
+      await expect(p.getByTestId('articles-search')).toHaveCount(0);
+      await expect(p.getByTestId('sort-open')).toHaveAttribute('data-sort', 'published');
+      await expect(onShown(p, 'articles')).toBeVisible({ timeout: 20_000 });
+      expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
+    } },
   // A-143 (5): the site's /live/ (any ?lang=) -> «Трансляції»: cold start AND the running app (from a card), never the browser
   { name: 'link-live', only: UK, path: '/', before: async (p) => { await recordOpens(p); await launchBy('https://inok.info/live/?lang=ru', 0)(p); }, ready: async (p) => {
       await expect(p).toHaveURL(/\/streams$/, { timeout: 30_000 });
@@ -4135,9 +4313,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p).toHaveURL(/\/more\/eparchies\/1$/, { timeout: 30_000 });
       await expect(p.getByTestId('eparchy-title').locator('visible=true')).toBeVisible({ timeout: 20_000 });
       expect(await p.evaluate(() => (window as any).__opened)).toEqual([]);
-      await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/monasteries/' })));
-      await expect(p).toHaveURL(/\/monasteries$/);
-      await expect(onShown(p, 'list')).toBeVisible();
+      // NOTE 1 (REVIEW cloud_42): the frame shows its SUBJECT - the eparchy page; the running-app list link is proven by link-list-monasteries
     } },
 ];
 

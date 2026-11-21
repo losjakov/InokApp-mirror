@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { importedDb, fixtureDirectory } from './helpers';
 import { getMonastery, listByCodes, listMonasteries, nearbyMonasteries } from '@/data/repo/monasteries';
-import { withoutPostcode, field } from '@/data/repo/types';
+import { withoutPostcode, field, headLine, headPerson } from '@/data/repo/types';
+import { searchMonasteries } from '@/data/search/query';
 import { parentName } from '@/components/ParentLine';
 import type { Db } from '@/data/db/types';
 import type { FtsMode } from '@/data/db/schema';
@@ -49,5 +50,27 @@ describe('A-140 the house row data', () => {
     expect(row).not.toMatch(/type\.\$\{|mrow__type/);
     expect(readFileSync('src/pages/MonasteryCard.tsx', 'utf8')).toMatch(/<HouseRow [^>]*noParent/);
     for (const l of ['uk', 'ru', 'en']) expect(Object.keys(JSON.parse(readFileSync(`src/i18n/${l}.json`, 'utf8')))).not.toContain('type.m');
+  });
+});
+
+// A-145 (cloud_43): every LIST of houses - the head without a bishop's see and without the birth date; the card keeps both
+describe('A-145 the head in a list row', () => {
+  it('headPerson cuts the see; a head with no see stays whole', () => {
+    expect(headPerson('Митрополит Павел (Лебідь), Вишгородський і Чорнобильський')).toBe('Митрополит Павел (Лебідь)');
+    expect(headPerson('Архімандрит Андрій (Нагибін)')).toBe('Архімандрит Андрій (Нагибін)');
+    expect(headPerson('Metropolitan Paul (Lebid), Vyshgorod and Chernobyl')).toBe('Metropolitan Paul (Lebid)');
+  });
+  it('the card 242 still has the see and the date (headLine for the card)', async () => {
+    const { db } = await importedDb();
+    const m = (await getMonastery(db, 242))!;
+    const h = headLine(m, 'uk', { label_head_born: 'р. н.' })!;
+    expect(h.person).toBe('Митрополит Павел (Лебідь)');
+    expect(h.rest).toBe('Вишгородський і Чорнобильський');
+    expect(h.born).toMatch(/^19\.04\.1961/);
+  });
+  it('the list search no longer finds the Lavra by its superior\'s see; still by the person', async () => {
+    const { db, fts } = await importedDb();
+    expect((await searchMonasteries(db, fts, 'Вишгородськ')).map((x) => x.code)).not.toContain(242);
+    expect((await searchMonasteries(db, fts, 'Лебідь')).map((x) => x.code)).toContain(242);
   });
 });

@@ -3,6 +3,10 @@ import { calendarStrip, calendarView } from '@/data/live/streams';
 import { useApp } from '@/state/AppContext';
 import { HtmlLite } from './HtmlLite';
 import { MoreButton } from './MoreButton';
+import { openLink } from '@/native/intents';
+
+/** A-152 (cloud_43): the calendar's source - the site takes it from blagovist.info; shown only under the EXPANDED calendar */
+export const CALENDAR_SOURCE = 'https://blagovist.info/';
 
 /**
  * THE church calendar of the app (home and streams, A-15). A-25 #5 (R-24): the paragraphs and emphasis of /live/ on a phone —
@@ -21,6 +25,12 @@ export function CalendarStrip() {
       <section className="streams__cal cal" aria-label={t('streams.calendar')} data-testid="calendar">
         {view.tomorrow && <p className="cal__note" data-testid="calendar-tomorrow">{t('calendar.tomorrow')}</p>}
         <HtmlLite html={shown.join('')} className="cal__body" />
+        {/* A-152 (variant A): «Джерело: blagovist.info» at the right, small and muted, ONLY when expanded; the link through THE external opener */}
+        {open && (
+          <p className="cal__source" data-testid="calendar-source"><span aria-hidden="true">{t('calendar.source')}</span>
+            <a href={CALENDAR_SOURCE} onClick={(e) => { e.preventDefault(); void openLink(CALENDAR_SOURCE, lang); }} aria-label={`${t('calendar.source')}blagovist.info`} data-testid="calendar-source-link">blagovist.info</a>
+          </p>
+        )}
         {/* D41: THE more button (as the history, the related blocks, «Зараз в ефірі»); on «Головна» it folds back too */}
         {view.paragraphs.length > view.summary && (
           <MoreButton label={open ? t('common.collapse') : t('card.read_full')} onClick={() => setOpen((o) => !o)} expanded={open} testId="calendar-toggle" />

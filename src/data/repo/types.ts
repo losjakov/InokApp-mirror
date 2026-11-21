@@ -78,16 +78,23 @@ export const withoutPostcode = (address: string): string => address.split(/\s*,\
  * after the first comma that follows the person (the see), then (R-22) «19.04.1961 р. н.» — the date as the export carries it +
  * dictionary label_head_born; no date = no tail. null = no head published.
  */
+/** THE split of the site's head line «Митрополит Павел (Лебідь), Вишгородський і Чорнобильський» -> the person «Митрополит Павел (Лебідь)»:
+ *  up to the first «, » after the closing bracket (no bracket: the first «, »). A-145: every LIST shows and searches only this part. */
+export function headPerson(head: string): string {
+  const close = head.indexOf(')');
+  const cut = head.indexOf(', ', close >= 0 ? close : 0);
+  return cut >= 0 ? head.slice(0, cut) : head;
+}
+
 export function headLine(row: object, lang: Lang, dict: Record<string, string> = {}): { role: string; person: string; rest: string; born: string } | null {
   const head = field(row, 'head', lang);
   if (!head) return null;
   const role = field(row, 'head_role', lang);
-  const close = head.indexOf(')');
-  const cut = head.indexOf(', ', close >= 0 ? close : 0);
+  const person = headPerson(head);
   return {
     role: role ? role.charAt(0).toLocaleUpperCase(lang) + role.slice(1) : '',
-    person: cut >= 0 ? head.slice(0, cut) : head,
-    rest: cut >= 0 ? head.slice(cut + 2) : '',
+    person,
+    rest: head.length > person.length ? head.slice(person.length + 2) : '',
     born: headBorn(row, lang, dict),
   };
 }

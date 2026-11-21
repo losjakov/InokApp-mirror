@@ -27,3 +27,31 @@ describe('iOS: the App Store lookup', () => {
     expect((await appStoreCheck('1.0.11')).state).toBe('error');
   });
 });
+
+// T3 (cloud_43): right after a release the ua storefront's copy was a day stale - both storefronts, past the cache, the HIGHER version
+describe('iOS: the App Store lookup is never stale (T3)', () => {
+  const by = (m: Record<string, object[] | Error>) => vi.fn(async (url: string) => {
+    const r = m[url.includes('country=ua') ? 'ua' : 'default'];
+    if (r instanceof Error) throw r;
+    return { json: async () => ({ resultCount: r.length, results: r }) } as Response;
+  });
+  it('ua stale 1.0.16 + default 1.0.17 -> available 1.0.17', async () => {
+    vi.stubGlobal('fetch', by({ ua: [{ version: '1.0.16', trackId: 1 }], default: [{ version: '1.0.17', trackId: 1 }] }));
+    expect(await appStoreCheck('1.0.16')).toMatchObject({ state: 'available', info: { appStoreId: 1 } });
+  });
+  it('ua 1.0.17 + default failed -> available; both failed -> error; one empty one failed -> not from the store', async () => {
+    vi.stubGlobal('fetch', by({ ua: [{ version: '1.0.17', trackId: 1 }], default: new TypeError('Load failed') }));
+    expect((await appStoreCheck('1.0.16')).state).toBe('available');
+    vi.stubGlobal('fetch', by({ ua: new TypeError('x'), default: new TypeError('y') }));
+    expect((await appStoreCheck('1.0.16')).state).toBe('error');
+    vi.stubGlobal('fetch', by({ ua: [], default: new TypeError('y') }));
+    expect((await appStoreCheck('1.0.16')).state).toBe('not_play');
+  });
+  it('every lookup goes past the HTTP cache (cache: no-store)', async () => {
+    const f = by({ ua: [{ version: '1.0.17', trackId: 1 }], default: [{ version: '1.0.17', trackId: 1 }] });
+    vi.stubGlobal('fetch', f);
+    await appStoreCheck('1.0.17');
+    expect(f).toHaveBeenCalledTimes(2);
+    for (const c of f.mock.calls as unknown as [string, RequestInit][]) expect(c[1]).toEqual({ cache: 'no-store' });
+  });
+});

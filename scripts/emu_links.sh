@@ -40,4 +40,7 @@ open_link 'https://inok.info/live/?lang=ru' '^/streams$' list_live
 open_link 'https://inok.info/monasteries/' '^/monasteries$' cold_list_monasteries cold
 open_link 'https://inok.info/articles/news/?lang=ru' '^/articles$' cold_list_news cold
 open_link 'https://inok.info/live/' '^/streams$' cold_list_live cold
+# cloud_43 (T4): the site's «Публікації» umbrella (exact path /articles/) -> «Публікації» «Усі»; running AND cold
+open_link 'https://inok.info/articles/?lang=ru' '^/articles$' list_articles_all
+open_link 'https://inok.info/articles/' '^/articles$' cold_list_articles_all cold
 echo "links $RES" | tee -a "$L"

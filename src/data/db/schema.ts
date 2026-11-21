@@ -1,11 +1,12 @@
 import type { Db } from './types';
 
-export const SCHEMA_VERSION = 11; // 2: channel.sort; 3: R-10 card fields; 4: channel sort per language + place (R-13); 5: channel avatar (R-16);
+export const SCHEMA_VERSION = 12; // 2: channel.sort; 3: R-10 card fields; 4: channel sort per language + place (R-13); 5: channel avatar (R-16);
 // 6: canonical units (R-11); 7: the address in the search (A-23 #4: FTS column + norm_all; a re-import fills it);
 // 8: the head's birth date (R-22) + the «Контакти» block (R-21, table `contacts`) + the eparchy page (R-15, PLAN 7)
 // 9: the eparchy's own site (R-23, A-25 #4)
 // 10: a house's square list thumbnail (R-25, A-29)
 // 11: the card's SORT (R-31, A-44: the lavras first in every name-sorted list)
+// 12: the list search indexes the head's PERSON only (A-145, cloud_43; no columns - a re-import refills the index)
 
 /** FTS mode decided at first run: trigram (typos + substrings), plain fts5 (whole-word prefix), or LIKE only. */
 export type FtsMode = 'trigram' | 'fts5' | 'none';

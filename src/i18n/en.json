@@ -372,7 +372,7 @@
   "reading.pct_a11y_few": "{n} percent read",
   "reading.done": "read",
   "reading.dismiss": "Remove from “Continue reading”",
-  "reading.resumed": "Resumed where you stopped",
+  "reading.resumed": "Resumed",
   "reading.from_start": "From the start",
   "reading.unfinished": "Unfinished",
   "reading.unfinished_empty": "No unfinished publications.",
@@ -390,5 +390,17 @@
   "sheet.restart": "Start from the beginning",
   "sheet.mark_read": "Mark as read",
   "sheet.mark_unread": "Mark as unread",
-  "sheet.hint": "Hold your finger on a row for quick actions"
+  "sheet.hint": "Hold your finger on a row for quick actions",
+  "share.copied": "Link copied",
+  "share.failed": "Could not share",
+  "calendar.source": "Source: ",
+  "reading.resumed_full": "Resumed where you stopped",
+  "remind.pill": "Remind me 10 min before",
+  "remind.on": "Reminder at {time} · Cancel",
+  "remind.a11y_off": "Remind me 10 min before: {title}",
+  "remind.toast": "I’ll remind you at {time} — 10 min before the start",
+  "remind.cancelled": "Reminder cancelled",
+  "remind.title": "In 10 min: {title}",
+  "remind.body": "{channel} · {time}",
+  "remind.channel": "Reminders"
 }

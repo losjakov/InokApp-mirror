@@ -372,7 +372,7 @@
   "reading.pct_a11y_few": "прочитано {n} процента",
   "reading.done": "прочитано",
   "reading.dismiss": "Убрать из «Продолжить чтение»",
-  "reading.resumed": "Продолжено с места остановки",
+  "reading.resumed": "Продолжено",
   "reading.from_start": "С начала",
   "reading.unfinished": "Недочитанные",
   "reading.unfinished_empty": "Недочитанных публикаций нет.",
@@ -390,5 +390,17 @@
   "sheet.restart": "Начать сначала",
   "sheet.mark_read": "Отметить как прочитанное",
   "sheet.mark_unread": "Отметить как непрочитанное",
-  "sheet.hint": "Удерживайте палец на строке — быстрые действия"
+  "sheet.hint": "Удерживайте палец на строке — быстрые действия",
+  "share.copied": "Ссылка скопирована",
+  "share.failed": "Не удалось поделиться",
+  "calendar.source": "Источник: ",
+  "reading.resumed_full": "Продолжено с места остановки",
+  "remind.pill": "Напомнить за 10 мин",
+  "remind.on": "Напомню в {time} · Отменить",
+  "remind.a11y_off": "Напомнить за 10 мин: {title}",
+  "remind.toast": "Напомню в {time} — за 10 мин до начала",
+  "remind.cancelled": "Напоминание отменено",
+  "remind.title": "Через 10 мин: {title}",
+  "remind.body": "{channel} · {time}",
+  "remind.channel": "Напоминания"
 }

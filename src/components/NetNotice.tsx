@@ -1,6 +1,6 @@
 import { IonButton } from '@ionic/react';
 import { useCallback, useEffect } from 'react';
-import { onOfflineOpen } from '@/native/intents';
+import { onOfflineOpen, onShareFallback } from '@/native/intents';
 import { useToast } from './toast';
 import { netFailure, netMessageKey, type NetFailure } from '@/data/netFailure';
 import { useT } from '@/state/AppContext';
@@ -37,9 +37,13 @@ export function useNetToast(): (e: unknown, retry?: () => void) => Promise<NetFa
   }, [t, toast]);
 }
 
-/** A-125: wires THE outer-page guard (src/native/intents.ts) to the app's snackbar - mounted once, inside the tabs. */
+/** A-125: wires THE outer-page guard and (T2) the share fallback (src/native/intents.ts) to the app's snackbar - mounted once, inside the tabs. */
 export function NetHost(): null {
   const say = useNetToast();
+  const { t } = useT();
+  const toast = useToast();
   useEffect(() => { onOfflineOpen((retry) => void say(new TypeError('offline'), retry)); return () => onOfflineOpen(null); }, [say]);
+  // T2 (cloud_43): the share sheet itself failed -> the link was copied (or not) - ONE snackbar, never a crash
+  useEffect(() => { onShareFallback((w) => toast(t(`share.${w}`), { testId: 'share-toast' })); return () => onShareFallback(null); }, [t, toast]);
   return null;
 }

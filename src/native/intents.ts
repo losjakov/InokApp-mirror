@@ -4,6 +4,8 @@ import { isIos, isNative } from './platform';
 import type { Lang } from '@/i18n';
 import { SITE_HOSTS } from '@/data/api/client';
 import { online } from './network';
+import { isUserCancel } from '@/app/userCancel';
+export { isUserCancel };
 
 /** tel: / mailto: / geo: — Capacitor's WebView hands these schemes to the system (intent). On the web: same via the browser. */
 const go = (url: string) => {
@@ -75,13 +77,22 @@ export function directions(lat: number, lon: number, label: string, app: Directi
   return go(`geo:${q}?q=${q}(${encodeURIComponent(label)})`);
 }
 
-/** The system share sheet (A-43); `text` = a line before the address (A-80: «Поділитися застосунком»). */
+/** T2: what the app says when the sheet itself failed - wired once by the tabs (ShareHost) to the app's snackbar; unwired = silent. */
+export type ShareWord = 'copied' | 'failed';
+let shareSaid: ((w: ShareWord) => void) | null = null;
+export const onShareFallback = (h: typeof shareSaid): void => { shareSaid = h; };
+
+/** The system share sheet (A-43); `text` = a line before the address (A-80: «Поділитися застосунком»). Never throws (T2): a cancel = nothing;
+ *  a real failure = the link copied + «Посилання скопійовано»; the copy refused too = «Не вдалося поділитися». */
 export async function shareUrl(title: string, url: string, text?: string): Promise<void> {
-  if (isNative() || typeof navigator.share === 'function') {
-    await Share.share({ title, text, url, dialogTitle: title });
-    return;
+  try {
+    if (isNative() || typeof navigator.share === 'function') await Share.share({ title, text, url, dialogTitle: title });
+    else shareSaid?.((await copyText(url)) ? 'copied' : 'failed');
+  } catch (e) {
+    if (isUserCancel(e)) return;
+    console.warn('InokShare: failed', e instanceof Error ? e.message : String(e));
+    shareSaid?.((await copyText(url)) ? 'copied' : 'failed');
   }
-  await navigator.clipboard?.writeText(url);
 }
 
 /** cloud_40: copy a text (the diagnostics) - the async clipboard first, the old `execCommand('copy')` of a selected field second (an

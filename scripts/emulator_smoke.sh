@@ -206,6 +206,32 @@ notify_proof() {
   else NOTIFY="FAIL $(grep -m1 '^FAIL' "$OUT/notify.txt")"; echo "::error::API $API: A-84 notifications $NOTIFY"; echo "FAIL notify $NOTIFY" > "$OUT/result.txt"; exit 1; fi
 }
 
+# A-144 (cloud_43): a FIRST launch with NO network imports the directory built into the app (public/bundled/, scripts/bundle_export.mjs):
+# the app's data cleared, airplane mode on, launch -> export_version stored + every house of the bundled manifest in the DB; then the network back
+offline_first() {
+  OFFLINE=n/a
+  local want got ev _
+  want=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['counts']['monasteries'])" "$ROOT/dist/bundled/manifest.json" 2>/dev/null || echo 0)
+  [ "$want" -gt 0 ] || { OFFLINE="FAIL no dist/bundled/manifest.json"; echo "::error::API $API: A-144 the build carries no bundled export"; echo "FAIL offline-first no-bundle" > "$OUT/result.txt"; exit 1; }
+  adb shell am force-stop $PKG; adb shell pm clear $PKG > /dev/null
+  adb shell cmd connectivity airplane-mode enable 2>/dev/null || { adb shell settings put global airplane_mode_on 1; adb shell am broadcast -a android.intent.action.AIRPLANE_MODE > /dev/null 2>&1 || true; }
+  sleep 3; adb shell am start -n $PKG/.MainActivity > /dev/null
+  got=0; ev=''
+  for _ in $(seq 1 24); do
+    sleep 5
+    if appcopy $DB "$OUT/offline.db" && [ "$(head -c 15 "$OUT/offline.db")" = "SQLite format 3" ]; then
+      ev=$(python3 -I "$ROOT/scripts/db_read.py" "$OUT/offline.db" "select value from meta where key='export_version'" 2>/dev/null || true)
+      got=$(python3 -I "$ROOT/scripts/db_read.py" "$OUT/offline.db" "select count(*) from monastery" 2>/dev/null || echo 0)
+      [ -n "$ev" ] && [ "${got:-0}" -ge "$want" ] && break
+    fi
+  done
+  shot "$OUT/offline_first.png"
+  adb shell cmd connectivity airplane-mode disable 2>/dev/null || { adb shell settings put global airplane_mode_on 0; adb shell am broadcast -a android.intent.action.AIRPLANE_MODE > /dev/null 2>&1 || true; }
+  OFFLINE="houses=$got/$want export=$ev"
+  echo "offline first launch: $OFFLINE" | tee "$OUT/offline_first.txt"
+  [ "${got:-0}" -ge "$want" ] || { echo "::error::API $API: A-144 the first launch without a network has $got of $want houses"; echo "FAIL offline-first $OFFLINE" > "$OUT/result.txt"; exit 1; }
+}
+
 if [ "$WV" -ge "$FLOOR" ]; then
   # the first run downloads the export from the live API and imports it; give a cold emulator up to 3 minutes
   for _ in $(seq 1 36); do
@@ -445,8 +471,8 @@ if [ "$WV" -ge "$FLOOR" ]; then
   LINKS=n/a; case "$API" in 26*) ;; *) bash "$ROOT/scripts/emu_links.sh" "$OUT" || true; LINKS="$(tail -1 "$OUT/links.txt" 2>/dev/null | sed 's/^links //' || true)";; esac
   # cloud_13 item 3: the Play screenshots from the live export, once, on the required image (scripts/emu_store.sh)
   STORE=n/a; case "$API" in 34-default*) bash "$ROOT/scripts/emu_store.sh" "$OUT" || true; STORE="$(grep -E '^store screenshots: [A-Z]+|^(missing|maps|pictures|anything|gallery|«Публікації»|language|unit words|status bar|colours|lavras|article top|on air)|^launcher label|STOPPED' "$OUT/store/sizes.txt" 2>/dev/null | sed 's/ (rules:.*//' | tr '\n' ';' || true)";; esac
-  native_paths; quick_actions; edge_shots; a11y_dumps; r8_scan; notify_proof
-  echo "FULL webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
+  native_paths; quick_actions; edge_shots; a11y_dumps; r8_scan; notify_proof; offline_first
+  echo "FULL offline=[$OFFLINE] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
 else
   sleep 20
   shot "$OUT/home.png"

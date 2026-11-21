@@ -443,6 +443,9 @@ for kind in $KINDS; do
   xcrun simctl privacy "$U" grant location "$BUNDLE" 2>>"$OUT/nav.txt" || true
   if ! launch; then a3 "start" FAIL "no «home painted» / no remote hand - ${TAG}_console.txt"; RC=1; xcrun simctl shutdown "$U"; continue; fi
   a3 "start + live import" PASS "$(grep -a 'InokBoot' "$OUT/${TAG}_console.txt" | tail -2 | sed 's/.*InokBoot: //' | tr '\n' ';' | cut -c1-200)"
+  # A-144 (cloud_43): a fresh simulator = an empty database -> the directory built into the app is imported first (no network wait)
+  if grep -aq 'InokBoot: bundled export .* imported' "$OUT/${TAG}_console.txt"; then a3 "bundled directory (A-144)" PASS "$(grep -a 'InokBoot: bundled export' "$OUT/${TAG}_console.txt" | head -1 | sed 's/.*InokBoot: //')"
+  else a3 "bundled directory (A-144)" FAIL "no «bundled export … imported» in ${TAG}_console.txt"; RC=1; fi
   case "$MODE" in walk|both) a3_walk;; esac
   case "$MODE" in appstore|both)
     case "$kind" in iPhone) appstore phone iphone;; iPhone63) appstore phone iphone63;; *) appstore tablet ipad;; esac || { echo "App Store set STOPPED ($TAG): $(grep -E 'FAIL' "$OUT/nav.txt" | tail -1)" | tee -a "$OUT/demo.txt"; RC=1; };;

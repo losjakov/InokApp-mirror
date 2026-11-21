@@ -52,7 +52,7 @@ export function UnfinishedPage() {
       <PageHeader title={t('reading.unfinished')} />
       <IonContent>
         {unfinished.length === 0 ? <div className="empty" data-testid="unfinished-empty">{t('reading.unfinished_empty')}</div> : (
-          <IonList data-testid="unfinished">{unfinished.map((p) => <ArticleRow key={p.id} a={{ ...p.snap, body: null }} onSelect={(id) => navigate(`/articles?id=${id}`)} />)}</IonList>
+          <IonList data-testid="unfinished">{unfinished.map((p) => <ArticleRow key={p.id} a={{ ...p.snap, body: null }} onSelect={(id) => navigate(`/articles?id=${id}`)} mixed />)}</IonList>
         )}
       </IonContent>
     </IonPage>

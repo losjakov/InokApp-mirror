@@ -17,6 +17,15 @@ export const DEVICE_TZ = undefined;
 
 const YEAR_MARK = /\s+(р\.|г\.)/gu;
 
+/** A-147 (cloud_43): THE short date of every article ROW - «20.11.2026», the same digits in uk / ru / en, the site's day in Kyiv time
+ *  (as longDate). The article page, comments and sheets keep the long date. An unparsable ISO string comes back as is. */
+export function shortDate(at: string | number | Date, timeZone: string | undefined = KYIV_TZ): string {
+  const d = at instanceof Date ? at : new Date(at);
+  if (Number.isNaN(d.getTime())) return String(at);
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).formatToParts(d).map((x) => [x.type, x.value]));
+  return `${p.day}.${p.month}.${p.year}`;
+}
+
 export function longDate(at: string | number | Date, lang: string, timeZone: string | undefined = KYIV_TZ): string {
   const d = at instanceof Date ? at : new Date(at);
   if (Number.isNaN(d.getTime())) return String(at);

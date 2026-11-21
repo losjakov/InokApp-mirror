@@ -4,7 +4,7 @@ import { openDb } from '@/data/db';
 import { ensureSchema, getMeta, type FtsMode } from '@/data/db/schema';
 import { countMonasteries, getDictionary, listFavourites, toggleFavourite } from '@/data/repo/monasteries';
 import { listVisited, toggleVisited, visitedCount } from '@/data/repo/visited';
-import { cachedLiveStatus, fetchLiveStatus, loadConfig, loadLiveStatus, syncDirectory } from '@/data/sync';
+import { cachedLiveStatus, fetchLiveStatus, importBundled, loadConfig, loadLiveStatus, syncDirectory } from '@/data/sync';
 import { fetchArticles, listArticles } from '@/data/repo/articles';
 import { dueOnReturn, lastCheck as readLastCheck, runRefresh, type RefreshResult } from '@/data/refresh';
 import { App as CapApp } from '@capacitor/app';
@@ -197,6 +197,11 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
         await afterImport();
         if (cancelled) return;
         setBoot('ready'); // the directory check runs with the start's full refresh (refreshAll)
+      } else if (await importBundled(d, mode)) { // A-144 (2): the first launch, the pair built into the app - no network wait
+        bootLog('ready (bundled export)');
+        await afterImport();
+        if (cancelled) return;
+        setBoot('ready'); // the site / mirror check runs with the start's full refresh (refreshAll)
       } else {
         const r = await syncDirectory(d, mode);
         bootLog(`first sync ${r} cancelled=${cancelled}`);

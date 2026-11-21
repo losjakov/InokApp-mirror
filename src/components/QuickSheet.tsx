@@ -23,6 +23,14 @@ import type { Snap } from '@/data/repo/reading';
 
 type Btn = { text: string; icon?: string; handler?: () => void; role?: 'cancel'; htmlAttributes?: Record<string, string> };
 const item = (k: string, text: string, icon: string, handler: () => void): Btn => ({ text, icon, handler, htmlAttributes: { 'data-testid': `qs-${k}` } });
+/** NOTE 2 (A-154 (4), cloud_43): an item that answers with a toast waits for the sheet's didDismiss - the sheet closes first, then the toast
+ *  at its usual place (never a toast over an open sheet). One gate per presented sheet. */
+export function sheetGate(): { closed: Promise<void>; onDidDismiss: () => void } {
+  let done!: () => void;
+  const closed = new Promise<void>((r) => { done = r; });
+  return { closed, onDidDismiss: () => done() };
+}
+
 /** P5: never over the reserve door (it renders INSTEAD of the app - no row exists then) nor over another open sheet / dialog / popover */
 const blocked = (): boolean => overlayOpen();
 
@@ -45,19 +53,20 @@ export function useMonasterySheet(open: (code: number) => void): (code: number) 
     const dial = phoneGroups(JSON.parse(row.phones_json || '[]') as string[]).find((g) => g.dial)?.dial ?? null;
     const hasGeo = row.lat != null && row.lon != null;
     const on = favourites.has(code); const was = visited.has(code);
+    const gate = sheetGate();
     const make: Record<MonasteryItem, () => Btn> = {
       page: () => item('page', t('sheet.m_page'), documentTextOutline, () => open(code)),
-      fav: () => item('fav', t(on ? 'sheet.fav_remove' : 'sheet.fav_add'), on ? star : starOutline, () => void toggleFavourite(code).then(() => fav(!on))),
-      visited: () => item('visited', t(was ? 'sheet.visited_remove' : 'sheet.visited_add'), checkmarkCircleOutline, () => void toggleVisited(code).then(vis)),
+      fav: () => item('fav', t(on ? 'sheet.fav_remove' : 'sheet.fav_add'), on ? star : starOutline, () => void toggleFavourite(code).then(() => gate.closed).then(() => fav(!on))),
+      visited: () => item('visited', t(was ? 'sheet.visited_remove' : 'sheet.visited_add'), checkmarkCircleOutline, () => void toggleVisited(code).then(async (r) => { await gate.closed; vis(r); })),
       route: () => item('route', t('sheet.route'), navigateOutline, () => { window.setTimeout(() => void present({ header: t('card.directions'), cssClass: 'quick-sheet',
         buttons: [...directionButtons(t, row.lat!, row.lon!, name), { text: t('common.cancel'), role: 'cancel' }] }), 350); }),
       map: () => item('map', t('sheet.map'), mapOutline, () => navigate(`/map?code=${code}`)),
       call: () => item('call', t('sheet.call'), callOutline, () => callPhone(dial!)),
       stream: () => item('stream', t('sheet.stream'), videocamOutline, () => openChannel(channel!)),
-      share: () => item('share', t('common.share'), shareSocialOutline, () => void shareUrl(name, siteUrl(row.site_url, lang))),
+      share: () => item('share', t('common.share'), shareSocialOutline, () => void gate.closed.then(() => shareUrl(name, siteUrl(row.site_url, lang)))),
     };
     await present({
-      header: name, subHeader: [p.town, p.oblast].filter(Boolean).join(', '), cssClass: 'quick-sheet', htmlAttributes: { 'data-testid': 'quick-sheet-m' },
+      header: name, subHeader: [p.town, p.oblast].filter(Boolean).join(', '), cssClass: 'quick-sheet', htmlAttributes: { 'data-testid': 'quick-sheet-m' }, onDidDismiss: gate.onDidDismiss,
       buttons: [...monasteryItems({ hasGeo, dial, hasChannel: !!channel }).map((k) => make[k]()), { text: t('common.cancel'), role: 'cancel', htmlAttributes: { 'data-testid': 'qs-cancel' } }],
     });
   }, [db, t, lang, dict, favourites, toggleFavourite, visited, toggleVisited, present, navigate, openChannel, fav, vis, open]);
@@ -76,17 +85,18 @@ export function useArticleSheet(open: (id: number) => void): (a: Article | Snap)
     const items = articleItems(a.kind, place);
     const on = saved.has(a.id);
     const read = !!place?.finished;
+    const gate = sheetGate();
     const make: Record<ArticleItem, () => Btn> = {
       continue: () => item('continue', t('sheet.continue', { n: place?.pct ?? 0 }), bookOutline, () => open(a.id)),
       restart: () => item('restart', t('sheet.restart'), refreshOutline, () => void setRead(a, false).then(() => open(a.id))),
       open: () => item('open', t('sheet.open'), bookOutline, () => open(a.id)),
-      fav: () => item('fav', t(on ? 'sheet.fav_remove' : 'sheet.fav_add'), on ? star : starOutline, () => void toggleSaved(a.id, 'body' in a ? (a as Article) : undefined).then((r) => r !== null && fav(r))),
+      fav: () => item('fav', t(on ? 'sheet.fav_remove' : 'sheet.fav_add'), on ? star : starOutline, () => void toggleSaved(a.id, 'body' in a ? (a as Article) : undefined).then(async (r) => { await gate.closed; if (r !== null) fav(r); })),
       read: () => item('read', t(read ? 'sheet.mark_unread' : 'sheet.mark_read'), read ? ellipseOutline : checkmarkDoneOutline, () => void setRead(a, !read)),
-      share: () => item('share', t('common.share'), shareSocialOutline, () => void shareUrl(a.title, siteUrl(a.site_url, lang))),
+      share: () => item('share', t('common.share'), shareSocialOutline, () => void gate.closed.then(() => shareUrl(a.title, siteUrl(a.site_url, lang)))),
     };
     const sub = [t(`kind1.${a.kind}`), longDate(a.published_at, lang), place?.started && !place.finished ? t('reading.pct', { n: place.pct }) : read ? t('reading.done') : ''].filter(Boolean).join(' · ');
     await present({
-      header: a.title, subHeader: sub, cssClass: 'quick-sheet', htmlAttributes: { 'data-testid': 'quick-sheet-a' },
+      header: a.title, subHeader: sub, cssClass: 'quick-sheet', htmlAttributes: { 'data-testid': 'quick-sheet-a' }, onDidDismiss: gate.onDidDismiss,
       buttons: [...items.map((k) => make[k]()), { text: t('common.cancel'), role: 'cancel', htmlAttributes: { 'data-testid': 'qs-cancel' } }],
     });
   }, [t, lang, saved, places, toggleSaved, setRead, present, fav, open]);

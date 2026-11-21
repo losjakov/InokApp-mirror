@@ -57,19 +57,21 @@ export const notFromPlay = (e: unknown): boolean =>
  */
 export const APP_STORE_LOOKUP = ['ua', null].map((c) => `https://itunes.apple.com/lookup?bundleId=${APP_ID}${c ? `&country=${c}` : ''}`);
 export async function appStoreCheck(installed = APP_VERSION): Promise<UpdateCheck> {
-  try {
-    for (const url of APP_STORE_LOOKUP) {
-      const j = (await (await fetch(url)).json()) as { results?: { version?: string; trackId?: number }[] };
+  // T3 (cloud_43): Apple's lookup answers max-age ~24 h and a CDN may keep a stale copy - BOTH storefronts in parallel, past the HTTP cache
+  // (`cache: 'no-store'`), each with its own catch; the HIGHER version of the answers that carry version + trackId wins
+  const answers = await Promise.all(APP_STORE_LOOKUP.map(async (url) => {
+    try {
+      const j = (await (await fetch(url, { cache: 'no-store' })).json()) as { results?: { version?: string; trackId?: number }[] };
       const r = j.results?.[0];
-      if (!r?.version || !r.trackId) continue;
-      const info: PlayUpdateInfo = { updateAvailability: versionBelow(installed, r.version) ? AVAILABLE : 1, immediateUpdateAllowed: false,
-        flexibleUpdateAllowed: false, currentVersionName: installed, appStoreId: r.trackId };
-      return info.updateAvailability === AVAILABLE ? { state: 'available', info } : { state: 'none', info };
-    }
-    return { state: 'not_play' };
-  } catch {
-    return { state: 'error' };
-  }
+      return r?.version && r.trackId ? { version: r.version, trackId: r.trackId } : 'empty';
+    } catch { return 'failed'; }
+  }));
+  const found = answers.filter((x): x is { version: string; trackId: number } => typeof x === 'object');
+  if (!found.length) return answers.every((x) => x === 'failed') ? { state: 'error' } : { state: 'not_play' };
+  const r = found.reduce((hi, x) => (versionBelow(hi.version, x.version) ? x : hi));
+  const info: PlayUpdateInfo = { updateAvailability: versionBelow(installed, r.version) ? AVAILABLE : 1, immediateUpdateAllowed: false,
+    flexibleUpdateAllowed: false, currentVersionName: installed, appStoreId: r.trackId };
+  return info.updateAvailability === AVAILABLE ? { state: 'available', info } : { state: 'none', info };
 }
 
 export async function checkUpdate(): Promise<UpdateCheck> {

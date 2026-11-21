@@ -7,7 +7,7 @@ export type LiveItem = LiveStatus['live'][number];
 export type ScheduledItem = NonNullable<LiveStatus['scheduled']>[number];
 export interface Grouped {
   online: { channel: ChannelRow; live: LiveItem }[];
-  scheduled: { channel: ChannelRow; at: string; title: LiveItem['title'] | undefined }[];
+  scheduled: { channel: ChannelRow; at: string; title: LiveItem['title'] | undefined; video_id?: string }[]; // T8: the reminder's key
   offline: ChannelRow[];
 }
 
@@ -25,7 +25,7 @@ export function groupChannels(channels: ChannelRow[], status: LiveStatus | null 
     const l = live.get(channel.id);
     const s = sched.get(channel.id);
     if (l) g.online.push({ channel, live: l });
-    else if (s) g.scheduled.push({ channel, at: s.scheduled_at, title: s.title });
+    else if (s) g.scheduled.push({ channel, at: s.scheduled_at, title: s.title, video_id: s.video_id });
     else g.offline.push(channel);
   }
   return g;

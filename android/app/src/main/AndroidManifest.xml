@@ -49,6 +49,8 @@
                 <data android:pathPrefix="/monasteries/" />
                 <data android:pathPrefix="/dioceses/" />
                 <data android:pathPrefix="/live/" />
+                <!-- T4 (cloud_43): the site's «Публікації» umbrella - the EXACT path (other /articles/... stay in the browser) -->
+                <data android:path="/articles/" />
             </intent-filter>
 
         </activity>
@@ -101,4 +103,8 @@
     <!-- N5 (REVIEW cloud_21): androidx.biometric of @capacitor-community/sqlite asks these; the app never sets biometricAuth (capacitor.config.ts) -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
+    <!-- T8 (A-153 (1), cloud_43): @capacitor/local-notifications declares SCHEDULE_EXACT_ALARM; «Нагадати» is INEXACT (isExactNotification false,
+         allowWhileIdle) - the owner's «без лишних разрешений»: no exact-alarm permission in the merged manifest (build.yml greps it) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" tools:node="remove" />
 </manifest>

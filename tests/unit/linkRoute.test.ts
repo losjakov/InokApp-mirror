@@ -21,6 +21,10 @@ describe('linkRoute (StartRoute + useAppLinks + the article text)', () => {
     expect(await linkRoute(db, 'https://inok.info/articles/publications/?lang=ru', now)).toEqual({ to: '/articles', entry: { reset: 1234, kind: 'publication' } });
     expect(await linkRoute(db, 'https://inok.info/articles/video/', now)).toEqual({ to: '/articles', entry: { reset: 1234, kind: 'video' } });
     expect(await linkRoute(db, 'https://inok.info/articles/news/?lang=en', now)).toEqual({ to: '/articles', entry: { reset: 1234, kind: 'news' } });
+    // T4 (cloud_43): the site's «Публікації» umbrella -> the tab «Усі», reset
+    for (const h of ['https://inok.info/articles/', 'https://inok.info/articles/?lang=ru', 'https://inok.info/uk/articles/'])
+      expect(await linkRoute(db, h, now), h).toEqual({ to: '/articles', entry: { reset: 1234, kind: 'all' } });
+    expect(await linkRoute(db, 'https://inok.info/articles/x/', now)).toBeNull();
   });
   it('/dioceses/ -> the eparchies list (reset); /dioceses/<id>/ in the DB -> the app\'s own eparchy page; unknown id -> the browser', async () => {
     expect(await linkRoute(db, 'https://inok.info/dioceses/', now)).toEqual({ to: '/more/eparchies', entry: { reset: 1234 } });

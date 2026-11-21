@@ -132,7 +132,7 @@ export function ArticleView({ id }: { id: number }) {
   );
 }
 
-/** A-141 (2): «↺ Продовжено з місця зупинки · З початку» - over the text after a jump to the place; it fades after a few seconds (polite:
+/** A-141 (2) + A-154 (3): «↺ Продовжено · З початку» - over the text after a jump to the place; it fades after a few seconds (polite:
  *  the reader hears it once); «З початку» = the top of the article. */
 function ResumePill({ onStart }: { onStart: () => void }) {
   const { t } = useApp();
@@ -140,7 +140,8 @@ function ResumePill({ onStart }: { onStart: () => void }) {
   useEffect(() => { const h = window.setTimeout(() => setGone(true), PILL_MS); return () => window.clearTimeout(h); }, []);
   return (
     <div className={`resume-pill${gone ? ' resume-pill--gone' : ''}`} role="status" data-testid="resume-pill" aria-hidden={gone ? 'true' : undefined}>
-      <span><span aria-hidden="true">↺ </span>{t('reading.resumed')}</span><span aria-hidden="true">·</span>
+      {/* NOTE 4 (A-154 (3)): the short word on the pill (one line at 360 px), the reader hears the full sentence (WCAG 2.5.3: it holds the word) */}
+      <span data-testid="resume-word"><span aria-hidden="true">↺ {t('reading.resumed')}</span><span className="sr-only">{t('reading.resumed_full')}</span></span><span aria-hidden="true">·</span>
       <button type="button" className="resume-pill__btn" onClick={onStart} tabIndex={gone ? -1 : undefined} data-testid="resume-start">{t('reading.from_start')}</button>
     </div>
   );

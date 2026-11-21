@@ -5,7 +5,7 @@ import { CoverImage } from './CoverImage';
 import { Hl } from './Hl';
 import type { Article } from '@/data/api/types';
 import { useT } from '@/state/AppContext';
-import { longDate } from '@/i18n/date';
+import { shortDate } from '@/i18n/date';
 import { useReading } from '@/state/reading';
 import { keepsPlace } from '@/data/repo/reading';
 import { ReadBar } from './ContinueReading';
@@ -14,11 +14,14 @@ import { useArticleSheet } from './QuickSheet';
 
 
 /** One article row in EVERY list (the feed and its kinds, «Нове на сайті», a card's blocks; D5, A-15): cover · title + subtitle ·
- *  line 1 «kind · date», line 2 «★ rating (count) · 💬 comments» (A-53: on their own line; no line 2 when neither is there); nothing is cut.
+ *  ONE meta line (A-146 / A-147, cloud_43) «[Новина - a news row of a MIXED list only] · DD.MM.YYYY · ★ v (n) · 💬 N», wrapping only between
+ *  groups; nothing is cut. `mixed` is set by the LIST (several kinds in it), never guessed by the row.
  *  NO lead line in any row (A-55 withdrew A-54: the lead belongs to the article, not to the list). */
-export function ArticleRow({ a, onSelect, selected, q }: { a: Article; onSelect: (id: number) => void; selected?: boolean;
+export function ArticleRow({ a, onSelect, selected, q, mixed }: { a: Article; onSelect: (id: number) => void; selected?: boolean;
   /** A-97: the search - its matches marked in the title and the subtitle (THE monasteries' highlight, `Hl`) */
-  q?: string }) {
+  q?: string;
+  /** A-146: the list holds several kinds («Усі», «★», Home «Нове на сайті», «Читайте також», «Недочитані») - a news row names its kind */
+  mixed?: boolean }) {
   const { t, lang } = useT();
   const { saved, places } = useReading();
   const sheet = useArticleSheet(onSelect);
@@ -36,8 +39,7 @@ export function ArticleRow({ a, onSelect, selected, q }: { a: Article; onSelect:
         {/* A-141 (1): a saved article's ★ before its title in EVERY list (drawn; the reader hears «В обраних») */}
         <h2 className="mrow__title">{saved.has(a.id) && <span className="arow__saved" role="img" aria-label={t('articles.saved_mark')} data-testid={`asaved-${a.id}`}>★ </span>}<Hl text={a.title} q={q} /></h2>
         {a.subtitle && <p className="arow__subtitle"><Hl text={a.subtitle} q={q} /></p>}
-        <MetaLine groups={[t(`kind1.${a.kind}`), longDate(a.published_at, lang)]} />
-        {badges.some(Boolean) && <MetaLine groups={badges} className="mrow__sub arow__badges" testId={`abadges-${a.id}`} />}
+        <MetaLine groups={[mixed && a.kind === 'news' && <span data-testid={`akind-${a.id}`}>{t('kind1.news')}</span>, shortDate(a.published_at), ...badges]} testId={`ameta-${a.id}`} />
         {/* A-141 (3): a started article - the thin bar + «прочитано N%»; a finished one - «✓ прочитано» */}
         {place?.finished ? <p className="arow__done" data-testid={`aread-${a.id}`}><span aria-hidden="true">✓ </span>{t('reading.done')}</p>
           : place?.started ? <p className="arow__read"><ReadBar pct={place.pct} testId={`apct-${a.id}`} /></p> : null}

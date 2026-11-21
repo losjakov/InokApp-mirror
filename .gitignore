@@ -46,3 +46,4 @@ screens/out/
 
 # cloud_29: Python byte-code (a local import of scripts/*.py writes it)
 __pycache__/
+public/bundled/

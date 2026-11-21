@@ -4,7 +4,7 @@ import { importedDb } from './helpers';
 import { openWasmDb } from '@/data/db/wasmDb';
 import { ensureSchema } from '@/data/db/schema';
 import type { Article } from '@/data/api/types';
-import { anchorAt, continueList, CONTINUE_DAYS, getPlace, getSaved, listPlaces, listSaved, noteOpened, pctOf, PLACES_KEPT, resumeOf, saveArticle,
+import { anchorAt, continueList, continueOver, SAVED, CONTINUE_DAYS, getPlace, getSaved, listPlaces, listSaved, noteOpened, pctOf, PLACES_KEPT, resumeOf, saveArticle,
   savedIds, savePlace, setFinished, unsaveArticle, yOfAnchor, dismissPlace, type Place } from '@/data/repo/reading';
 import { getArticle, storeArticles } from '@/data/repo/articles';
 import { KEPT_TABLES, resetData } from '@/data/repo/resetData';
@@ -123,5 +123,15 @@ describe('A-141 storage', () => {
     expect(fav).toMatch(/card\.favourite_removed/);
     expect(readFileSync('src/pages/MonasteryCard.tsx', 'utf8')).toMatch(/useFavToast\(\)/);
     expect(readFileSync('src/pages/MonasteryCard.tsx', 'utf8')).not.toMatch(/favourite_added/);
+  });
+});
+
+// T1 (cloud_43, remark 1): the card over «Публікації» for ANY order and entry; only a typed search and «★» hide it
+describe('continueOver (T1)', () => {
+  it('every kind tab, whatever the sort; not on «★»; not while a search text is typed', () => {
+    for (const k of ['all', 'publications', 'video', 'news']) expect(continueOver(k, '')).toBe(true);
+    expect(continueOver('all', '   ')).toBe(true);
+    expect(continueOver(SAVED, '')).toBe(false);
+    expect(continueOver('all', 'x')).toBe(false);
   });
 });

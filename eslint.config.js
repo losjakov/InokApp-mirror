@@ -3,7 +3,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import compat from 'eslint-plugin-compat';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'android/', 'ios/', 'node_modules/', 'screens/out/', 'playwright-report/', 'test-results/', '.claude/'] },
+  { ignores: ['dist/', 'android/', 'ios/', 'node_modules/', 'screens/out/', 'playwright-report/', 'test-results/', '.claude/', 'store/'] }, // cloud_43: store/ = CD's listing tools (S327_feast_draw.mjs), not app code - not mirrored, not linted
   ...tseslint.configs.recommended,
   {
     files: ['src/**/*.{ts,tsx}'],
