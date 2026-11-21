@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import CoreSpotlight
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
@@ -18,6 +19,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
         // cloud_41 (A-133 C1): a quick action that STARTED the app = its launch URL (Capacitor's `getLaunchUrl`), read by the app's router
         if let item = connectionOptions.shortcutItem { _ = Self.openQuickAction(item) }
+        // cloud_43 (T10): a Spotlight result that STARTED the app
+        for a in connectionOptions.userActivities { _ = Self.openSpotlight(a) }
     }
 
     /// cloud_41 (A-133 C1): a quick action while the app runs (from the background) = `appUrlOpen` with the same address
@@ -38,6 +41,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        if Self.openSpotlight(userActivity) { return }
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)
+    }
+
+    /// cloud_43 (T10, A-153 (3)): a tapped Spotlight item - its identifier IS the site address (a card, an article, «Трансляції»), handed to the
+    /// app's ONE router through Capacitor's open-URL path, as a quick action
+    static func openSpotlight(_ a: NSUserActivity) -> Bool {
+        guard a.activityType == CSSearchableItemActionType, let id = a.userInfo?[CSSearchableItemActivityIdentifier] as? String, let url = URL(string: id) else { return false }
+        return ApplicationDelegateProxy.shared.application(UIApplication.shared, open: url, options: [:])
     }
 }

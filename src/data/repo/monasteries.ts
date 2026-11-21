@@ -24,6 +24,9 @@ const ROW = `${prefixed(LIST_COLS)}, ${NAMES}`;
 const CARD_ROW = `${prefixed([...LIST_COLS, ...CARD_ONLY])}, ${NAMES}`;
 const FROM = 'FROM monastery m LEFT JOIN eparchy e ON e.id = m.eparchy_id LEFT JOIN oblast o ON o.id = m.oblast_id LEFT JOIN monastery p ON p.code = m.parent_code';
 
+/** T10 / T11 (cloud_43): EVERY house with its names x3 (eparchy / oblast joined) - Spotlight's index and Siri's «Знайти обитель» list */
+export const allHouseRows = (db: Db): Promise<MonasteryRow[]> => db.query<MonasteryRow>(`SELECT ${ROW} ${FROM}`);
+
 function whereOf(f: Filters): { sql: string; params: (string | number)[] } {
   const w: string[] = [];
   const p: (string | number)[] = [];

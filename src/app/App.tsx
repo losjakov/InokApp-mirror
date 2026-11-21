@@ -29,6 +29,7 @@ import { FavouritesPage, UnfinishedPage, VisitedPage } from '@/pages/Favourites'
 import { ReadingProvider } from '@/state/reading';
 import { RemindersProvider } from '@/state/reminders';
 import { WidgetsHost } from '@/components/WidgetsHost';
+import { SpotlightHost } from '@/components/SpotlightHost';
 import { onReminderTap } from '@/native/reminders';
 import { channelUrl } from '@/data/live/streams';
 import { UNFINISHED_PATH } from '@/components/ContinueReading';
@@ -101,6 +102,7 @@ function Tabs() {
     <ReviewAsk />
     <NetHost />
     <WidgetsHost />
+    <SpotlightHost />
     <IonTabs>
       <IonRouterOutlet>
         <Route path="/home" element={<HomePage />} />

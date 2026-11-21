@@ -32,6 +32,15 @@ runs:
         { echo "### iOS ${{ inputs.task }} ${{ inputs.runtime }} ${{ inputs.device }} (exit $rc)"; grep '^== ' "$O/runtimes.txt"; echo '```'; cat "$O/a3.txt" 2>/dev/null; cat "$O/blank.txt" 2>/dev/null; echo '```';
           cat "$O/sizes.txt" 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
         exit $rc
+    - name: iPhone Duo? (T14, the owner 20.11) - the runner's simulator device types, written for the REPORT (no frames from another size, ever)
+      if: inputs.task == 'appstore'
+      shell: bash
+      run: |
+        set +e
+        O="ios-out/${{ inputs.task }}-${{ inputs.runtime }}-${{ inputs.device }}"; mkdir -p "$O"
+        xcrun simctl list devicetypes > "$O/devicetypes.txt" 2>&1
+        echo "simulator device types: $(grep -c '(com.apple' "$O/devicetypes.txt") - iPhone Duo: $(grep -i 'duo' "$O/devicetypes.txt" | tr '\n' ';' | sed 's/;$//' | grep . || echo NONE)" | tee -a "$GITHUB_STEP_SUMMARY"
+        exit 0
     - name: App Store 04-eparchy / 05-map - the browser half on the LIVE export, joined with this run's marks (cloud_42, A-135; never fails the job)
       if: inputs.task == 'appstore' && inputs.device != 'iphone63'
       shell: bash
@@ -39,11 +48,12 @@ runs:
         set +e   # the frames are evidence for CD, never a gate: every outcome is written, the job's verdict stays the tour's
         O="ios-out/${{ inputs.task }}-${{ inputs.runtime }}-${{ inputs.device }}"; D="${{ inputs.device }}"; L="$O/appstore_join.txt"
         [ -f "$O/appstore/insets-$D.json" ] || { echo "LIVE 04/05: SKIPPED - no insets-$D.json from the tour" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; }
-        UA="InokApp/$V (ios)"; API=https://inok.info/api/app/v1/export
-        # the LIVE export in place of the sample (this job's checkout only; nothing is committed): the same two files the app downloads
-        if curl -fsS -A "$UA" "$API/manifest.json" -o fixtures/manifest.json && curl -fsS -A "$UA" "$API/directory_v1.json.gz" -o fixtures/directory_v1.json.gz; then
+        # cloud_43 (T14): the LIVE export in place of the sample (this job's checkout only; nothing is committed) = the pair the bundle step
+        # already fetched for this build (public/bundled/, sha checked: scripts/bundle_export.mjs - the site with the PUBLIC X-Inok-App key,
+        # contract §1; without the key the site answered 403, QUESTIONS cloud_42 5) - one fetch, one source (DRY)
+        if [ -s public/bundled/manifest.json ] && cp public/bundled/manifest.json fixtures/manifest.json && cp public/bundled/directory_v1.json.gz fixtures/directory_v1.json.gz; then
           echo "LIVE export: $(python3 -c 'import json;print(json.load(open("fixtures/manifest.json"))["export_version"])')" | tee -a "$L"
-        else echo "LIVE 04/05: SKIPPED - the export refused this runner (HTTP $(curl -s -o /dev/null -w '%{http_code}' -A "$UA" "$API/manifest.json")): a browser half needs the site to serve it (QUESTIONS cloud_42)" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; fi
+        else echo "LIVE 04/05: SKIPPED - no bundled live export in this job (public/bundled/)" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; fi
         npx playwright install chromium > /dev/null 2>&1
         INSETS="$O/appstore" APPSTORE_RAW="$O/appstore_raw" npx playwright test -c screens/appstore.config.ts --grep "$D" > "$O/appstore_frames.txt" 2>&1
         tail -4 "$O/appstore_frames.txt" | tee -a "$L"

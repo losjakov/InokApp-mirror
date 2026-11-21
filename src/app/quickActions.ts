@@ -12,9 +12,13 @@ export const QUICK_ACTIONS = [
   { id: 'articles', to: '/articles' },
 ] as const;
 
+/** cloud_43 (T11): the system's other ways in that name a screen by the same address form - Siri / Shortcuts «Обителі поруч» (Home with
+ *  «Поруч»); not an icon quick action (the four above stay the owner's list) */
+export const SYSTEM_ROUTES = [{ id: 'home', to: '/home' }] as const;
+
 /** the tab route of a quick action's address, or null (any other address: the link router's other rules) */
 export function quickRoute(url: string | null | undefined): string | null {
   if (!url || !url.toLowerCase().startsWith(QUICK_PREFIX)) return null;
   const id = url.slice(QUICK_PREFIX.length).replace(/[/?#].*$/, '');
-  return QUICK_ACTIONS.find((a) => a.id === id)?.to ?? null;
+  return [...QUICK_ACTIONS, ...SYSTEM_ROUTES].find((a) => a.id === id)?.to ?? null;
 }

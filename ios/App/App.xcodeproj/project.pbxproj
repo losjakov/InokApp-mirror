@@ -37,6 +37,8 @@
 		1C0A1143000000000000002E /* InokWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000008 /* InokWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1C0A1143000000000000002F /* InokNotifications.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1C0A1143000000000000001E /* InokNotifications.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1C0A1143000000000000FF01 /* WidgetCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000003 /* WidgetCore.swift */; };
+		1C0A1143000000000000FF03 /* InokIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A1143000000000000FF02 /* InokIntents.swift */; };
+		1C0A1143000000000000FF07 /* AppShortcuts.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A1143000000000000FF04 /* AppShortcuts.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -79,6 +81,9 @@
 		1C0A11430000000000000028 /* InokNotifications.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = InokNotifications.entitlements; sourceTree = "<group>"; };
 		1C0A11430000000000000029 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1C0A1143000000000000001E /* InokNotifications.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = InokNotifications.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C0A1143000000000000FF02 /* InokIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokIntents.swift; sourceTree = "<group>"; };
+		1C0A1143000000000000FF05 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		1C0A1143000000000000FF06 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +138,8 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				1C0A1143000000000000FF04 /* AppShortcuts.strings */,
+				1C0A1143000000000000FF02 /* InokIntents.swift */,
 				1C0A11430000000000000004 /* InokWidgetsPlugin.swift */,
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
@@ -302,6 +309,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1C0A1143000000000000FF07 /* AppShortcuts.strings in Resources */,
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
@@ -356,6 +364,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1C0A1143000000000000FF03 /* InokIntents.swift in Sources */,
 				1C0A1143000000000000FF01 /* WidgetCore.swift in Sources */,
 				1C0A11430000000000000006 /* InokShared.swift in Sources */,
 				1C0A11430000000000000005 /* InokWidgetsPlugin.swift in Sources */,
@@ -434,6 +443,15 @@
 				1C0A11430000000000000017 /* en */,
 			);
 			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		1C0A1143000000000000FF04 /* AppShortcuts.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				1C0A1143000000000000FF05 /* ru */,
+				1C0A1143000000000000FF06 /* en */,
+			);
+			name = AppShortcuts.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

@@ -1,3 +1,9 @@
 /* cloud_38 (A2, REQUEST R-52): a notification title in the language iOS shows the app in - the site sends the three titles
    as title-loc-args [uk, ru, en] with title-loc-key INOK_PUSH_TITLE (no Notification Service Extension needed). */
 "INOK_PUSH_TITLE" = "%3$@";
+/* cloud_43 (T11, A-153 (4)): Siri / «Команди» - the four shortcuts' titles and the entity («Обитель») */
+"intent_streams" = "Streams now";
+"intent_near" = "Monasteries near me";
+"intent_new" = "New on the site";
+"intent_find" = "Find a monastery";
+"entity_house" = "Monastery";

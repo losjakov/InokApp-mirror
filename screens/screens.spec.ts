@@ -2199,7 +2199,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.getByTestId('kind-tab-news').click();
       await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7);
       expect(await noLeads(p, '[data-testid="articles"]')).toBe(7);
-      await hyphenated(p, '[data-testid="articles"] [data-testid^="arow-"] ion-label', true); // A-56: a long word breaks with a hyphen where the engine can
+      await hyphenated(p, '[data-testid="articles"] [data-testid^="arow-"] ion-label', false); // NOTE 5 (A-154 (6)): list rows never hyphenate, even at 200 %
       expect(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no sideways scroll').toBe(true);
     } },
   { name: 'article', path: '/articles?id=2869', ready: async (p) => {

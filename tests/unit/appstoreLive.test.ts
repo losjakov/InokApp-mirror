@@ -8,6 +8,11 @@ describe('the appstore job\'s live 04 / 05 step', () => {
   const step = a.slice(a.indexOf('App Store 04-eparchy / 05-map'), a.indexOf('- uses: actions/upload-artifact'));
   it('exists, only for the appstore task, never for the 6.3-inch set', () => expect(step).toMatch(/if: inputs\.task == 'appstore' && inputs\.device != 'iphone63'/));
   it('never fails the job', () => { expect(step).toMatch(/set \+e/); expect(step.match(/exit (\d)/g)?.every((e) => e === 'exit 0')).toBe(true); });
-  it('sends no app key', () => expect(step).not.toMatch(/X-Inok-App|APP_KEY/));
-  it('writes why it skipped (the HTTP code)', () => expect(step).toMatch(/SKIPPED - the export refused this runner \(HTTP/));
+  // cloud_43 (T14): the live pair = the one the bundle step fetched for this build (the site WITH the public key, sha checked) - no second fetch
+  it('takes the bundled live export (one fetch, one source); no curl of its own', () => {
+    expect(step).toMatch(/cp public\/bundled\/manifest\.json fixtures\/manifest\.json && cp public\/bundled\/directory_v1\.json\.gz fixtures\/directory_v1\.json\.gz/);
+    expect(step).not.toMatch(/curl /);
+    expect(readFileSync('.github/actions/ios-setup/action.yml', 'utf8')).toMatch(/node scripts\/bundle_export\.mjs && npm run build/);
+  });
+  it('writes why it skipped', () => expect(step).toMatch(/SKIPPED - no bundled live export in this job/));
 });

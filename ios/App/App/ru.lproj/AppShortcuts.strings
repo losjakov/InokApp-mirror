@@ -1,0 +1,6 @@
+/* cloud_43 (T11): Siri's Russian phrases (Siri has no Ukrainian); the English ones are in InokIntents.swift */
+"Streams now in ${applicationName}" = "Трансляции сейчас в ${applicationName}";
+"Live broadcasts in ${applicationName}" = "Прямые трансляции в ${applicationName}";
+"Monasteries near me in ${applicationName}" = "Обители рядом в ${applicationName}";
+"New on the site in ${applicationName}" = "Новое на сайте в ${applicationName}";
+"Find a monastery in ${applicationName}" = "Найти обитель в ${applicationName}";

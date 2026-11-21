@@ -1,0 +1,6 @@
+/* cloud_43 (T11): Siri's English phrases (= InokIntents.swift) */
+"Streams now in ${applicationName}" = "Streams now in ${applicationName}";
+"Live broadcasts in ${applicationName}" = "Live broadcasts in ${applicationName}";
+"Monasteries near me in ${applicationName}" = "Monasteries near me in ${applicationName}";
+"New on the site in ${applicationName}" = "New on the site in ${applicationName}";
+"Find a monastery in ${applicationName}" = "Find a monastery in ${applicationName}";

@@ -53,11 +53,11 @@ public class WidgetWorker extends Worker {
         String lang = app == null ? "uk" : app.optString("lang", "uk");
         long at = System.currentTimeMillis();
         try {
-            JSONObject status = new JSONObject(get(API + "live-status", key));
+            JSONObject status = new JSONObject(get(API + "live-status", key, ua(c)));
             WidgetStore.putOwn(c, WidgetStore.LIVE_KEY, new JSONObject().put("at", at).put("status", status));
         } catch (Exception e) { android.util.Log.i("InokWidgets", "live-status kept: " + e.getClass().getSimpleName()); }
         try {
-            JSONObject page = new JSONObject(get(API + "articles?lang=" + lang + "&limit=3", key));
+            JSONObject page = new JSONObject(get(API + "articles?lang=" + lang + "&limit=3", key, ua(c)));
             JSONArray items = page.optJSONArray("items");
             if (items != null) WidgetStore.putOwn(c, WidgetStore.NEW_KEY, new JSONObject().put("at", at).put("lang", lang).put("items", items));
         } catch (Exception e) { android.util.Log.i("InokWidgets", "articles kept: " + e.getClass().getSimpleName()); }
@@ -65,12 +65,18 @@ public class WidgetWorker extends Worker {
         return Result.success();
     }
 
-    static String get(String url, String key) throws Exception {
+    /** contract §1: «InokApp/<version> (android)» - the installed version (this project generates no BuildConfig) */
+    static String ua(Context c) {
+        try { return "InokApp/" + c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName + " (android)"; }
+        catch (Exception e) { return "InokApp/0 (android)"; }
+    }
+
+    static String get(String url, String key, String ua) throws Exception {
         HttpURLConnection h = (HttpURLConnection) new URL(url).openConnection();
         h.setConnectTimeout(15_000); h.setReadTimeout(20_000);
         if (!key.isEmpty()) h.setRequestProperty("X-Inok-App", key);
         h.setRequestProperty("Accept", "application/json");
-        h.setRequestProperty("User-Agent", "InokApp/" + BuildConfig.VERSION_NAME + " (android)");
+        h.setRequestProperty("User-Agent", ua);
         try {
             int code = h.getResponseCode();
             String type = h.getContentType() == null ? "" : h.getContentType();
