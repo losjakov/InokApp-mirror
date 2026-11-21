@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- T9 (A-153 (2), style B): THE widget layout (one for the three kinds; WidgetRender shows / hides parts) -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/w_root" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="12dp" android:background="@drawable/widget_bg">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:minHeight="28dp">
+    android:orientation="vertical" android:padding="10dp" android:background="@drawable/widget_bg">
+    <!-- the content takes what is left, clipped - the footer («оновлено HH:MM», «+N ще») is ALWAYS seen (emulator 44917561352: it was pushed out) -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:minHeight="24dp">
         <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_marginEnd="6dp" android:src="@mipmap/ic_launcher_round" android:importantForAccessibility="no" />
         <ImageView android:id="@+id/w_live_dot" android:layout_width="8dp" android:layout_height="8dp" android:layout_marginEnd="6dp" android:src="@drawable/widget_dot" android:visibility="gone" android:importantForAccessibility="no" />
         <TextView android:id="@+id/w_header" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="@color/widget_accent"
@@ -11,50 +13,50 @@
     <TextView android:id="@+id/w_big" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/widget_text"
         android:textSize="26sp" android:textStyle="bold" android:visibility="gone" />
     <LinearLayout android:id="@+id/w_row1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal"
-        android:gravity="center_vertical" android:paddingTop="4dp" android:paddingBottom="4dp" android:minHeight="44dp">
-        <FrameLayout android:layout_width="40dp" android:layout_height="40dp" android:layout_marginEnd="10dp">
-            <ImageView android:id="@+id/w_row1_img" android:layout_width="40dp" android:layout_height="40dp" android:src="@mipmap/ic_launcher_round" android:importantForAccessibility="no" />
+        android:gravity="center_vertical" android:paddingTop="2dp" android:paddingBottom="2dp" android:minHeight="38dp">
+        <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_marginEnd="8dp">
+            <ImageView android:id="@+id/w_row1_img" android:layout_width="34dp" android:layout_height="34dp" android:src="@mipmap/ic_launcher_round" android:importantForAccessibility="no" />
             <ImageView android:id="@+id/w_row1_dot" android:layout_width="10dp" android:layout_height="10dp" android:layout_gravity="top|end" android:src="@drawable/widget_dot" android:visibility="gone" android:importantForAccessibility="no" />
         </FrameLayout>
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
             <TextView android:id="@+id/w_row1_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/widget_text"
-                android:textSize="14sp" android:textStyle="bold" android:maxLines="3" android:ellipsize="end" />
+                android:textSize="13sp" android:textStyle="bold" android:maxLines="3" android:ellipsize="end" />
             <TextView android:id="@+id/w_row1_sub" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/widget_muted"
-                android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+                android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
         </LinearLayout>
         <ImageView android:id="@+id/w_row1_bell" android:layout_width="18dp" android:layout_height="18dp" android:layout_marginStart="6dp" android:src="@drawable/ic_widget_bell" android:visibility="gone" android:importantForAccessibility="no" />
     </LinearLayout>
     <LinearLayout android:id="@+id/w_row2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal"
-        android:gravity="center_vertical" android:paddingTop="4dp" android:paddingBottom="4dp" android:minHeight="44dp">
-        <FrameLayout android:layout_width="40dp" android:layout_height="40dp" android:layout_marginEnd="10dp">
-            <ImageView android:id="@+id/w_row2_img" android:layout_width="40dp" android:layout_height="40dp" android:src="@mipmap/ic_launcher_round" android:importantForAccessibility="no" />
+        android:gravity="center_vertical" android:paddingTop="2dp" android:paddingBottom="2dp" android:minHeight="38dp">
+        <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_marginEnd="8dp">
+            <ImageView android:id="@+id/w_row2_img" android:layout_width="34dp" android:layout_height="34dp" android:src="@mipmap/ic_launcher_round" android:importantForAccessibility="no" />
             <ImageView android:id="@+id/w_row2_dot" android:layout_width="10dp" android:layout_height="10dp" android:layout_gravity="top|end" android:src="@drawable/widget_dot" android:visibility="gone" android:importantForAccessibility="no" />
         </FrameLayout>
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
             <TextView android:id="@+id/w_row2_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/widget_text"
-                android:textSize="14sp" android:textStyle="bold" android:maxLines="3" android:ellipsize="end" />
+                android:textSize="13sp" android:textStyle="bold" android:maxLines="3" android:ellipsize="end" />
             <TextView android:id="@+id/w_row2_sub" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/widget_muted"
-                android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+                android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
         </LinearLayout>
         <ImageView android:id="@+id/w_row2_bell" android:layout_width="18dp" android:layout_height="18dp" android:layout_marginStart="6dp" android:src="@drawable/ic_widget_bell" android:visibility="gone" android:importantForAccessibility="no" />
     </LinearLayout>
     <LinearLayout android:id="@+id/w_row3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal"
-        android:gravity="center_vertical" android:paddingTop="4dp" android:paddingBottom="4dp" android:minHeight="44dp">
-        <FrameLayout android:layout_width="40dp" android:layout_height="40dp" android:layout_marginEnd="10dp">
-            <ImageView android:id="@+id/w_row3_img" android:layout_width="40dp" android:layout_height="40dp" android:src="@mipmap/ic_launcher_round" android:importantForAccessibility="no" />
+        android:gravity="center_vertical" android:paddingTop="2dp" android:paddingBottom="2dp" android:minHeight="38dp">
+        <FrameLayout android:layout_width="34dp" android:layout_height="34dp" android:layout_marginEnd="8dp">
+            <ImageView android:id="@+id/w_row3_img" android:layout_width="34dp" android:layout_height="34dp" android:src="@mipmap/ic_launcher_round" android:importantForAccessibility="no" />
             <ImageView android:id="@+id/w_row3_dot" android:layout_width="10dp" android:layout_height="10dp" android:layout_gravity="top|end" android:src="@drawable/widget_dot" android:visibility="gone" android:importantForAccessibility="no" />
         </FrameLayout>
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
             <TextView android:id="@+id/w_row3_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/widget_text"
-                android:textSize="14sp" android:textStyle="bold" android:maxLines="3" android:ellipsize="end" />
+                android:textSize="13sp" android:textStyle="bold" android:maxLines="3" android:ellipsize="end" />
             <TextView android:id="@+id/w_row3_sub" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/widget_muted"
-                android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+                android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
         </LinearLayout>
         <ImageView android:id="@+id/w_row3_bell" android:layout_width="18dp" android:layout_height="18dp" android:layout_marginStart="6dp" android:src="@drawable/ic_widget_bell" android:visibility="gone" android:importantForAccessibility="no" />
     </LinearLayout>
     <TextView android:id="@+id/w_note" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/widget_muted"
         android:textSize="12sp" android:visibility="gone" android:paddingTop="4dp" />
-    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+    </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
         <TextView android:id="@+id/w_foot" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="@color/widget_muted" android:textSize="11sp" />
         <TextView android:id="@+id/w_updated" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/widget_muted" android:textSize="11sp" />

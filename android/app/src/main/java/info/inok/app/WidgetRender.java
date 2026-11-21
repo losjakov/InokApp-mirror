@@ -80,9 +80,9 @@ final class WidgetRender {
             v.setTextViewText(ROW_SUB[i], r.sub == null ? "" : r.sub);
             v.setViewVisibility(ROW_BELL[i], r.bell ? View.VISIBLE : View.GONE);
             v.setViewVisibility(ROW_DOT[i], r.live ? View.VISIBLE : View.GONE);
-            Bitmap b = r.image == null ? null : avatar(c, r.image);
+            Bitmap b = r.image == null || small ? null : avatar(c, r.image); // a small widget gives its width to the words (emulator 44917561352)
             if (b != null) { v.setImageViewBitmap(ROW_IMG[i], b); v.setViewVisibility(ROW_IMG[i], View.VISIBLE); }
-            else v.setViewVisibility(ROW_IMG[i], kind.equals(WidgetModel.NEW) ? View.GONE : View.VISIBLE);
+            else v.setViewVisibility(ROW_IMG[i], kind.equals(WidgetModel.NEW) || small ? View.GONE : View.VISIBLE);
             v.setContentDescription(ROW[i], r.say);
             v.setOnClickPendingIntent(ROW[i], open(c, id * 10 + i, r.url));
         }

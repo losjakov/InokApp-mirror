@@ -111,7 +111,7 @@ enum WModel {
                 let bell = d.reminders.contains("\(p.ch)|\(p.video)")
                 let say = fill(fill(d.w("say_planned"), "name", name), "time", when)
                 if small {
-                    v.big = hhmm(p.at)
+                    v.big = when // «завтра 07:00»: the small one shows no sub line, the day rides with the time
                     v.rows.append(WRow(id: i, title: name, sub: [day, p.title].filter { !$0.isEmpty }.joined(separator: " · "), url: streams, say: say, live: false, bell: bell))
                     if bell { v.foot = fill(d.w("remind"), "time", hhmm(p.at.addingTimeInterval(-600))) }
                 } else {
@@ -165,9 +165,12 @@ struct WidgetBody: View {
     func row(_ r: WRow) -> some View {
         HStack(alignment: .top, spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(r.title).font(.subheadline.bold()).foregroundColor(.primary).lineLimit(large ? 2 : (small ? 5 : 3)).truncationMode(.tail)
-                if !r.sub.isEmpty { Text(r.sub).font(.caption).foregroundColor(.secondary).lineLimit(1) }
+                // a small widget: the name gets the room (no sub line, a step smaller) - whole at the normal size (A-155 (1); ring snapshot 44907976664)
+                Text(r.title).font(small ? .footnote.bold() : .subheadline.bold()).foregroundColor(.primary)
+                    .lineLimit(large ? 2 : (small ? 4 : 3)).truncationMode(.tail).multilineTextAlignment(.leading)
+                if !r.sub.isEmpty && !small { Text(r.sub).font(.caption).foregroundColor(.secondary).lineLimit(1) }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
             if r.bell { Image(systemName: "bell.fill").font(.caption).foregroundColor(Self.accent).accessibilityHidden(true) }
         }
