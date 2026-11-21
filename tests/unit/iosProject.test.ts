@@ -64,6 +64,11 @@ describe('iOS project', () => {
 
 describe('ios.yml (A-118): the mirror only, never a pull request, no secret printed', () => {
   const wf = read('.github/workflows/ios.yml').replace(/^\s*#.*$/gm, '').replace(/ # .*$/gm, ''); // the words, not the comments
+  it('the signed step: the archive path `A` is set ONCE - the upload exports the archive, not a codesign line (ring 44939546650)', () => {
+    const step = wf.slice(wf.indexOf('- name: SIGNED for the App Store'), wf.indexOf('- name:', wf.indexOf('- name: SIGNED for the App Store') + 10));
+    expect(step.match(/(^|[\s;(])A=/g), 'assignments of A').toHaveLength(1);
+    expect(step).toMatch(/A="\$RUNNER_TEMP\/App\.xcarchive"/);
+  });
   const on = /^on:\n([\s\S]*?)^\S/m.exec(wf)![1];
   it('starts on push / workflow_dispatch only', () => {
     expect(on).not.toMatch(/pull_request/);
