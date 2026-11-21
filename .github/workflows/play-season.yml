@@ -1,0 +1,42 @@
+# Google Play seasonal listing (owner 21.11.2026, CD S327): every morning the main store listing is made to match
+# store/events/feasts.json - the feast feature graphic + short description from 3 days before a feast to 2 days after it
+# (Pascha: Holy Monday .. Bright Saturday), the normal ones otherwise (store/events/play_normal.json).
+# Account play-listing@info-inok-app (store-listing rights only), secret PLAY_LISTING_JSON. Idempotent: no change = nothing sent.
+name: play-season
+on:
+  schedule:
+    - cron: '17 3 * * *'   # 05:17 Kyiv in winter, 06:17 in summer
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Kyiv date YYYY-MM-DD (empty = today)'
+        required: false
+      dry:
+        description: 'dry run (show the plan, change nothing)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: play-season
+  cancel-in-progress: false
+jobs:
+  season:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply the feast plan to the Google Play listing
+        env:
+          PLAY_LISTING_JSON: ${{ secrets.PLAY_LISTING_JSON }}
+          IN_DATE: ${{ inputs.date }}
+          IN_DRY: ${{ inputs.dry }}
+        run: |
+          if [ -z "$PLAY_LISTING_JSON" ]; then echo "no secret PLAY_LISTING_JSON - skipped" | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          K="$RUNNER_TEMP/listing.json"; printf '%s' "$PLAY_LISTING_JSON" > "$K"
+          A=""
+          if [ -n "$IN_DATE" ]; then A="--date $IN_DATE"; fi
+          if [ "$IN_DRY" = "true" ]; then A="$A --dry"; fi
+          set -o pipefail
+          python3 -I scripts/play_season.py apply "$K" $A 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          rm -f "$K"
