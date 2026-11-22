@@ -197,6 +197,11 @@ a3_walk() {
     local back; back=$(ev "(() => (document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed') + ' ' + location.pathname)()")
     case "$v $back" in *' / '*' closed /monasteries/242') a3 "gallery link $f (A-166)" PASS "viewer $v; closed -> $back";; *) a3 "gallery link $f (A-166)" FAIL "viewer $v; after close $back";; esac
   done
+  # cloud_45 (ring 45062829310: «Перевірка Apple» FAIL x4, its frame = «Головна»): the link router PUSHED the card (pushedByRoute /home) and the
+  # remote hand's `go` is a popstate - Ionic's router reads a POP over a pushed route as BACK (-> /home, never /more/about). The person's way
+  # out first: the card's own arrow (-> /home); every `go` after it is a plain one
+  nav click '[data-testid="back"]'; sleep 3
+  echo "after the gallery links, the card's arrow -> $(node "$NAVJS" url)" >> "$OUT/nav.txt"
   # 0b cloud_40 (A1 g): «Про застосунок» - «Перевірка Apple: …» on a simulator = «not supported by this device» (Apple's own answer), never
   # «the call failed» (= the plugin not in the bridge); «Скопіювати подробиці» shows the text (no key id / install id in it)
   nav go /more/about; sleep 3

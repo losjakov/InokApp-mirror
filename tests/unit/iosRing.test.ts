@@ -25,4 +25,9 @@ describe('iOS ring (A-169)', () => {
     expect(tour.slice(at('a3 "screen $name (A8)" PASS') - 4000, live)).toMatch(/answer_offers/);
     expect(tour.slice(live - 1500, live)).toMatch(/answer_offers/);
   });
+  it('ring 45062829310 (FAIL x4): after the gallery links (a card PUSHED by the link router) the card\'s own arrow first - then `go` is a plain one', () => {
+    // the remote hand's `go` = a popstate (POP); Ionic's router reads a POP over a pushed route as BACK (-> /home, the frame of «Перевірка Apple»)
+    const links = at('a3 "gallery link $f (A-166)" PASS'), apple = at('nav go /more/about; sleep 3');
+    expect(tour.slice(links, apple)).toMatch(/done\n(?:\s+#[^\n]*\n)*\s+nav click '\[data-testid="back"\]'; sleep 3\n/);
+  });
 });
