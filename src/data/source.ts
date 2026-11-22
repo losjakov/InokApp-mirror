@@ -22,6 +22,8 @@ export type DataSource = {
   /** A-144: the pair the release build put INTO the app (`public/bundled/`, scripts/bundle_export.mjs); null = this build carries none */
   bundled(): Promise<{ man: Manifest; dir: Directory } | null>;
   config(): Promise<AppConfig>;
+  /** A-162 (2): the small settings file (contract § «ui-config», PLANNED - 404 until the site's ruling); the raw JSON, checked by uiConfig.ts */
+  uiConfig(): Promise<unknown>;
   liveStatus(): Promise<LiveStatus>;
   /** the feed (no filter), a card's block (R-17: monastery + kind, 5 per page); R-44: `q` / `sort`; `signal` cancels it (A-97) */
   articles(lang: Lang, since?: string | null, f?: ArticleFilter, signal?: AbortSignal): Promise<ArticlesPage>;
@@ -114,6 +116,7 @@ const live: DataSource = {
   },
   bundled: () => bundledPair(''),
   config: () => apiJson<AppConfig>('config'),
+  uiConfig: () => apiJson<unknown>('ui-config'),
   liveStatus: () => apiJson<LiveStatus>('live-status'),
   articles: (lang, since, f, signal) => apiJson<ArticlesPage>(articlesQuery(lang, since, f), signal ? { signal } : undefined),
   article: (id, lang) => apiJson<Article>(`articles/${id}?lang=${lang}`),
@@ -177,6 +180,7 @@ const fixtures: DataSource = {
     rights_url: 'https://inok.info/about/rightsholders/', photo_add_hash: 'skm-cta-photo', // R-56 (contract §3, 17.11.2026)
     ...(globalThis as { __inokConfig?: object }).__inokConfig, // a screen's stand-in for the site's answer (R-41's switch)
   }),
+  uiConfig: () => fx<unknown>('ui-config.json'), // absent in fixtures/ = 404, as the site today (a screen test routes its own)
   liveStatus: () => fx<LiveStatus>('live-status.json'),
   async articles(lang, since, f) {
     if (f?.q || (f?.sort && f.sort !== 'published')) return fixtureQuery(f, since, lang); // R-44 (`articles.json?q=` lets a screen count / refuse them)

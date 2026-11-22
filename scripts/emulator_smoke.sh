@@ -483,8 +483,10 @@ if [ "$WV" -ge "$FLOOR" ]; then
   bash "$ROOT/scripts/emu_widgets.sh" "$OUT" "$API" || true; WIDGETS="$(tail -1 "$OUT/widgets.txt" 2>/dev/null | sed 's/^widgets //' || true)"
   # A-161 (3) (cloud_44): a live tap (the widget's row, the stream push) = «Трансляції» + the stream on top, Back -> «Трансляції» (debug APK installed)
   bash "$ROOT/scripts/emu_livetap.sh" "$OUT" || true; LIVETAP="$(tail -1 "$OUT/livetap.txt" 2>/dev/null | sed 's/^livetap //' || true)"
+  # A-168 (2) (cloud_44): the Play phone frame «02-widgets» - the REAL home screen with the three widgets the launcher placed (API 34 only)
+  WSTORE=n/a; case "$API" in 34-default*) bash "$ROOT/scripts/emu_store_widgets.sh" "$OUT" || true; WSTORE="$(tail -1 "$OUT/store/widgets_store.txt" 2>/dev/null || true)";; esac
   offline_first
-  echo "FULL offline=[$OFFLINE] widgets=[$WIDGETS] livetap=[$LIVETAP] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] filter=[$FILTER] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
+  echo "FULL offline=[$OFFLINE] widgets=[$WIDGETS] livetap=[$LIVETAP] wstore=[$WSTORE] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] filter=[$FILTER] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
 else
   sleep 20
   shot "$OUT/home.png"

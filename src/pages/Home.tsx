@@ -1,7 +1,8 @@
 import { IonContent, IonIcon, IonItem, IonLabel, IonList, IonPage, useIonViewDidEnter, useIonViewWillLeave } from '@ionic/react';
 import { ListBox, ListHeading } from '@/components/ListHeading';
 import { locateOutline, mapOutline, newspaperOutline, refreshOutline, videocamOutline } from 'ionicons/icons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { HomeBlock } from '@/data/uiConfig';
 import { Link, useNavigate } from 'react-router-dom';
 import { MAP_NEAR } from '@/app/nav';
 import { PageHeader } from '@/components/PageHeader';
@@ -44,7 +45,7 @@ const NEAR_RADIUS_KM = 200;
  * (the newest cached articles, stage 4), and the data's freshness. Everything but the live status comes from SQLite (offline).
  */
 export function HomePage() {
-  const { db, t, lang, live, refreshing, lastCheck, config } = useApp();
+  const { db, t, lang, live, refreshing, lastCheck, config, ui } = useApp();
   const navigate = useNavigate();
   useEffect(() => {
     bootLog('home mounted');
@@ -85,6 +86,33 @@ export function HomePage() {
   // A-128: «Нове на сайті» by the date of placing, «Популярне за тиждень» by the week's views - only the orders the server takes (R-44 / R-48)
   const newSort: ArticleSort = config && !config.features.articles_query ? 'published' : 'created';
   const popular = !config || !!config.features.articles_sort_v2;
+  const homeBlock: Record<HomeBlock, ReactNode> = {
+    live: <>
+          {header(online.length ? t('home.live_now_n', { n: online.length }) : t('home.live_now'), '/streams', 'home-live')}
+          {online.length === 0 ? <IonItem lines="none"><IonLabel className="home__quiet">{t('home.live_none')}</IonLabel></IonItem> : online.slice(0, allLive ? undefined : LIVE_N).map(({ channel, live: l }) => (
+            <StreamRow key={channel.id} channel={channel} second={streamTitle(pickLang(l.title, lang))} live place={false} testId={`home-live-${channel.id}`} />
+          ))}
+          {/* D42: the number of the hidden rows on the button; «Головна» is a dashboard — the long list folds back (the card's history is one-way) */}
+          {online.length > LIVE_N && <ListBox><MoreButton label={allLive ? t('common.collapse') : t('common.more_n', { n: online.length - LIVE_N })}
+            onClick={() => setAllLive((v) => !v)} expanded={allLive} testId="home-live-more" /></ListBox>}
+          </>,
+    near: <>
+          {header(t('home.near'), MAP_NEAR, 'home-near')}
+          {near ? (near.length === 0 ? <IonItem lines="none"><IonLabel className="home__quiet">{t('map.nearby_empty', { km: NEAR_RADIUS_KM })}</IonLabel></IonItem>
+            : near.map((r) => <MonasteryRow key={r.code} row={r} onSelect={(c) => navigate(`/monasteries/${c}`)} />)) : (
+            <IonItem button detail={false} onClick={locate} data-testid="home-locate">
+              <IonIcon slot="start" icon={locateOutline} aria-hidden="true" />
+              <IonLabel className="ion-text-wrap">{posError ? t('monasteries.no_location') : t('home.near_invite')}</IonLabel>
+            </IonItem>
+          )}
+          </>,
+    new: <>
+          <ArticleBlock sort={newSort} title={t('home.new')} testId="home-new" />
+          </>,
+    popular: <>
+          {popular && <ArticleBlock sort="views_week" title={t('home.popular')} testId="home-popular" />}
+          </>,
+  };
   return (
     <IonPage>
       <PageHeader title={t('app.name')} end={refresh.button} />
@@ -102,23 +130,8 @@ export function HomePage() {
         <ContinueReading testId="home-continue" />{/* A-141 (3): under the four buttons, only while something is unfinished */}
         <CalendarStrip />
         <IonList className="home__list">
-          {header(online.length ? t('home.live_now_n', { n: online.length }) : t('home.live_now'), '/streams', 'home-live')}
-          {online.length === 0 ? <IonItem lines="none"><IonLabel className="home__quiet">{t('home.live_none')}</IonLabel></IonItem> : online.slice(0, allLive ? undefined : LIVE_N).map(({ channel, live: l }) => (
-            <StreamRow key={channel.id} channel={channel} second={streamTitle(pickLang(l.title, lang))} live place={false} testId={`home-live-${channel.id}`} />
-          ))}
-          {/* D42: the number of the hidden rows on the button; «Головна» is a dashboard — the long list folds back (the card's history is one-way) */}
-          {online.length > LIVE_N && <ListBox><MoreButton label={allLive ? t('common.collapse') : t('common.more_n', { n: online.length - LIVE_N })}
-            onClick={() => setAllLive((v) => !v)} expanded={allLive} testId="home-live-more" /></ListBox>}
-          {header(t('home.near'), MAP_NEAR, 'home-near')}
-          {near ? (near.length === 0 ? <IonItem lines="none"><IonLabel className="home__quiet">{t('map.nearby_empty', { km: NEAR_RADIUS_KM })}</IonLabel></IonItem>
-            : near.map((r) => <MonasteryRow key={r.code} row={r} onSelect={(c) => navigate(`/monasteries/${c}`)} />)) : (
-            <IonItem button detail={false} onClick={locate} data-testid="home-locate">
-              <IonIcon slot="start" icon={locateOutline} aria-hidden="true" />
-              <IonLabel className="ion-text-wrap">{posError ? t('monasteries.no_location') : t('home.near_invite')}</IonLabel>
-            </IonItem>
-          )}
-          <ArticleBlock sort={newSort} title={t('home.new')} testId="home-new" />
-          {popular && <ArticleBlock sort="views_week" title={t('home.popular')} testId="home-popular" />}
+          {/* A-162 (2) (cloud_44): the order of the blocks from the site's ui-config (a permutation of HOME_BLOCKS; the default = this order) */}
+          {ui.home.map((b) => <Fragment key={b}>{homeBlock[b]}</Fragment>)}
         </IonList>
         <SocialLinks />
         <IonList className="home__list home__list--end">

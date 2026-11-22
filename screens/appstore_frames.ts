@@ -18,7 +18,8 @@ const frames = readFileSync(new URL('../scripts/store_frames.txt', import.meta.u
   .filter((l) => /^(phone|tablet)\|0[45]-/.test(l)).map((l) => l.split('|'));
 type Insets = { top: number; right: number; bottom: number; left: number; rootPx: number; w: number; h: number; dpr: number };
 
-for (const [set, device] of [['phone', 'iphone'], ['tablet', 'ipad']] as const) for (const lang of ['uk', 'ru', 'en'] as const) {
+// cloud_44 (A-168 (3)): the 6.3-inch iPhone gets its OWN 04 / 05 at its own measured numbers (never the 6.9-inch frames scaled - 1.0.17 had those)
+for (const [set, device] of [['phone', 'iphone'], ['phone', 'iphone63'], ['tablet', 'ipad']] as const) for (const lang of ['uk', 'ru', 'en'] as const) {
   test(`${device} ${lang}`, async ({ browser }) => {
     test.skip(!INSETS, 'INSETS=<dir> (the simulator run\'s insets-<device>.json)');
     const ins: Insets = JSON.parse(readFileSync(`${INSETS}/insets-${device}.json`, 'utf8'));

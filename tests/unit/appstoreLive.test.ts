@@ -6,7 +6,12 @@ import { readFileSync } from 'node:fs';
 describe('the appstore job\'s live 04 / 05 step', () => {
   const a = readFileSync('.github/actions/ios-sim-run/action.yml', 'utf8');
   const step = a.slice(a.indexOf('App Store 04-eparchy / 05-map'), a.indexOf('- uses: actions/upload-artifact'));
-  it('exists, only for the appstore task, never for the 6.3-inch set', () => expect(step).toMatch(/if: inputs\.task == 'appstore' && inputs\.device != 'iphone63'/));
+  // cloud_44 (A-168 (3)): the 6.3-inch set too - at ITS OWN measured insets (1.0.17 had the 6.9-inch frames scaled); each device greps its own tests
+  it('exists, only for the appstore task, every device incl. the 6.3-inch one, its own tests only', () => {
+    expect(step).toMatch(/if: inputs\.task == 'appstore'\s/);
+    expect(step).not.toMatch(/device != 'iphone63'/);
+    expect(step).toMatch(/--grep "\$D \(uk\|ru\|en\)\$"/);
+  });
   it('never fails the job', () => { expect(step).toMatch(/set \+e/); expect(step.match(/exit (\d)/g)?.every((e) => e === 'exit 0')).toBe(true); });
   // cloud_43 (T14): the live pair = the one the bundle step fetched for this build (the site WITH the public key, sha checked) - no second fetch
   it('takes the bundled live export (one fetch, one source); no curl of its own', () => {

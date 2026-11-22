@@ -29,7 +29,8 @@ describe('social block (A-120 1)', () => {
     expect(com).toMatch(/<SocialLinks \/>\s*<ShareFooter/);
     expect(about).toMatch(/<\/IonList>\s*<SocialLinks \/>\s*<\/IonContent>/);
     expect(readFileSync('src/pages/Contacts.tsx', 'utf8')).toMatch(/\{c && <SocialLinks \/>\}\s*\{c && <ShareFooter/);
-    expect(readFileSync('src/pages/Home.tsx', 'utf8')).toMatch(/testId="home-popular" \/>\}\s*<\/IonList>\s*<SocialLinks \/>\s*<IonList className="home__list home__list--end">\s*<IonItem[^\n]*data-testid="home-fresh"/);
+    // cloud_44 (A-162 (2)): the blocks in the ui-config order, then the list closes, then the social block
+    expect(readFileSync('src/pages/Home.tsx', 'utf8')).toMatch(/\{ui\.home\.map\(\(b\) => <Fragment key=\{b\}>\{homeBlock\[b\]\}<\/Fragment>\)\}\s*<\/IonList>\s*<SocialLinks \/>\s*<IonList className="home__list home__list--end">\s*<IonItem[^\n]*data-testid="home-fresh"/);
     expect(files('src').filter((f) => readFileSync(f, 'utf8').includes('<SocialLinks')).sort()).toEqual([join('src', 'pages', 'About.tsx'), join('src', 'pages', 'Commission.tsx'), join('src', 'pages', 'Contacts.tsx'), join('src', 'pages', 'Home.tsx')]);
   });
   it('the heading in three languages', () => {

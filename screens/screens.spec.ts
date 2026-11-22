@@ -869,6 +869,18 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(await p.getByTestId('live-avatar').first().evaluate((e) => { const c = getComputedStyle(e); return [c.outlineStyle, /\b4px\b/.test(c.boxShadow)].join(); })).toBe('none,true');
       await avatarsLoaded(p);
     } },
+  // A-162 (2) (cloud_44): the site's ui-config orders Home's blocks (values only); a bad file / 404 (the site today) / offline = today's order.
+  // Red before: no ui-config read, one fixed order.
+  ...([['good', { home: ['new', 'live', 'near', 'popular'] }, ['home-new', 'home-live', 'home-near', 'home-popular']],
+    ['bad', '<html>not json', ['home-live', 'home-near', 'home-new', 'home-popular']],
+    ['404', null, ['home-live', 'home-near', 'home-new', 'home-popular']]] as const).map(([tag, body, order]) => ({ name: `home-ui-config-${tag}`, only: ['phone-light'],
+    path: '/home', tall: 2650, before: async (p: Page) => {
+      if (body !== null) await p.route('**/fixtures/ui-config.json', (r) => r.fulfill({ contentType: 'application/json', body: typeof body === 'string' ? body : JSON.stringify(body) }));
+    }, ready: async (p: Page) => {
+      await expect(onShown(p, 'home-new')).toBeVisible({ timeout: 20_000 });
+      await expect.poll(() => p.locator(SHOWN).locator('[data-testid="home-live"], [data-testid="home-near"], [data-testid="home-new"], [data-testid="home-popular"]')
+        .evaluateAll((es) => es.map((e) => e.getAttribute('data-testid'))), { timeout: 15_000 }).toEqual([...order]);
+    } })),
   // A-128 (owner 16.11.2026): the home's two blocks of the site's materials - the SAME four places in a fixed order (2 «Статті», «Відео»,
   // «Новина»), «Нове на сайті» by the date of placing (sort=created), «Популярне за тиждень» by the week's views (sort=views_week); under them
   // the social block (the fourth place of SocialLinks), the «checked / refresh» line LAST. The fixture's orders: created 2869, 2868 | 1892 |

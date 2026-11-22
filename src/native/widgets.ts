@@ -7,6 +7,7 @@ import type { Article, LiveStatus } from '@/data/api/types';
 import type { Reminder } from './reminders';
 import type { Lang, Translate } from '@/i18n';
 import { sortArticles } from '@/data/repo/articleOrder';
+import { UI_DEFAULTS, type UiConfig } from '@/data/uiConfig';
 
 /**
  * T9 (A-153 (2), A-155, A-156 (1); cloud_43): THE data the three home-screen widgets read - written by the app on every refresh (live-status,
@@ -27,12 +28,20 @@ export interface WidgetJson {
   status: Pick<LiveStatus, 'live' | 'scheduled'> | null;
   items: { id: number; kind: string; title: string; published_at: string; created_at: string; site_url: string }[];
   reminders: { channel_id: number; video_id: string; at: string }[];
+  /** A-162 (2): the site's values for the widgets (checked by src/data/uiConfig.ts; absent = the kit's) */
+  ui: { dots: UiConfig['dots']; max_rows: number };
 }
 
 /** The JSON (pure: unit `widgets`). The channel picture = the app's KEPT file name (photoName, the same file the rows show offline). */
 export function widgetJson(o: { t: Translate; lang: Lang; channels: ChannelRow[]; dict: Record<string, string>; status: LiveStatus | null; items: Article[];
-  reminders: Reminder[]; now: number }): WidgetJson {
+  reminders: Reminder[]; now: number; ui?: UiConfig }): WidgetJson {
+  const ui = o.ui ?? UI_DEFAULTS;
   const words = Object.fromEntries(WIDGET_WORDS.map((k) => [k, o.t(`widget.${k}`)])) as WidgetJson['words'];
+  // A-162 (2): the three headers from the site's labels (the count keeps its place in «Зараз в ефірі · {n}»)
+  const label = ui.labels[o.lang] ?? {};
+  if (label.live) words.live_title = `${label.live} · {n}`;
+  if (label.upcoming) words.upcoming_title = label.upcoming;
+  if (label.new) words.new_title = label.new;
   const channels: WidgetJson['channels'] = {};
   for (const c of o.channels)
     channels[String(c.id)] = { name: field(c, 'title', o.lang), place: rowSubtitle(c, o.lang, o.dict), avatar: c.avatar_url ? photoName(`ch${c.id}`, c.avatar_url, c.avatar_sha256) : '' };
@@ -44,6 +53,7 @@ export function widgetJson(o: { t: Translate; lang: Lang; channels: ChannelRow[]
     items: sortArticles(o.items, 'created').slice(0, WIDGET_ITEMS)
       .map((a) => ({ id: a.id, kind: a.kind, title: a.title, published_at: a.published_at, created_at: a.created_at ?? a.published_at, site_url: a.site_url })),
     reminders: o.reminders.map((r) => ({ channel_id: r.channel_id, video_id: r.video_id, at: r.at })),
+    ui: { dots: ui.dots, max_rows: ui.max_rows },
   };
 }
 

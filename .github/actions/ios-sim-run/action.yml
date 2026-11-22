@@ -42,7 +42,7 @@ runs:
         echo "simulator device types: $(grep -c '(com.apple' "$O/devicetypes.txt") - iPhone Duo: $(grep -i 'duo' "$O/devicetypes.txt" | tr '\n' ';' | sed 's/;$//' | grep . || echo NONE)" | tee -a "$GITHUB_STEP_SUMMARY"
         exit 0
     - name: App Store 04-eparchy / 05-map - the browser half on the LIVE export, joined with this run's marks (cloud_42, A-135; never fails the job)
-      if: inputs.task == 'appstore' && inputs.device != 'iphone63'
+      if: inputs.task == 'appstore'   # cloud_44 (A-168 (3)): the 6.3-inch iPhone too, at ITS OWN insets (no 6.9-inch frame scaled)
       shell: bash
       run: |
         set +e   # the frames are evidence for CD, never a gate: every outcome is written, the job's verdict stays the tour's
@@ -55,7 +55,7 @@ runs:
           echo "LIVE export: $(python3 -c 'import json;print(json.load(open("fixtures/manifest.json"))["export_version"])')" | tee -a "$L"
         else echo "LIVE 04/05: SKIPPED - no bundled live export in this job (public/bundled/)" | tee -a "$L" "$GITHUB_STEP_SUMMARY"; exit 0; fi
         npx playwright install chromium > /dev/null 2>&1
-        INSETS="$O/appstore" APPSTORE_RAW="$O/appstore_raw" npx playwright test -c screens/appstore.config.ts --grep "$D" > "$O/appstore_frames.txt" 2>&1
+        INSETS="$O/appstore" APPSTORE_RAW="$O/appstore_raw" npx playwright test -c screens/appstore.config.ts --grep "$D (uk|ru|en)$" > "$O/appstore_frames.txt" 2>&1
         tail -4 "$O/appstore_frames.txt" | tee -a "$L"
         for lang in uk ru en; do for n in 04-eparchy 05-map; do
           raw="$O/appstore_raw/$lang/$D/$n.png"; sim="$O/appstore/$lang/$D/02-home.png"

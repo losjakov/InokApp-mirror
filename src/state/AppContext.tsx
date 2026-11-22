@@ -4,6 +4,7 @@ import { openDb } from '@/data/db';
 import { ensureSchema, getMeta, type FtsMode } from '@/data/db/schema';
 import { countMonasteries, getDictionary, listFavourites, toggleFavourite } from '@/data/repo/monasteries';
 import { listVisited, toggleVisited, visitedCount } from '@/data/repo/visited';
+import { loadUiConfig, UI_DEFAULTS, type UiConfig } from '@/data/uiConfig';
 import { cachedLiveStatus, fetchLiveStatus, importBundled, loadConfig, loadLiveStatus, syncDirectory } from '@/data/sync';
 import { fetchArticles, listArticles } from '@/data/repo/articles';
 import { dueOnReturn, lastCheck as readLastCheck, runRefresh, type RefreshResult } from '@/data/refresh';
@@ -35,6 +36,8 @@ export interface AppState {
   /** the state after the tap and the counter after it (the toast says both) */
   toggleVisited(code: number): Promise<{ on: boolean; n: number; m: number }>;
   config: AppConfig | null;
+  /** A-162 (2): the site's small settings (values only; the defaults until / unless the site answers) */
+  ui: UiConfig;
   live: { status: LiveStatus; stale: boolean } | null;
   liveChannelIds: Set<number>;
   refreshLive(): Promise<void>;
@@ -84,6 +87,7 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
   const [visited, setVisited] = useState<Set<number>>(new Set());
   const [visitedStat, setVisitedStat] = useState<{ n: number; m: number }>({ n: 0, m: 0 });
   const [config, setConfig] = useState<AppConfig | null>(null);
+  const [ui, setUi] = useState<UiConfig>(UI_DEFAULTS);
   const [live, setLive] = useState<{ status: LiveStatus; stale: boolean } | null>(null);
   const [exportVersion, setExportVersion] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -212,7 +216,10 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
           setBoot('ready');
         } else setBoot(r === 'update_app' ? 'update_app' : 'first_run');
       }
-      afterFirstScreen(() => { loadConfig(d).then((c) => !cancelled && setConfig(c)); });
+      afterFirstScreen(() => {
+        loadConfig(d).then((c) => !cancelled && setConfig(c));
+        void loadUiConfig(d).then((u) => !cancelled && setUi(u)); // A-162 (2): never throws - the defaults on any failure
+      });
     })();
     return () => {
       cancelled = true;
@@ -312,10 +319,10 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
     () =>
       db && {
         db, fts, boot, lang, t, settings, setSettings, dict, favourites, toggleFavourite: toggleFav, visited, visitedStat, toggleVisited: toggleVis,
-        config, live, liveChannelIds, refreshLive, articlesVersion, refreshArticles, exportVersion, refreshAll, refreshing, lastCheck,
+        config, ui, live, liveChannelIds, refreshLive, articlesVersion, refreshArticles, exportVersion, refreshAll, refreshing, lastCheck,
         push, pushRegistered, enablePush, pushTap, clearPushTap,
       },
-    [db, fts, boot, lang, t, settings, setSettings, dict, favourites, toggleFav, visited, visitedStat, toggleVis, config, live, liveChannelIds, refreshLive, articlesVersion, refreshArticles, exportVersion, refreshAll, refreshing, lastCheck,
+    [db, fts, boot, lang, t, settings, setSettings, dict, favourites, toggleFav, visited, visitedStat, toggleVis, config, ui, live, liveChannelIds, refreshLive, articlesVersion, refreshArticles, exportVersion, refreshAll, refreshing, lastCheck,
       push, pushRegistered, enablePush, pushTap, clearPushTap],
   );
 
