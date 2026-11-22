@@ -51,13 +51,16 @@ public class NotifierTest {
         public String channelArticles() { return "Нові статті"; }
         public String channelLive() { return "Ефір"; }
         public String text(String json) { return json; }
+        public String lang() { return lang; }
+        String lang = "uk";
     }
 
     FakeTray tray;
     Notifier n;
     long clock = 1000;
 
-    @Before public void setUp() { tray = new FakeTray(); n = new Notifier(tray, new FakeWords()); }
+    FakeWords words;
+    @Before public void setUp() { tray = new FakeTray(); words = new FakeWords(); n = new Notifier(tray, words); }
 
     static Map<String, String> msg(String... kv) {
         Map<String, String> m = new HashMap<>();
@@ -208,5 +211,71 @@ public class NotifierTest {
         assertEquals(2869, Notifier.articleNid("2869"));
         assertEquals(Notifier.articleNid("x-1"), Notifier.articleNid("x-1"));
         assertTrue(Notifier.articleNid("x-1") >= 0);
+    }
+
+    // ---- A-161 (4) + A-162 (1) (cloud_44): the site's ready texts n_title / n_text (InokSite 409, contract §4) in the APP's language
+    static final String N_TITLE = "{\"uk\":\"Києво-Печерська Лавра\",\"ru\":\"Киево-Печерская Лавра\",\"en\":\"Kyiv Pechersk Lavra\"}";
+    static final String N_TEXT = "{\"uk\":\"🔴 Наживо · Літургія\",\"ru\":\"🔴 В эфире · Литургия\",\"en\":\"🔴 Live · Liturgy\"}";
+    Notifier.Note live409(String nTitle, String nText) {
+        Map<String, String> m = msg("type", "stream_live", "channel_id", "3", "video_id", "v1", "title", "OLD");
+        if (nTitle != null) m.put("n_title", nTitle);
+        if (nText != null) m.put("n_text", nText);
+        n.onData(m, false, "x", clock++);
+        return tray.shown.get(FakeTray.key("live_3", Notifier.LIVE_ID));
+    }
+
+    @Test public void the409PayloadShowsTheChannelAndTheLineInEachLanguage() {
+        String[][] want = { { "uk", "Києво-Печерська Лавра", "🔴 Наживо · Літургія" }, { "ru", "Киево-Печерская Лавра", "🔴 В эфире · Литургия" },
+            { "en", "Kyiv Pechersk Lavra", "🔴 Live · Liturgy" } };
+        for (String[] w : want) {
+            words.lang = w[0];
+            Notifier.Note x = live409(N_TITLE, N_TEXT);
+            assertEquals(w[0], w[1], x.title);
+            assertEquals(w[0], w[2], x.text);
+            assertEquals("the tap data unchanged", "v1", x.tap.get("video_id"));
+        }
+    }
+
+    @Test public void anEmptyLanguageFallsBackToUkrainian() {
+        words.lang = "ru";
+        Notifier.Note x = live409("{\"uk\":\"Почаївська Лавра\",\"ru\":\"\",\"en\":\"Pochaiv Lavra\"}", "{\"uk\":\"🔴 Наживо · Акафіст\",\"ru\":\"\"}");
+        assertEquals("Почаївська Лавра", x.title);
+        assertEquals("🔴 Наживо · Акафіст", x.text);
+    }
+
+    @Test public void missingOrBadTextsKeepTheOldWordsNeverABlank() {
+        for (String[] bad : new String[][] { { null, null }, { "", "" }, { "{not json", "[1,2]" }, { "{\"uk\":\"\",\"ru\":\"\"}", "{\"uk\":1}" },
+                { "\"Лавра\"", "{\"uk\":\"a\"" } }) {
+            Notifier.Note x = live409(bad[0], bad[1]);
+            assertEquals("Зараз в ефірі", x.title);
+            assertEquals("OLD", x.text);
+        }
+    }
+
+    @Test public void eachFieldFallsBackOnItsOwn() {
+        Notifier.Note x = live409(N_TITLE, "{broken");
+        assertEquals("Києво-Печерська Лавра", x.title);
+        assertEquals("OLD", x.text);
+    }
+
+    @Test public void anArticlePushIsUnchangedWithoutTheFieldsAndTakesThemWhenSent() {
+        article("7");
+        Notifier.Note a = tray.shown.get(FakeTray.key(Notifier.TAG_ARTICLE, 7));
+        assertEquals("Нове на inok.info", a.title);
+        assertEquals("T7", a.text);
+        n.onData(msg("type", "article", "id", "8", "kind", "news", "title", "T8", "n_title", "{\"uk\":\"Новина\"}", "n_text", "{\"uk\":\"Свято \\\"Покрови\\\" \\u2014 тест\"}"), false, "m8", clock++);
+        Notifier.Note b = tray.shown.get(FakeTray.key(Notifier.TAG_ARTICLE, 8));
+        assertEquals("Новина", b.title);
+        assertEquals("Свято \"Покрови\" \u2014 тест", b.text);
+    }
+
+    @Test public void siteTextParsesOnlyAFlatObjectOfStrings() {
+        assertEquals("a", Notifier.siteText("{ \"uk\" : \"a\" , \"ru\":\"b\" }", "uk"));
+        assertEquals("b", Notifier.siteText("{\"uk\":\"a\",\"ru\":\"b\"}", "ru"));
+        assertEquals("a", Notifier.siteText("{\"uk\":\"a\"}", "en"));
+        assertEquals("x/y\nz", Notifier.siteText("{\"uk\":\"x\\/y\\nz\"}", "uk"));
+        assertNull(Notifier.siteText("{\"uk\":\"a\"} tail", "uk"));
+        assertNull(Notifier.siteText("{\"uk\":null}", "uk"));
+        assertNull(Notifier.siteText("   ", "uk"));
     }
 }

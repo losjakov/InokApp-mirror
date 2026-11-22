@@ -43,4 +43,26 @@ open_link 'https://inok.info/live/' '^/streams$' cold_list_live cold
 # cloud_43 (T4): the site's «Публікації» umbrella (exact path /articles/) -> «Публікації» «Усі»; running AND cold
 open_link 'https://inok.info/articles/?lang=ru' '^/articles$' list_articles_all
 open_link 'https://inok.info/articles/' '^/articles$' cold_list_articles_all cold
+# cloud_44 (A-166): the site's SHORT / legacy / gallery forms. A gallery link = the card, ITS gallery on top (the viewer «1 / N»), the system Back
+# closes the viewer and leaves the card (frames link_<name>_viewer / _back); a plain short link = the card only; a short path that is not a card
+# (in the filter by its digit) -> the browser. Running AND cold.
+NAV="$ROOT/scripts/emu_nav.mjs"
+viewer() { node "$NAV" eval "(() => { const m = document.querySelector('ion-modal.viewer:not(.overlay-hidden)'); if (!m) return 'closed'; const c = m.querySelector('[data-testid=viewer-count]'); return c ? c.textContent.trim() : 'open'; })()" 2>/dev/null || echo none; }
+gallery_link() { # url  code  shot-name  [cold]
+  open_link "$1" "^/monasteries/$2\$" "$3" "${4:-}"
+  local v=closed _; for _ in 1 2 3 4 5 6 7 8 9 10; do v=$(viewer); case "$v" in closed|none) sleep 2;; *) break;; esac; done
+  adb exec-out screencap -p > "$OUT/link_$3_viewer.png"
+  adb shell input keyevent 4; sleep 3
+  local after url; after=$(viewer); url=$(node "$NAV" url 2>/dev/null || echo none)
+  adb exec-out screencap -p > "$OUT/link_$3_back.png"
+  echo "  gallery: viewer=[$v] after Back: viewer=$after url=$url" >> "$L"
+  case "$v" in *' / '*|open) ;; *) RES="FAIL:$1 no gallery over the card";; esac
+  if [ "$after" != closed ] || ! echo "$url" | grep -q "^/monasteries/$2\$"; then RES="FAIL:$1 Back did not leave the card"; fi
+}
+gallery_link 'https://inok.info/ru/242/g' 242 short_gallery_ru
+gallery_link 'https://inok.info/monasteries/242/?lang=ru&gallery=Y' 242 full_gallery_ru
+gallery_link 'https://inok.info/242/G/' 242 cold_short_gallery cold
+for f in '/242' '/uk/242/' '/en/242' '/objects/monasteries/242/'; do open_link "https://inok.info$f" '^/monasteries/242$' "short_$(echo "$f" | tr -c 'a-z0-9' '_')"; done
+open_link 'https://inok.info/ru/242' '^/monasteries/242$' cold_short_ru cold
+open_link 'https://inok.info/242a/' browser short_not_card
 echo "links $RES" | tee -a "$L"

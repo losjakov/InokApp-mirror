@@ -61,7 +61,7 @@ export function MonasteryRow({ row, onSelect, selected, q, noParent, onPage }: {
           <div className="hrow__main">
             <h2 className="mrow__title hrow__title"><Hl text={name} q={q} /></h2>
             {parent && <ParentLine row={row} q={q} />}
-            {parts.eparchy && <p className="mrow__sub"><span className="mrow__eparchy"><Hl text={parts.eparchy} q={q} /></span></p>}
+            {parts.eparchy && <p className="mrow__sub mrow__sub--title"><span className="mrow__eparchy"><Hl text={parts.eparchy} q={q} /></span></p>}
           </div>
         </div>
         {address && <p className="mrow__sub hrow__wide" data-testid="row-address"><Hl text={address} q={q} /></p>}

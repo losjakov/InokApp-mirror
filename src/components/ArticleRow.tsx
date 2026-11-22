@@ -14,8 +14,8 @@ import { useArticleSheet } from './QuickSheet';
 
 
 /** One article row in EVERY list (the feed and its kinds, «Нове на сайті», a card's blocks; D5, A-15): cover · title + subtitle ·
- *  ONE meta line (A-146 / A-147, cloud_43) «[Новина - a news row of a MIXED list only] · DD.MM.YYYY · ★ v (n) · 💬 N», wrapping only between
- *  groups; nothing is cut. `mixed` is set by the LIST (several kinds in it), never guessed by the row.
+ *  ONE meta line (A-146 / A-147, cloud_43; A-164 order, cloud_44) «[Новина - a news row of a MIXED list only] · ★ v (n) · 💬 N · DD.MM.YYYY»
+ *  (the date LAST; an absent group drops with its dot), wrapping only between groups; nothing is cut. `mixed` is set by the LIST (several kinds in it), never guessed by the row.
  *  NO lead line in any row (A-55 withdrew A-54: the lead belongs to the article, not to the list). */
 export function ArticleRow({ a, onSelect, selected, q, mixed }: { a: Article; onSelect: (id: number) => void; selected?: boolean;
   /** A-97: the search - its matches marked in the title and the subtitle (THE monasteries' highlight, `Hl`) */
@@ -39,7 +39,7 @@ export function ArticleRow({ a, onSelect, selected, q, mixed }: { a: Article; on
         {/* A-141 (1): a saved article's ★ before its title in EVERY list (drawn; the reader hears «В обраних») */}
         <h2 className="mrow__title">{saved.has(a.id) && <span className="arow__saved" role="img" aria-label={t('articles.saved_mark')} data-testid={`asaved-${a.id}`}>★ </span>}<Hl text={a.title} q={q} /></h2>
         {a.subtitle && <p className="arow__subtitle"><Hl text={a.subtitle} q={q} /></p>}
-        <MetaLine groups={[mixed && a.kind === 'news' && <span data-testid={`akind-${a.id}`}>{t('kind1.news')}</span>, shortDate(a.published_at), ...badges]} testId={`ameta-${a.id}`} />
+        <MetaLine groups={[mixed && a.kind === 'news' && <span data-testid={`akind-${a.id}`}>{t('kind1.news')}</span>, ...badges, shortDate(a.published_at)]} testId={`ameta-${a.id}`} />
         {/* A-141 (3): a started article - the thin bar + «прочитано N%»; a finished one - «✓ прочитано» */}
         {place?.finished ? <p className="arow__done" data-testid={`aread-${a.id}`}><span aria-hidden="true">✓ </span>{t('reading.done')}</p>
           : place?.started ? <p className="arow__read"><ReadBar pct={place.pct} testId={`apct-${a.id}`} /></p> : null}

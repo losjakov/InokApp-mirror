@@ -12,6 +12,15 @@ type Profile = { viewport: { width: number; height: number }; deviceScaleFactor:
 const profiles = profilesJson as Record<string, Profile>;
 const OUT = new URL('./out/', import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
+/** the system Back as Ionic's hardware back runs it in the app (a browser starts none): `ionBackButton`, ONLY the highest-priority handler
+ *  (an open overlay 100 > the router's 0) - the overlay closes, the page stays */
+const systemBack = (p: Page) => p.evaluate(() => {
+  const hs: [number, (next: () => void) => void][] = [];
+  document.dispatchEvent(new CustomEvent('ionBackButton', { detail: { register: (prio: number, h: (next: () => void) => void) => hs.push([prio, h]) } }));
+  hs.sort((a, b) => b[0] - a[0])[0]?.[1](() => undefined);
+});
+/** cloud_44: a frame of a step INSIDE a screen (its subject, e.g. the viewer over the card) - `<name>__<profile>.png` beside the screen's own */
+const shotPath = (_p: Page, name: string) => `${OUT}${name}__${test.info().titlePath.at(-2)}.png`;
 
 /** Each screen: route + what must be visible before the shot (so a screenshot is evidence, not decoration). */
 /** D34 + D48: the card's action row, one rule for 5 and 6: every label WHOLE on ONE line, ≥ 8 px between two LABELS (the buttons' own
@@ -164,7 +173,9 @@ const scopeFitOnce = async (p: Page) => {
   await p.waitForFunction(() => new Promise<boolean>((res) => {
     const map = (window as any).__inokMap;
     const n = () => map.queryRenderedFeatures({ layers: ['points', 'lavras', 'clusters'] }).length;
-    const ok = () => !map.isMoving() && map.isSourceLoaded('monasteries') && map.isSourceLoaded('lavras');
+    // NOTE 3 (REVIEW cloud_43, run 44949331133 «reading 'layers'»): the read came while the NETWORK style replaced the local one - getStyle()
+    // is undefined between the two styles; the wait now also needs a loaded style (and the read below retries a swap like a re-placement)
+    const ok = () => !map.isMoving() && !!map.getStyle()?.layers && map.isStyleLoaded() && map.isSourceLoaded('monasteries') && map.isSourceLoaded('lavras');
     if (!ok()) { res(false); return; }
     const a = n(); requestAnimationFrame(() => requestAnimationFrame(() => res(ok() && a > 0 && n() === a)));
   }), null, { timeout: 20_000 });
@@ -174,10 +185,12 @@ const scopeFitOnce = async (p: Page) => {
     const zoom = document.querySelector('.maplibregl-ctrl-top-right')!.getBoundingClientRect();
     const feats = map.queryRenderedFeatures({ layers: ['points', 'lavras', 'clusters'] });
     const xs = feats.map((f: any) => map.project(f.geometry.coordinates).x); const ys = feats.map((f: any) => map.project(f.geometry.coordinates).y);
-    const order = map.getStyle().layers.map((l: any) => l.id);
+    const style = map.getStyle(); if (!style?.layers) return null; // a style swap at the read
+    const order = style.layers.map((l: any) => l.id);
     return { n: feats.length, spanX: Math.max(...xs) - Math.min(...xs), spanY: Math.max(...ys) - Math.min(...ys), w: c.width, h: c.height,
       chipBottom: chip.bottom - c.top, zoomLeft: zoom.left - c.left, zoomBottom: zoom.bottom - c.top, z: map.getZoom(), countAbove: order.indexOf('cluster-count') > order.indexOf('lavras') };
   });
+  if (!v) throw new Error('no marks drawn at the read (a style swap)');
   const d = await drawnMarks(p, '__inokMap'); // D53: the DRAWN marks, the same measure as the mini-maps
   const m = { ...v, l: d.l, r: d.r, t: d.t, b: d.b };
   if (m.n === 0 || d.n === 0) throw new Error('no marks drawn at the read (re-placement)');
@@ -842,6 +855,9 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p.getByTestId('tile-streams')).toBeVisible(); await expect(p.getByTestId('live-avatar').first()).toBeVisible({ timeout: 15_000 }); await expect(p.getByTestId('tab-live')).toBeVisible();
       await expect(p.getByTestId('home-live-1686')).toBeVisible(); // «Зараз в ефірі» from live-status
       await expect(p.getByTestId('mrow-37')).toContainText('км'); // «Поруч» (geolocation granted → Kyiv)
+      // A-165 (cloud_44): «0,2 км від вас» in the TITLE's colour, weight 500 (red before: the link colour)
+      expect(await p.getByTestId('mrow-37').evaluate((row) => { const x = getComputedStyle(row.querySelector('.mrow__dist')!);
+        return { same: x.color === getComputedStyle(row.querySelector('.mrow__title')!).color, w: x.fontWeight }; }), 'the distance = the title colour').toEqual({ same: true, w: '500' });
       await expect(p.getByTestId('home-checked')).toHaveText(/^(Перевірено сьогодні о|Проверено сегодня в|Checked today at) \d\d:\d\d$/, { timeout: 15_000 }); // A-52
       // A-128: «Нове на сайті» + «Популярне за тиждень», four rows each: 2 «Статті», «Відео», «Новина» (the blocks' own screen: home-blocks)
       await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8);
@@ -1358,6 +1374,38 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(gallery(p).list, 'the list held for this launch').toHaveLength(1);
       await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
     } },
+  // A-166 (cloud_44): a GALLERY link (the running app AND a cold start) = the card, its gallery ON TOP at the first photo - THE viewer of its
+  // «Фотогалерея» button (one modal, one list request); the system Back closes the viewer and leaves the card; the same entry never reopens it.
+  // A plain short link = the card only. Red before: the short forms opened the browser, `gallery=Y` was dropped.
+  ...(['warm', 'cold'] as const).map((how) => ({ name: `link-gallery-${how}`, only: how === 'warm' ? [...UK, 'phone-ru'] : UK,
+    path: how === 'warm' ? '/home' : '/', before: async (p: Page) => { await countGallery(p); if (how === 'cold') await launchBy('https://inok.info/ru/242/g', 300)(p); },
+    ready: async (p: Page) => {
+      if (how === 'warm') {
+        await expect(onShown(p, 'home-new')).toBeVisible({ timeout: 20_000 });
+        await expect.poll(() => p.evaluate(() => !!localStorage.getItem('inok.config')), { timeout: 15_000 }).toBe(true).catch(() => undefined);
+        await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/monasteries/242/?lang=ru&gallery=Y' })));
+      }
+      await expect(p).toHaveURL(/\/monasteries\/242$/, { timeout: 30_000 });
+      await expect(p.getByTestId('viewer-count')).toContainText('1 / 40', { timeout: 20_000 });
+      await expect(p.locator('ion-modal.viewer')).toHaveCount(1); // never a second viewer
+      expect(gallery(p).list, 'the list asked once').toHaveLength(1);
+      await expect(p.getByTestId('viewer-img')).toHaveAttribute('src', /\/monasteries\/242\/00\.jpg$/);
+      await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
+      await p.screenshot({ path: shotPath(p, `link-gallery-${how}-viewer`) });
+      await systemBack(p);
+      await viewerGone(p);
+      await expect(p).toHaveURL(/\/monasteries\/242$/);
+      await expect(onShown(p, 'card')).toBeVisible();
+      await p.waitForTimeout(600);
+      await expect(p.locator('ion-modal.viewer:not(.overlay-hidden)'), 'the same entry opens nothing again').toHaveCount(0);
+      if (how === 'warm') { // a SHORT card link: the card only
+        await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'https://inok.info/en/275' })));
+        await expect(p).toHaveURL(/\/monasteries\/275$/, { timeout: 15_000 });
+        await expect(onShown(p, 'card')).toBeVisible();
+        await p.waitForTimeout(800);
+        await expect(p.locator('ion-modal.viewer:not(.overlay-hidden)')).toHaveCount(0);
+      }
+    } })),
   // A-109: a card with ONE photo (275, the live answer): the viewer shows it with no counter and no arrows (nothing to page)
   { name: 'card-gallery-one', only: ['phone-light'], path: '/monasteries/275', before: countGallery, ready: async (p) => {
       const card = onShown(p, 'card');
@@ -3147,12 +3195,19 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(Math.abs(body - line), 'the verse ends at the right edge').toBeLessThan(4);
       await right.first().scrollIntoViewIfNeeded();
     } },
-  // A-146 / A-147 (cloud_43; A-53's line 2 withdrawn): ONE meta line «[Новина - a news row of a MIXED list] · DD.MM.YYYY · ★ v (n) · 💬 N»;
-  // a one-kind tab names no kind; «Усі» names only news; the date is the Kyiv day in digits. Red before: «Стаття · 29 жовтня 2026 р.» + line 2.
+  // A-146 / A-147 (cloud_43; A-53's line 2 withdrawn) + A-164 (cloud_44): ONE meta line «[Новина - a news row of a MIXED list] · ★ v (n) · 💬 N ·
+  // DD.MM.YYYY» (the date LAST); a one-kind tab names no kind; «Усі» names only news; the date is the Kyiv day in digits; the reader hears the
+  // same order. Red before A-164: «29.10.2026 · ★ 5 (7) · 💬 4».
   { name: 'article-rows', only: [...UK, 'phone-ru'], path: '/articles', ready: async (p) => {
       const row = (id: number) => onShown(p, `arow-${id}`);
       await expect(onShown(p, 'kind-tab-publication')).toHaveClass(/segment-button-checked/);
-      await expect(row(2869).getByTestId('ameta-2869')).toHaveText('29.10.2026 · ★ 5 (7) · 💬 4'); // 2026-10-28T22:00Z = 29.10 in Kyiv
+      await expect(row(2869).getByTestId('ameta-2869')).toHaveText('★ 5 (7) · 💬 4 · 29.10.2026'); // 2026-10-28T22:00Z = 29.10 in Kyiv
+      // A-164 (2): the reader's order = the visual order (★'s and 💬's Spoken names first, the date as digits last)
+      const spoken = await row(2869).getByTestId('ameta-2869').evaluate((e) => Array.from(e.querySelectorAll('.meta__g')).map((g) =>
+        (g.querySelector('[aria-label]')?.getAttribute('aria-label') ?? g.textContent ?? '').trim()));
+      expect(spoken.length).toBe(3);
+      expect(spoken[2], 'the date is read last').toBe('29.10.2026');
+      expect(spoken[0], 'the rating is read first').not.toMatch(/\d\d\.\d\d\.\d{4}/);
       await starColours(p, 'ion-tabs .ion-page:not(.ion-page-hidden) [data-testid="ameta-2869"] .star-mark', 1); // A-78 3: the row's «★» = the stars' token
       await expect(row(2869).locator('.arow__badges')).toHaveCount(0);
       const lines = async (id: number) => row(id).getByTestId(`ameta-${id}`).evaluate((e) => { const r = document.createRange(); r.selectNodeContents(e);
@@ -3430,11 +3485,25 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(onShown(p, 'about-update-note')).toHaveText(/Встановлено не з Google Play|Установлено не из Google Play|Not installed from Google Play/);
       expect(await asked(p)).toEqual([]); // nothing opened
     } },
+  // A-167 (cloud_44): «Історія версій ›» right UNDER «Версія застосунку» - a button row (TalkBack / VoiceOver: a button with its label), a tap opens
+  // https://inok.info/app/versions/ in the app's language (THE openLink: uk bare, ru / en ?lang=) x3. Red before: no row.
+  ...(['uk', 'ru', 'en'] as const).map((lang) => ({ name: `about-versions${lang === 'uk' ? '' : `-${lang}`}`, only: lang === 'uk' ? UK : ['phone-light'],
+    path: '/more/about', before: async (p: Page) => { await recordOpens(p); if (lang !== 'uk') await p.addInitScript((l) => localStorage.setItem('CapacitorStorage.settings', JSON.stringify({ lang: l })), lang); },
+    ready: async (p: Page) => {
+      const row = onShown(p, 'about-versions');
+      await expect(row).toHaveText({ uk: 'Історія версій', ru: 'История версий', en: 'Version history' }[lang]);
+      const order = await p.locator(SHOWN).locator('ion-list > ion-item').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')));
+      expect(order[order.indexOf('version-line') + 1], 'right after the version line').toBe('about-versions');
+      expect(await row.evaluate((e) => (e.shadowRoot?.querySelector('button') ? 'button' : 'none')), 'a button for the reader').toBe('button');
+      expect(await row.evaluate((e) => e.getBoundingClientRect().height), '48 dp').toBeGreaterThanOrEqual(48);
+      await row.click();
+      await expect.poll(() => p.evaluate(() => (window as any).__opened)).toEqual([`https://inok.info/app/versions/${lang === 'uk' ? '' : `?lang=${lang}`}`]);
+    } })),
   // A-80 1: the three rows under the version (the switch on): icons + words; share = one line + the Play URL; rate = the Play app
   { name: 'about-store', path: '/more/about', before: withPlay({ updateAvailability: 1, currentVersionName: '1.0.4' }, STORE_ON), ready: async (p) => {
       await expect(onShown(p, 'about-share')).toBeVisible(); // the rows come with the site's config (after the first screen)
       const ids = await p.locator('[data-testid="app-version"]').locator('xpath=ancestor::ion-list[1]').locator('ion-item').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')));
-      expect(ids.slice(ids.indexOf('version-line'), ids.indexOf('version-line') + 4)).toEqual(['version-line', 'about-share', 'about-rate', 'about-update']);
+      expect(ids.slice(ids.indexOf('version-line'), ids.indexOf('version-line') + 5)).toEqual(['version-line', 'about-versions', 'about-share', 'about-rate', 'about-update']); // A-167: the history under the version
       for (const id of ['about-share', 'about-rate', 'about-update']) await expect(onShown(p, id).locator('ion-icon[slot="start"]')).toBeVisible();
       await p.evaluate(() => { (navigator as unknown as { share: (o: object) => Promise<void> }).share = async (o) => { (window as unknown as { __asked: string[] }).__asked.push(`share ${JSON.stringify(o)}`); }; });
       await onShown(p, 'about-share').click();
@@ -3938,9 +4007,15 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await sheet.getByTestId('qs-fav').click();
       await expect(p.locator('ion-toast[data-testid="fav-toast"]:not(.overlay-hidden)').first()).toContainText(added);
       expect(await p.evaluate(() => (window as any).__toastOverSheet), 'a toast over the open sheet').toBe(false);
+      // NOTE 2 (REVIEW cloud_43, cloud_44): the toast's OWN frame after the sheet closed; the screen's frame = the sheet open, no toast
+      await expect(p.locator('ion-action-sheet:not(.overlay-hidden)')).toHaveCount(0);
+      await p.screenshot({ path: shotPath(p, 'sheet-monastery-toast') });
+      await expect(p.locator('ion-toast:not(.overlay-hidden)')).toHaveCount(0, { timeout: 8_000 });
       await longPress(p, onShown(p, 'mrow-37'));
       const again = p.locator('ion-action-sheet[data-testid="quick-sheet-m"]:not(.overlay-hidden)');
       await expect(again.getByTestId('qs-fav')).toContainText((await words(p, ['sheet.fav_remove']))[0]);
+      await p.waitForTimeout(600);
+      await expect(p.locator('ion-toast:not(.overlay-hidden)'), 'no toast in the sheet frame').toHaveCount(0);
     } })),
   { name: 'sheet-article', only: [...UK, 'phone-ru'], path: '/articles', ready: async (p) => {
       await toAll(p);
@@ -4120,6 +4195,14 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.getByTestId('search-open').click();
       await p.getByTestId('articles-search').locator('input').fill('Лавра');
       await expect(onShown(p, 'continue'), 'a typed search: no card').toHaveCount(0, { timeout: 5_000 });
+      // NOTE 2 (REVIEW cloud_43, cloud_44): the frame ENDS on its subject - the search text cleared, the list in the last order (rating) with
+      // the card back above it, in view
+      await p.getByTestId('articles-search').locator('input').fill('');
+      await expect(onShown(p, 'continue'), 'the search cleared: the card is back').toBeVisible({ timeout: 5_000 });
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', 'rating');
+      await onShown(p, 'continue').scrollIntoViewIfNeeded();
+      await p.waitForTimeout(400);
+      expect(await onShown(p, 'continue').evaluate((e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }), 'the card in the frame').toBe(true);
     } },
   // NOTE 4 (A-154 (3), cloud_43): the resume pill «↺ Продовжено · З початку» on ONE line at 360 / 390 px, never over the cover's full-screen
   // sign; the reader hears the full old sentence. Red before: «… з місця зупинки ·» / «З початку» on two lines at 360 px.
@@ -4215,6 +4298,22 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(unit?.parentAria, '«↳» is drawn, not read').toBe('↳ ');
       expect(r.filter((x) => x.code === 'mrow-98').every((x) => x.parent === null), 'a parent has no line').toBe(true);
     } })),
+  // A-165 (cloud_44): in a house ROW the eparchy, the non-link «↳ <parent>» and «0,2 км від вас» wear the TITLE's colour (light ~black, dark
+  // ~white), weights unchanged; the CARD's eparchy and its parent button stay the link colour («blue = it can be tapped»). Red before: primary.
+  { name: 'house-row-colours', only: [...UK, 'phone-ru'], path: '/monasteries', ready: async (p) => {
+      await expect(p.getByTestId('list')).toBeVisible();
+      await p.getByTestId('search').locator('input').fill('лавр');
+      await expect(p.getByTestId('mrow-110').getByTestId('row-parent')).toBeVisible({ timeout: 20_000 });
+      const c = (sel: string) => p.locator(SHOWN).locator(sel).first().evaluate((e) => getComputedStyle(e).color);
+      const title = await c('[data-testid="mrow-110"] .mrow__title');
+      expect(await c('[data-testid="mrow-110"] [data-testid="row-parent"]'), '«↳ parent» = the title colour').toBe(title);
+      expect(await c('[data-testid="mrow-242"] .mrow__eparchy'), 'the eparchy = the title colour').toBe(title);
+      expect(await c('[data-testid="mrow-242"] .mrow__title')).toBe(title);
+      const primary = await p.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--ion-color-primary)'; document.body.appendChild(d);
+        const v = getComputedStyle(d).color; d.remove(); return v; });
+      expect(primary, 'the title colour is not the link colour').not.toBe(title);
+      await onShown(p, 'mrow-110').scrollIntoViewIfNeeded();
+    } },
   // A-140 (2): the card head - «↳ <parent> ›» right under the h1 (48 dp), a tap -> the parent's card; the parent's units list without «↳»
   { name: 'card-parent-head', only: [...UK, 'phone-ru'], path: '/monasteries/110', ready: async (p) => {
       const link = onShown(p, 'parent-link');
@@ -4226,6 +4325,11 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(g.gap, 'right under the name').toBeLessThanOrEqual(6);
       expect(g.h, '48 dp target').toBeGreaterThanOrEqual(47);
       await expect(link).toContainText(/(Лавр|Lavra)/);
+      // A-165 (2): the card's parent button and eparchy stay the LINK colour («blue = it can be tapped»), unlike the rows
+      const linkC = await p.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--ion-color-primary)'; document.body.appendChild(d);
+        const v = getComputedStyle(d).color; d.remove(); return v; });
+      expect(await link.evaluate((e) => getComputedStyle(e).color), 'the parent button = the link colour').toBe(linkC);
+      expect(await p.locator(SHOWN).locator('.card__eparchy').first().evaluate((e) => getComputedStyle(e).color), 'the card eparchy = the link colour').toBe(linkC);
       if (p.viewportSize()!.width < 600) {
         await link.click();
         await expect(p).toHaveURL(/\/monasteries\/98$/);

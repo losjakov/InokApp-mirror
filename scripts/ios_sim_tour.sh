@@ -108,7 +108,12 @@ launch() { # (re)start the app with its console captured; wait for a NEW «home 
   local n0; n0=$(grep -c 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null || true); n0=${n0:-0}
   xcrun simctl terminate "$U" "$BUNDLE" > /dev/null 2>&1 || true
   xcrun simctl launch --console-pty --terminate-running-process "$U" "$BUNDLE" -AppleLanguages '(uk)' -AppleLocale uk_UA >> "$OUT/${TAG}_console.txt" 2>&1 &
-  local _; for _ in $(seq 1 90); do [ "$(grep -c 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null || echo 0)" -gt "$n0" ] && break; sleep 2; done
+  # cloud_44 (REVIEW cloud_43 backlog): `grep -c … || echo 0` printed «0» TWICE (grep prints 0 and exits 1) -> «[: 0\n0: integer expression
+  # expected»; the same form as n0 above. The OLDEST runtime's FIRST launch (iOS 16.4 iPad «start» timed out twice on 22.11: a cold simulator
+  # compiles the WebKit caches) waits up to 300 s, every other launch 180 s; the time it took is written down (measured, not guessed)
+  local tries=90 t0=$SECONDS n _; if [ "$WHICH" = oldest ] && [ "${FIRST_LAUNCH_DONE:-}" != "$TAG" ]; then tries=150; fi; FIRST_LAUNCH_DONE="$TAG"
+  for _ in $(seq 1 "$tries"); do n=$(grep -c 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null || true); [ "${n:-0}" -gt "$n0" ] && break; sleep 2; done
+  echo "launch $TAG: home painted after $((SECONDS - t0)) s (limit $((tries * 2)) s)" >> "$OUT/nav.txt"
   for _ in $(seq 1 30); do [ "$(curl -s localhost:8765/health | python3 -I -c 'import json,sys; a=json.load(sys.stdin)["ago"]; print(1 if a is not None and a < 20000 else 0)')" = 1 ] && return 0; sleep 2; done
   echo "the remote hand never asked the relay ($TAG)" | tee -a "$OUT/nav.txt"; return 1
 }

@@ -53,3 +53,31 @@ describe('html-lite link router', () => {
     expect(out).not.toContain('javascript');
   });
 });
+
+/** A-166 (cloud_44): EVERY short / full / legacy form of the site's card and gallery links -> the card (+ its gallery on top). Red before: the
+ *  short forms were null (the browser), `gallery=Y` was dropped. */
+describe('A-166 gallery and short card links', () => {
+  const hosts = ['https://inok.info', 'http://inok.info', 'https://www.inok.info'];
+  const card = (gallery: boolean) => ({ kind: 'card', code: 140, gallery });
+  it('the short forms x3 languages, with / without the slash -> the card; `/g` -> its gallery (any case)', () => {
+    for (const h of hosts) for (const l of ['', '/uk', '/ru', '/en']) for (const sl of ['', '/']) {
+      expect(linkTarget(`${h}${l}/140${sl}`), `${h}${l}/140${sl}`).toEqual(card(false));
+      expect(linkTarget(`${h}${l}/140/g${sl}`), `${h}${l}/140/g${sl}`).toEqual(card(true));
+      expect(linkTarget(`${h}${l}/140/G${sl}`), `${h}${l}/140/G${sl}`).toEqual(card(true));
+    }
+  });
+  it('the full and the legacy forms; `gallery=Y` among any parameters, any order, any case', () => {
+    for (const f of ['/monasteries/140/', '/monasteries/140', '/ru/monasteries/140/', '/objects/monasteries/140/', '/objects/monasteries/140'])
+      expect(linkTarget(`https://inok.info${f}`), f).toEqual(card(false));
+    for (const q of ['?gallery=Y', '?lang=ru&gallery=Y', '?gallery=Y&lang=en', '?GALLERY=y', '?gallery=y&utm_source=tg', '?a=1&lang=uk&gallery=Y#photo'])
+      for (const f of ['/monasteries/140/', '/140/', '/ru/140', '/objects/monasteries/140/'])
+        expect(linkTarget(`https://inok.info${f}${q}`), f + q).toEqual(card(true));
+    for (const q of ['?gallery=N', '?gallery=', '?lang=ru', '?gal=Y']) expect(linkTarget(`https://inok.info/monasteries/140/${q}`), q).toEqual(card(false));
+  });
+  it('a non-numeric id, another prefix or a deeper path is NOT a card (the browser, as today)', () => {
+    for (const f of ['/140a/', '/a140/', '/14.0/', '/de/140/', '/ru/140/x/', '/140/g/x', '/140/gallery/', '/140/gg', '/objects/monasteries/140/photos/', '/objects/140/',
+      '/ru/map/', '/app/', '/app/versions/', '/ru/', '/uk', '/-140/'])
+      expect(linkTarget(`https://inok.info${f}`), f).toBeNull();
+    expect(linkTarget('https://example.com/140/g')).toBeNull();
+  });
+});

@@ -39,7 +39,8 @@ describe('linkRoute (StartRoute + useAppLinks + the article text)', () => {
     let n = 0;
     const a = await linkRoute(db, 'https://inok.info/monasteries/', () => ++n);
     const b = await linkRoute(db, 'https://inok.info/monasteries/', () => ++n);
-    expect(a?.entry?.reset).not.toBe(b?.entry?.reset);
+    const reset = (r: typeof a) => (r?.entry && 'reset' in r.entry ? r.entry.reset : null);
+    expect(reset(a)).not.toBe(reset(b));
   });
   it('unchanged: a card, an article, a quick action carry no reset; another page -> null (the browser)', async () => {
     expect(await linkRoute(db, 'https://inok.info/monasteries/242/?lang=ru', now)).toEqual({ to: '/monasteries/242' });
@@ -47,5 +48,12 @@ describe('linkRoute (StartRoute + useAppLinks + the article text)', () => {
     expect(await linkRoute(db, 'inokapp://tab/map', now)).toEqual({ to: '/map' });
     expect(await linkRoute(db, 'https://inok.info/monasteries/table/', now)).toBeNull();
     expect(await linkRoute(db, 'https://inok.info/live/12/', now)).toBeNull();
+  });
+  it('A-166 (cloud_44): a gallery link -> the card with a gallery mark (once per link); a short card link -> the card; a house not in the DB -> the browser', async () => {
+    for (const h of ['https://inok.info/242/g', 'https://inok.info/ru/242/g/', 'https://inok.info/monasteries/242/?lang=ru&gallery=Y', 'https://inok.info/objects/monasteries/242/?gallery=y'])
+      expect(await linkRoute(db, h, now), h).toEqual({ to: '/monasteries/242', entry: { gallery: 1234 } });
+    for (const h of ['https://inok.info/242', 'https://inok.info/en/242/', 'https://inok.info/objects/monasteries/242/'])
+      expect(await linkRoute(db, h, now), h).toEqual({ to: '/monasteries/242' });
+    expect(await linkRoute(db, 'https://inok.info/999999/g', now)).toBeNull();
   });
 });

@@ -210,7 +210,7 @@ notify_proof() {
 # the app's data cleared, airplane mode on, launch -> export_version stored + every house of the bundled manifest in the DB; then the network back
 offline_first() {
   OFFLINE=n/a
-  local want got ev _
+  local want got ev _ LISTED
   want=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['counts']['monasteries'])" "$ROOT/dist/bundled/manifest.json" 2>/dev/null || echo 0)
   [ "$want" -gt 0 ] || { OFFLINE="FAIL no dist/bundled/manifest.json"; echo "::error::API $API: A-144 the build carries no bundled export"; echo "FAIL offline-first no-bundle" > "$OUT/result.txt"; exit 1; }
   adb shell am force-stop $PKG; adb shell pm clear $PKG > /dev/null
@@ -226,8 +226,13 @@ offline_first() {
     fi
   done
   shot "$OUT/offline_first.png"
+  # NOTE 2 (REVIEW cloud_43, cloud_44): the frame of its SUBJECT - «Монастирі» with every house, still in airplane mode (the count read back)
+  node "$ROOT/scripts/emu_nav.mjs" go /monasteries >> "$OUT/nav.txt" 2>&1 || true
+  node "$ROOT/scripts/emu_nav.mjs" wait '[data-testid="count"]' >> "$OUT/nav.txt" 2>&1 || true; sleep 3
+  LISTED=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=count]') || {}).textContent || 'none'")
+  shot "$OUT/offline_first_list.png"
   adb shell cmd connectivity airplane-mode disable 2>/dev/null || { adb shell settings put global airplane_mode_on 0; adb shell am broadcast -a android.intent.action.AIRPLANE_MODE > /dev/null 2>&1 || true; }
-  OFFLINE="houses=$got/$want export=$ev"
+  OFFLINE="houses=$got/$want export=$ev list=[$LISTED]"
   echo "offline first launch: $OFFLINE" | tee "$OUT/offline_first.txt"
   [ "${got:-0}" -ge "$want" ] || { echo "::error::API $API: A-144 the first launch without a network has $got of $want houses"; echo "FAIL offline-first $OFFLINE" > "$OUT/result.txt"; exit 1; }
 }
@@ -469,13 +474,15 @@ if [ "$WV" -ge "$FLOOR" ]; then
   BACK=folded
   # A-76 App Links (API 31+: `pm set-app-links`): an article / card link opens that screen in the app, another path leaves the router (scripts/emu_links.sh)
   LINKS=n/a; case "$API" in 26*) ;; *) bash "$ROOT/scripts/emu_links.sh" "$OUT" || true; LINKS="$(tail -1 "$OUT/links.txt" 2>/dev/null | sed 's/^links //' || true)";; esac
+  # A-166 (cloud_44): which short / gallery links the filters let in on this Android (the package manager's answer)
+  bash "$ROOT/scripts/emu_filter.sh" "$OUT" "$API" || true; FILTER="$(tail -1 "$OUT/filter.txt" 2>/dev/null | sed 's/^filter //' || true)"
   # cloud_13 item 3: the Play screenshots from the live export, once, on the required image (scripts/emu_store.sh)
   STORE=n/a; case "$API" in 34-default*) bash "$ROOT/scripts/emu_store.sh" "$OUT" || true; STORE="$(grep -E '^store screenshots: [A-Z]+|^(missing|maps|pictures|anything|gallery|«Публікації»|language|unit words|status bar|colours|lavras|article top|on air)|^launcher label|STOPPED' "$OUT/store/sizes.txt" 2>/dev/null | sed 's/ (rules:.*//' | tr '\n' ';' || true)";; esac
   native_paths; quick_actions; edge_shots; a11y_dumps; r8_scan; notify_proof
   # T9 (cloud_43): the widgets' review snapshots + the push path (debug APK installed by notify_proof; informational - the verdict in widgets.txt)
   bash "$ROOT/scripts/emu_widgets.sh" "$OUT" || true; WIDGETS="$(tail -1 "$OUT/widgets.txt" 2>/dev/null | sed 's/^widgets //' || true)"
   offline_first
-  echo "FULL offline=[$OFFLINE] widgets=[$WIDGETS] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
+  echo "FULL offline=[$OFFLINE] widgets=[$WIDGETS] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] filter=[$FILTER] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
 else
   sleep 20
   shot "$OUT/home.png"
@@ -484,6 +491,8 @@ else
   # a blank WebView gives ≈0.02 (status bar only); the error page with its text and button gives > 0.05
   awk "BEGIN{exit !($INK > 0.05)}" || { echo "::error::API $API: WebView $WV < $FLOOR and the screen is blank (error.html not shown)"; echo "FAIL blank webview=$WV ink=$INK" > "$OUT/result.txt"; exit 1; }
   edge_shots; r8_scan; notify_proof
+  # A-166 (cloud_44): the short links reach the app on Android 8 too (the .ShortLinks alias) - the package manager's answer, no JavaScript
+  bash "$ROOT/scripts/emu_filter.sh" "$OUT" "$API" || true; FILTER="$(tail -1 "$OUT/filter.txt" 2>/dev/null | sed 's/^filter //' || true)"
   INSETS=$(grep -a "InokInsets" "$OUT/logcat_full.txt" | tail -1 | sed 's/.*nav overlap css px //' || true)
-  echo "WEBVIEW insets=[$INSETS] webview=$WV ink=$INK (error.html shown; web layer not testable on this image) r8=[$R8] e2e=[$E2E] notify=[$NOTIFY]" | tee "$OUT/result.txt"
+  echo "WEBVIEW insets=[$INSETS] webview=$WV ink=$INK (error.html shown; web layer not testable on this image) filter=[$FILTER] r8=[$R8] e2e=[$E2E] notify=[$NOTIFY]" | tee "$OUT/result.txt"
 fi

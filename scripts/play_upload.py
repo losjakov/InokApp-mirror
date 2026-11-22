@@ -97,6 +97,9 @@ def upload(sa_path: str, aab: str, package_json: str, notes_dir: str, pkg: str) 
 
 
 if __name__ == '__main__':
+    # REVIEW cloud_43 NOTE 4 (cloud_44): a Windows console (cp1251) cannot print «→» / «“» of the notes - the print, not the read, failed;
+    # the output is UTF-8 whatever the console (the parse reads UTF-8 already)
+    sys.stdout.reconfigure(encoding='utf-8')
     a = sys.argv[1:]
     if a[:1] == ['body'] and len(a) == 3: print(json.dumps(body(a[1], a[2]), ensure_ascii=False, indent=1))
     elif a[:1] == ['texts'] and len(a) == 3: print(json.dumps(texts(a[2], version_of(a[1])[0]), ensure_ascii=False, indent=1))

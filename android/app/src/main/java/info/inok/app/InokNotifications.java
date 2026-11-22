@@ -51,6 +51,7 @@ final class InokNotifications {
         public String channelArticles() { return c.getString(R.string.push_channel_articles); }
         public String channelLive() { return c.getString(R.string.push_channel_live); }
         public String text(String json) { return InokMessagingService.pickTitle(json, lang); }
+        public String lang() { return lang; }
     }
 
     static final class AndroidTray implements Notifier.Tray {

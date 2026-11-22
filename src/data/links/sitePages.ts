@@ -18,6 +18,9 @@ export const SITE_PAGES = {
 } as const;
 export type SharedRoute = keyof typeof SITE_PAGES;
 
+/** A-167 (cloud_44): the app's version history on the site («Про застосунок» -> «Історія версій»; openLink adds the language) */
+export const VERSIONS_URL = `${SITE_URL}app/versions/`;
+
 /** the articles' kind tabs = the site's sections (R-19; the same paths the feed's `site_url` carries) */
 export const ARTICLE_SECTIONS: Record<ArticleKind, string> = {
   publication: 'articles/publications/',

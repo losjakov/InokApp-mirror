@@ -51,9 +51,85 @@
                 <data android:pathPrefix="/live/" />
                 <!-- T4 (cloud_43): the site's «Публікації» umbrella - the EXACT path (other /articles/... stay in the browser) -->
                 <data android:path="/articles/" />
+                <!-- A-166 (cloud_44): the site's SHORT card / gallery links /<id>, /<id>/g, /<uk|ru|en>/<id>[/g] (digits only, Android 12+ = API 31:
+                     pathAdvancedPattern; an older Android ignores it - the alias below) and the legacy /objects/monasteries/<id>/ -->
+                <data android:pathPrefix="/objects/monasteries/" />
+                <data android:pathAdvancedPattern="/[0-9]+" />
+                <data android:pathAdvancedPattern="/[0-9]+/" />
+                <data android:pathAdvancedPattern="/[0-9]+/[gG]" />
+                <data android:pathAdvancedPattern="/[0-9]+/[gG]/" />
+                <data android:pathAdvancedPattern="/uk/[0-9]+" />
+                <data android:pathAdvancedPattern="/uk/[0-9]+/" />
+                <data android:pathAdvancedPattern="/uk/[0-9]+/[gG]" />
+                <data android:pathAdvancedPattern="/uk/[0-9]+/[gG]/" />
+                <data android:pathAdvancedPattern="/ru/[0-9]+" />
+                <data android:pathAdvancedPattern="/ru/[0-9]+/" />
+                <data android:pathAdvancedPattern="/ru/[0-9]+/[gG]" />
+                <data android:pathAdvancedPattern="/ru/[0-9]+/[gG]/" />
+                <data android:pathAdvancedPattern="/en/[0-9]+" />
+                <data android:pathAdvancedPattern="/en/[0-9]+/" />
+                <data android:pathAdvancedPattern="/en/[0-9]+/[gG]" />
+                <data android:pathAdvancedPattern="/en/[0-9]+/[gG]/" />
             </intent-filter>
 
         </activity>
+
+        <!-- A-166 (cloud_44): the SAME short links on Android 8-11 (API 26-30), which has no pathAdvancedPattern: pathPattern cannot say «digits only»,
+             so «/<digit>…» is let in and the ONE router hands anything that is not a card to the browser. ENABLED ONLY BELOW API 31
+             (res/values-v31/bools.xml), so Android 12+ keeps the digits-only filter above. -->
+        <activity-alias
+            android:name=".ShortLinks"
+            android:targetActivity=".MainActivity"
+            android:enabled="@bool/inok_short_links_legacy"
+            android:exported="true">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="inok.info" />
+                <data android:pathPattern="/0.*" />
+                <data android:pathPattern="/1.*" />
+                <data android:pathPattern="/2.*" />
+                <data android:pathPattern="/3.*" />
+                <data android:pathPattern="/4.*" />
+                <data android:pathPattern="/5.*" />
+                <data android:pathPattern="/6.*" />
+                <data android:pathPattern="/7.*" />
+                <data android:pathPattern="/8.*" />
+                <data android:pathPattern="/9.*" />
+                <data android:pathPattern="/uk/0.*" />
+                <data android:pathPattern="/uk/1.*" />
+                <data android:pathPattern="/uk/2.*" />
+                <data android:pathPattern="/uk/3.*" />
+                <data android:pathPattern="/uk/4.*" />
+                <data android:pathPattern="/uk/5.*" />
+                <data android:pathPattern="/uk/6.*" />
+                <data android:pathPattern="/uk/7.*" />
+                <data android:pathPattern="/uk/8.*" />
+                <data android:pathPattern="/uk/9.*" />
+                <data android:pathPattern="/ru/0.*" />
+                <data android:pathPattern="/ru/1.*" />
+                <data android:pathPattern="/ru/2.*" />
+                <data android:pathPattern="/ru/3.*" />
+                <data android:pathPattern="/ru/4.*" />
+                <data android:pathPattern="/ru/5.*" />
+                <data android:pathPattern="/ru/6.*" />
+                <data android:pathPattern="/ru/7.*" />
+                <data android:pathPattern="/ru/8.*" />
+                <data android:pathPattern="/ru/9.*" />
+                <data android:pathPattern="/en/0.*" />
+                <data android:pathPattern="/en/1.*" />
+                <data android:pathPattern="/en/2.*" />
+                <data android:pathPattern="/en/3.*" />
+                <data android:pathPattern="/en/4.*" />
+                <data android:pathPattern="/en/5.*" />
+                <data android:pathPattern="/en/6.*" />
+                <data android:pathPattern="/en/7.*" />
+                <data android:pathPattern="/en/8.*" />
+                <data android:pathPattern="/en/9.*" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- T9 (cloud_43, A-153 (2)): the three home-screen widgets (WidgetRender / WidgetStore / WidgetWorker) -->
         <receiver android:name=".LiveWidget" android:exported="false" android:label="@string/widget_live">

@@ -60,6 +60,7 @@ final class Notifier {
         String channelArticles();
         String channelLive();
         String text(String titleJson);  // contract §4: `title` = JSON of the three languages -> the app's one
+        String lang();                  // the app's language (uk | ru | en) - the site's ready texts are picked in it
     }
 
     /** One of OUR notifications now in the tray. */
@@ -134,6 +135,7 @@ final class Notifier {
         Note n = new Note();
         n.tag = TAG_ARTICLE; n.id = articleNid(data.get("id")); n.channel = CH_ARTICLES; n.when = now;
         n.title = words.articleTitle(); n.text = words.text(data.get("title"));
+        siteTexts(n, data);
         n.group = GROUP; n.childOfGroup = true; n.reportDismiss = true; n.tap = tapData(data, messageId);
         tray.post(n);
         List<Shown> kids = children(Collections.singleton(n.id));
@@ -146,8 +148,78 @@ final class Notifier {
         Note n = new Note();
         n.tag = TAG_LIVE + data.get("channel_id"); n.id = LIVE_ID; n.channel = CH_LIVE; n.when = now;
         n.title = words.liveTitle(); n.text = words.text(data.get("title"));
+        siteTexts(n, data);
         n.timeoutMs = LIVE_TIMEOUT_MS; n.tap = tapData(data, messageId);
         tray.post(n);
+    }
+
+    /**
+     * A-161 (4) + A-162 (1) (cloud_44): the SITE's ready words of a push (InokSite 409, contract §4) - `n_title` / `n_text`, each a JSON string of
+     * {uk, ru, en} - replace the app's own title / text, each field on its own, in the app's language (an empty one = uk). Anything missing,
+     * empty or not such an object keeps the app's words (never a blank, never a crash). ONE function for every push type that carries them;
+     * the channel, the group, the summary and the quiet hours stay the app's.
+     */
+    private void siteTexts(Note n, Map<String, String> data) {
+        String t = siteText(data.get("n_title"), words.lang());
+        String x = siteText(data.get("n_text"), words.lang());
+        if (t != null) n.title = t;
+        if (x != null) n.text = x;
+    }
+
+    /** The `lang` value (else uk) of a FLAT JSON object of strings, or null when the text is not one / both are empty. Plain Java (the JVM unit
+     *  test has no org.json): whitespace, the JSON escapes incl. \\uXXXX; any other value type or trailing text = null. */
+    static String siteText(String json, String lang) {
+        if (json == null) return null;
+        Map<String, String> o = new HashMap<>();
+        int[] at = { skip(json, 0) };
+        if (at[0] >= json.length() || json.charAt(at[0]) != '{') return null;
+        at[0] = skip(json, at[0] + 1);
+        if (at[0] < json.length() && json.charAt(at[0]) == '}') at[0]++;
+        else while (true) {
+            String k = str(json, at); if (k == null) return null;
+            at[0] = skip(json, at[0]);
+            if (at[0] >= json.length() || json.charAt(at[0]) != ':') return null;
+            at[0] = skip(json, at[0] + 1);
+            String v = str(json, at); if (v == null) return null;
+            o.put(k, v);
+            at[0] = skip(json, at[0]);
+            if (at[0] >= json.length()) return null;
+            char c = json.charAt(at[0]++);
+            if (c == '}') break;
+            if (c != ',') return null;
+            at[0] = skip(json, at[0]);
+        }
+        if (skip(json, at[0]) != json.length()) return null;
+        for (String l : new String[] { lang, "uk" }) { String v = o.get(l); if (v != null && !v.trim().isEmpty()) return v; }
+        return null;
+    }
+    private static int skip(String s, int i) { while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++; return i; }
+    /** a JSON string at at[0] (which moves past it), or null */
+    private static String str(String s, int[] at) {
+        int i = at[0];
+        if (i >= s.length() || s.charAt(i) != '"') return null;
+        StringBuilder b = new StringBuilder();
+        for (i++; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"') { at[0] = i + 1; return b.toString(); }
+            if (c != '\\') { b.append(c); continue; }
+            if (++i >= s.length()) return null;
+            char e = s.charAt(i);
+            switch (e) {
+                case '"': case '\\': case '/': b.append(e); break;
+                case 'n': b.append('\n'); break;
+                case 't': b.append('\t'); break;
+                case 'r': b.append('\r'); break;
+                case 'b': b.append('\b'); break;
+                case 'f': b.append('\f'); break;
+                case 'u':
+                    if (i + 4 >= s.length()) return null;
+                    try { b.append((char) Integer.parseInt(s.substring(i + 1, i + 5), 16)); } catch (NumberFormatException x) { return null; }
+                    i += 4; break;
+                default: return null;
+            }
+        }
+        return null;
     }
 
     /** Our article children now in the tray, newest first, without the given ids. */

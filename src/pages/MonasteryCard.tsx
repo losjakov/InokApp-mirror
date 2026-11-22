@@ -23,7 +23,7 @@ import { useFavToast, useVisitedToast } from '@/components/FavMark';
 import { phoneGroups } from '@/data/repo/phones';
 import { getChannelOfMonastery } from '@/data/repo/channels';
 import { field, headBorn, revivalLabel, rowParts, rowSubtitle, type ChannelRow, type MonasteryListRow, type MonasteryRow } from '@/data/repo/types';
-import { EPARCHIES_PATH, eparchyPath } from '@/app/nav';
+import { EPARCHIES_PATH, eparchyPath, useCardGalleryEntry } from '@/app/nav';
 import { detailHref } from '@/components/SplitContent';
 import { callPhone, mailTo, openLink, shareUrl, siteUrl } from '@/native/intents';
 import { useOpenChannel } from '@/components/StreamRow';
@@ -91,6 +91,12 @@ function PlaceLine({ row, wide }: { row: MonasteryRow; wide: boolean }) {
   return (
     <>{before && <span className="card__place1" data-testid="card-place1">{before}</span>}<Link to={detailHref(EPARCHIES_PATH, 'id', row.eparchy_id, wide, eparchyPath)} className="card__eparchy" data-testid="card-eparchy">{p.eparchy}</Link></>
   );
+}
+
+/** A-166: a gallery link's mark on this card's entry runs the card's «Фотогалерея» action once (rendered only when the card has a gallery) */
+function GalleryEntry({ configKnown, run }: { configKnown: boolean; run: () => void }): null {
+  useCardGalleryEntry(true, configKnown, run);
+  return null;
 }
 
 /** One label-over-value row of the card's facts (the site's «Офіційна назва: …», «Телефони: …», «GPS …»). */
@@ -161,6 +167,9 @@ function Detail({ code }: { code: number }) {
     else if (coverUrl) setViewer(onePhoto(row.code, coverUrl, cover, name)); // offline cover / the server has none: the cover alone, as 1.0.7
   };
 
+  // the «Фотогалерея» button's ONE action (A-98 / A-109): the app's viewer, else the site's gallery; a gallery link (A-166) runs the same
+  const galleryAction = () => (inApp ? void openGallery(null) : openLink(row.gallery_url!, lang));
+
   const actions: { k: string; icon: string; label: string; on: () => void; testId?: string }[] = [
     ...(firstDial ? [{ k: 'call', icon: callOutline, label: t('card.call_short'), on: () => callPhone(firstDial), testId: 'call' }] : []),
     ...(row.website ? [{ k: 'site', icon: globeOutline, label: t('card.site_short'), on: () => openLink(row.website!, lang) }] : []),
@@ -180,12 +189,13 @@ function Detail({ code }: { code: number }) {
         {/* A-23 #6: only over a cover that is really shown. A-109: in the app's viewer (no «opens outside» sign; no thumbnail grid on the
             card - the photos appear only in the viewer); a server without R-49 = 1.0.7's site gallery, the sign kept */}
         {coverShown && row.photo_count > 0 && (inApp || row.gallery_url) && (
-          <button type="button" className="over-photo card__photos" onClick={() => (inApp ? void openGallery(null) : openLink(row.gallery_url!, lang))}
+          <button type="button" className="over-photo card__photos" onClick={galleryAction}
             aria-label={t(inApp ? 'card.gallery_open' : 'card.gallery_hint')} data-testid="gallery" data-in-app={inApp ? '1' : '0'}>
             <IonIcon icon={imagesOutline} aria-hidden="true" /><span>{t('card.gallery')}</span>{!inApp && <IonIcon icon={openOutline} aria-hidden="true" />}
           </button>
         )}
         <PhotoViewer set={viewer} onClose={() => setViewer(null)} />
+        {row.photo_count > 0 && (inApp || row.gallery_url) && <GalleryEntry configKnown={config !== null} run={galleryAction} />}
       </div>
       {/* D49: on ≥600 dp (no toolbar of its own) the star sits at the end of the title row — the cover carries only the open sign and «Фотогалерея» */}
       <div className="card__title-row"><h1 className="card__title">{name}</h1>{wide && <span className="card__marks"><VisitedButton code={row.code} /><FavButton code={row.code} /></span>}</div>

@@ -108,7 +108,9 @@ ion-tab-button { position: relative; }
 .meta__g { display: inline-block; max-width: 100%; } /* D38: a meta group never breaks inside (MetaLine) - an atomic box moves to the next line whole; only a group wider than the whole line (200 % font, the tablet's list pane: «26 жовтня 2026 р.») wraps inside itself instead of running off the row (cloud_21) */
 .meta__stick { white-space: nowrap; } /* N7 (REVIEW cloud_22): «· 👁 N» - the dot and the last group of a MetaLine `stickyLast` in one box */
 .mrow__sub { font-size: var(--inok-type-secondary); color: var(--ion-color-medium); white-space: normal; }
-.mrow__eparchy { color: var(--ion-color-primary); }
+/* A-165 (cloud_44): in a house ROW the eparchy, the non-link «↳ <parent>» and the distance wear the TITLE's colour - inherited from the label
+   exactly as the h2 is (light ~black, dark ~white, a selected row's contrast too); a LINK (the card's eparchy, `.parent-line--link`) stays primary */
+.item ion-label .mrow__sub--title, .item ion-label .mrow__eparchy, .item ion-label .mrow__sub.parent-line { color: inherit; }
 /* A-140 (1): the house row - thumbnail + (name, «↳ parent», eparchy) on top, the rest under it at full width. The thumbnail's top = the cap
    line of the name's first line: (title line height - cap height) / 2 in the TITLE's em (font-size set on the thumb), cap height of the system
    face: Roboto 0.711 em (Android), SF Pro 0.705 em (iOS) - at 100-200 % the em follows the scale. No lh / cap units: the old floor (Chrome 89). */
@@ -121,9 +123,8 @@ ion-tab-button { position: relative; }
 .item ion-label .hrow__title { font-size: var(--inok-type-title); font-weight: 500; line-height: var(--inok-title-lh); margin: 0 0 2px; white-space: normal; }
 .hrow__main > .mrow__sub { margin: 2px 0 0; }
 .item ion-label > .hrow__wide { margin: 4px 0 0; }
-.parent-line { color: var(--ion-color-primary); }
 .parent-line--link { display: flex; align-items: center; flex-wrap: wrap; background: none; border: 0; padding: 4px 0; min-height: 32px; text-align: start; font: inherit; font-size: var(--inok-type-secondary); text-decoration: underline; color: var(--ion-color-primary); }
-.item ion-label > .mrow__dist { font-size: var(--inok-type-secondary); color: var(--ion-color-primary); font-weight: 500; }
+.item ion-label > .mrow__dist { font-size: var(--inok-type-secondary); color: inherit; font-weight: 500; } /* A-165: the title's colour */
 
 /* two-pane (≥600 dp): list left, card right */
 .split { display: flex; height: 100%; }

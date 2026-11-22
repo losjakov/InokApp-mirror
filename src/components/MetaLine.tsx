@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 
 /**
- * ONE meta line of a list row (D38, A-15): «kind · date · ★ 5 (4) · 💬 1», «Монастирів: 8 · Насельників: 1429». A group never
+ * ONE meta line of a list row (D38, A-15): «kind · ★ 5 (4) · 💬 1 · date» (A-164), «Монастирів: 8 · Насельників: 1429». A group never
  * breaks inside («★ 5 / (4)» was D38); the line wraps only between groups, at the « · ».
  * `stickyLast` (N7, REVIEW cloud_22): the last group takes its dot with it (one no-wrap box: Chrome breaks
  * after a no-break space before an inline-block) - «· 👁 1146» never splits, the break comes BEFORE the dot.

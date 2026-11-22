@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A-166 (cloud_44): Android 12+ matches the short links by the main filter's pathAdvancedPattern (digits only) - the legacy alias is off -->
+    <bool name="inok_short_links_legacy">false</bool>
+</resources>

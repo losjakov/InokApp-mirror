@@ -1,9 +1,9 @@
-import { useCallback, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { IonTabButton, NavContext } from '@ionic/react';
 import { App } from '@capacitor/app';
 import { isNative } from '@/native/platform';
-import type { ListEntry } from './linkRoute';
+import type { CardEntry, ListEntry } from './linkRoute';
 
 /**
  * THE navigation module (A-15): the bottom tabs (A-27) and Back (A-25 #6) — one table of tab roots, one rule each.
@@ -150,3 +150,30 @@ export function useListEntry(apply: (e: ListEntry) => void): void {
     latest.current({ reset: mark, kind: e?.kind });
   }, [mark, e?.kind]);
 }
+
+/**
+ * A-166 (cloud_44): a GALLERY link reached this card (`CardEntry` in the location's state) -> `open` (the card's own «Фотогалерея» path) runs
+ * ONCE per mark, as soon as the card is `ready`; Back from the viewer leaves the card, and Back / a re-render to the same entry opens nothing
+ * again (the card is re-created per code / language, so the marks seen are kept here, not in the card).
+ */
+const galleriesSeen = new Set<number>();
+export function useCardGalleryEntry(ready: boolean, configKnown: boolean, open: () => void): void {
+  const loc = useLocation();
+  const mark = (loc.state as Partial<CardEntry> | null)?.gallery;
+  const latest = useRef(open);
+  useEffect(() => { latest.current = open; });
+  // the button's choice (the app's viewer or the site's gallery) needs the site's config: a cold start waits for it (kept or fetched),
+  // at most CONFIG_WAIT_MS - then the button's own fallback, as a tap would do
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    if (typeof mark !== 'number' || configKnown) return;
+    const id = setTimeout(() => setWaited(true), CONFIG_WAIT_MS);
+    return () => clearTimeout(id);
+  }, [mark, configKnown]);
+  useEffect(() => {
+    if (!ready || !(configKnown || waited) || typeof mark !== 'number' || galleriesSeen.has(mark)) return;
+    galleriesSeen.add(mark);
+    latest.current();
+  }, [ready, configKnown, waited, mark]);
+}
+const CONFIG_WAIT_MS = 8000;

@@ -9,7 +9,10 @@ import { quickRoute } from './quickActions';
  *  also when that screen was already open with filters. `reset` = a fresh number per link (a new link = a new reset; Back to the same entry
  *  resets nothing again); `kind` = the article tab of an article section link. */
 export type ListEntry = { reset: number; kind?: ArticleKind | 'all' };
-export type LinkRoute = { to: string; entry?: ListEntry };
+/** A-166 (cloud_44): a GALLERY link's mark on the card's entry - the card opens its gallery on top once per mark (a fresh number per link;
+ *  Back to the same entry opens nothing again) by the SAME path as its «Фотогалерея» button */
+export type CardEntry = { gallery: number };
+export type LinkRoute = { to: string; entry?: ListEntry | CardEntry };
 
 const LIST_ROUTES: Record<SiteList, LinkRoute['to']> = {
   monasteries: '/monasteries', eparchies: '/more/eparchies', streams: '/streams', publication: '/articles', video: '/articles', news: '/articles', all: '/articles',
@@ -21,7 +24,7 @@ export async function linkRoute(db: Db, href: string, now: () => number = Date.n
   const quick = quickRoute(href); // cloud_41 (A-133 C1): a quick action on the app icon = its tab
   if (quick) return { to: quick };
   const to = linkTarget(href);
-  if (to?.kind === 'card') return (await getMonastery(db, to.code)) ? { to: `/monasteries/${to.code}` } : null;
+  if (to?.kind === 'card') return (await getMonastery(db, to.code)) ? { to: `/monasteries/${to.code}`, ...(to.gallery ? { entry: { gallery: now() } } : {}) } : null;
   if (to?.kind === 'article') return { to: `/articles?id=${to.id}` };
   if (to?.kind === 'eparchy') return (await getEparchy(db, to.id)) ? { to: `/more/eparchies/${to.id}` } : null;
   if (to?.kind === 'list') {

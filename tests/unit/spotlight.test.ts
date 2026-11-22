@@ -17,7 +17,7 @@ describe('Spotlight items', () => {
     const items = houseItems(rows, 'uk', dicts);
     expect(items).toHaveLength(rows.length);
     const lavra = items.find((x) => x.id === 'https://inok.info/monasteries/242/')!;
-    expect(linkTarget(lavra.id)).toEqual({ kind: 'card', code: 242 });
+    expect(linkTarget(lavra.id)).toEqual({ kind: 'card', code: 242, gallery: false });
     expect(lavra.title).toMatch(/Лавр/);
     for (const w of ['Києво-Печерська', 'Киево-Печерская', 'Kyiv']) expect(lavra.keywords.join(' '), w).toContain(w);
     expect(new Set(items.map((x) => x.id)).size).toBe(items.length);

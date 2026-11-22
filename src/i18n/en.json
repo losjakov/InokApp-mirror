@@ -76,6 +76,7 @@
   "commission.open_site": "Open inok.info",
   "about.title": "About the app",
   "about.version": "App version",
+  "about.versions": "Version history",
   "about.data": "Directory data as of",
   "about.data_none": "Data not loaded yet",
   "about.privacy": "Privacy policy",

@@ -39,6 +39,11 @@ send '{"type":"zzz_future","channel_id":"990001","title":"x"}'
 check "an unknown type draws nothing" "$(ours | wc -l | tr -d ' ')" "$before"
 send "$(live stream_live 990002 v3)"; send "$(live stream_ended 990002 v3)"
 check "stream_ended removes its channel" "$(n '^live_990002$')" 0
+# A-161 (4) + A-162 (1) (cloud_44): the site's 409 stream push - the CHANNEL as the title, «🔴 Наживо · …» as the text, in the app's language (uk)
+send '{"type":"stream_live","channel_id":"990003","video_id":"v409","title":"{\"uk\":\"Літургія\",\"ru\":\"Литургия\",\"en\":\"Liturgy\"}","n_title":"{\"uk\":\"Тестовий канал\",\"ru\":\"Тестовый канал\",\"en\":\"Test channel\"}","n_text":"{\"uk\":\"🔴 Наживо · Літургія\",\"ru\":\"🔴 В эфире · Литургия\",\"en\":\"🔴 Live · Liturgy\"}"}'
+N409=$(adb shell dumpsys notification --noredact 2>/dev/null | tr -d '\r' | grep -A40 "tag=live_990003" | grep -E "android\.(title|text)=" | head -2 | tr '\n' ' ')
+echo "409: $N409" >> "$R"
+check "409 stream push titled by the channel" "$(echo "$N409" | grep -c 'Тестовий канал')" 1
 ours > "$OUT/notify_list_before.txt"
 adb shell dumpsys notification --noredact 2>/dev/null | tr -d '\r' | grep -A40 "pkg=$PKG" | grep -E "android\.(title|text|textLines|summaryText)|groupKey|mGroupSummary|channel=" | head -60 > "$OUT/notify_dump.txt" || true
 grep -E "channel=inok_" "$OUT/notify_dump.txt" | grep -o "channel=[a-z_]*" | sort | uniq -c | tee -a "$R" || true

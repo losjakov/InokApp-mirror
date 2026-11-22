@@ -304,7 +304,7 @@ export class InokMap {
       lastProbe = performance.now();
       const el = map.getContainer();
       el.dataset.lavrasDrawn = String(map.queryRenderedFeatures({ layers: ['lavras'] }).length);
-      const order = map.getStyle().layers.map((l) => l.id);
+      const order = (map.getStyle()?.layers ?? []).map((l) => l.id); // undefined between two styles (the network one replacing the local)
       el.dataset.lavrasAbove = String(order.indexOf('lavras') > Math.max(order.indexOf('clusters'), order.indexOf('points')));
     });
   }

@@ -8,6 +8,7 @@ import { AttestCheck } from '@/components/AttestCheck';
 import { APP_VERSION } from '@/app/version';
 import { openLink } from '@/native/intents';
 import { SITE_URL } from '@/data/api/client';
+import { VERSIONS_URL } from '@/data/links/sitePages';
 import { isIos } from '@/native/platform';
 import { netFailure, type NetFailure } from '@/data/netFailure';
 import { appStoreLinksShown, checkUpdate, immediateUpdate, openAppStoreUrl, openListing, shareApp, storeLinksShown, type UpdateCheck } from '@/native/play';
@@ -49,6 +50,9 @@ export function AboutPage() {
             <IonNote slot="end" data-testid="app-version">{APP_VERSION}</IonNote>
             {settings.ownDevice && <IonIcon slot="end" icon={eyeOffOutline} className="own-device" aria-label={t('views.own_device')} data-testid="own-device" />}
           </IonItem>
+          {/* A-167 (cloud_44): the app's version history on the site (public versions, each change once), right under the version line -
+              the in-app browser like the privacy row; offline = what openLink says */}
+          <IonItem button detail onClick={() => openLink(VERSIONS_URL, lang)} data-testid="about-versions"><IonLabel>{t('about.versions')}</IonLabel></IonItem>
           {isIos() && <AttestCheck />}{/* cloud_40 (A1 g): App Attest of THIS iPhone / iPad, under the version */}
           {/* A-131 (R-57, R-60): «Поділитися» shares the smart link /app/get/ - on iOS always, on Android by R-41's switch as before;
               «Оцінити» - each platform by ITS OWN pair (Android: store_links -> Play; iOS: app_store_links + app_store_url -> «write a review») */}

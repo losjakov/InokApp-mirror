@@ -2,4 +2,6 @@
 <resources>
     <!-- cloud_27: true ONLY in the qa build (android/app/src/qa/res/values/bools.xml) - its WebView is inspectable for the emulator smoke -->
     <bool name="inok_webview_inspectable">false</bool>
+    <!-- A-166 (cloud_44): the short-link alias (AndroidManifest.xml .ShortLinks) - on below API 31 only; values-v31 turns it off -->
+    <bool name="inok_short_links_legacy">true</bool>
 </resources>

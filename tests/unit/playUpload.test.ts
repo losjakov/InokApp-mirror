@@ -19,6 +19,14 @@ describe('Google Play upload (scripts/play_upload.py)', () => {
     expect(body.releases[0].releaseNotes).toEqual([{ language: 'uk', text: t.play.uk }, { language: 'ru-RU', text: t.play.ru }, { language: 'en-US', text: t.play.en }]);
     for (const n of body.releases[0].releaseNotes) expect(n.text).not.toContain('App Store');
   });
+  it('REVIEW cloud_43 NOTE 4: `texts` prints UTF-8 on a cp1251 console (Windows) - the same text, no UnicodeEncodeError', () => {
+    // a cp1251 console, as Windows gives one (`-I` ignores PYTHONIOENCODING, so the console's stream is made by hand)
+    const cp1251 = "import io, runpy, sys; sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='cp1251'); sys.argv = ['play_upload.py', 'texts', 'package.json', 'store/release_notes']; runpy.run_path('scripts/play_upload.py', run_name='__main__')";
+    const out = execFileSync('python3', ['-I', '-c', cp1251]);
+    const t = JSON.parse(out.toString('utf8'));
+    expect(t.play.uk).toContain('•');
+    expect(t).toEqual(JSON.parse(execFileSync('python3', ['-I', 'scripts/play_upload.py', 'texts', 'package.json', 'store/release_notes'], { encoding: 'utf8' })));
+  });
   it('the workflow: the tag run only, after the AAB artifact, skipped without the secret', () => {
     const wf = readFileSync('.github/workflows/build.yml', 'utf8');
     const step = wf.slice(wf.indexOf('- name: Google Play - the AAB'));
