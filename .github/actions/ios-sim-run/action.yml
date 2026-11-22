@@ -26,7 +26,7 @@ runs:
         # cloud_44 (ios 45037644332: iOS 16.4 «dyld: Library not loaded: SwiftUICore … Referenced from App.debug.dylib» - Xcode 26's DEBUG dylib
         # links SwiftUICore, absent before iOS 18). ios 45043064388: the SIMULATOR app links it strongly even without the debug dylib (the device
         # archive does not: «release links SwiftUICore: none»); a weak link is refused by ld («not an allowed client», ios 45050510468) - the
-        # oldest (< 18) simulator cannot start it with this Xcode: CD's decision (QUESTIONS cloud_44); the release binary is checked in ios.yml
+        # oldest (< 18) simulator cannot start it with this Xcode -> A-169: «oldest» = the lowest rung that starts it (ios_sim_tour.sh OLDEST_LADDER)
         otool -L "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app/App" | grep -i swiftui | sed 's/^/App links: /' | tee -a "$GITHUB_STEP_SUMMARY" || true
     - name: The tour - ${{ inputs.task }} on the ${{ inputs.runtime }} iOS, ${{ inputs.device }}
       shell: bash

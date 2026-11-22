@@ -38,6 +38,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # A-169 (cloud_45): «oldest» = the LOWEST rung of scripts/ios_sim_tour.sh OLDEST_LADDER whose simulator STARTS this Xcode's simulator
+        # build (Xcode 26.6 links SwiftUICore: 16.4 cannot) - measured in each run, written in runtimes.txt; iOS 15-17 = the archive check
         include:
           - { runtime: oldest, device: iphone, task: walk }
           - { runtime: oldest, device: ipad, task: walk }

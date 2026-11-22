@@ -44,29 +44,37 @@ toasts() { ev "(window.__toasts || []).join(' ; ') || 'no toast'"; }
 demo_all() { sb_override; sleep 1; }
 ev() { local o; o=$(node "$NAVJS" eval "$1" 2>>"$OUT/nav.txt") || true; o="${o%%$'\n'*}"; printf '%s\n' "${o#eval: }"; }
 
-# ---- the runtime: newest / oldest iOS the runner has; for «oldest» first try to download iOS 15 (the app's floor), then 16, 17
+# ---- the runtime: the newest iOS the runner has; «oldest» (A-169, cloud_45) = the LOWEST rung of OLDEST_LADDER whose simulator STARTS
+# this Xcode's simulator build - measured in every run (the device loop below), each rung present or downloaded, each refusal written with
+# the loader's own line. Xcode 26.6 (macos-26): its simulator app links SwiftUICore (iOS 18+) - 16.4 printed «dyld: Library not loaded:
+# SwiftUICore» (cloud_44, ios 45037644332 / 45052241324); 15.5 «is not available for download». iOS 15-17 = the archive check (ios.yml:
+# «release links SwiftUICore: none», minimumOS 15.0) + TestFlight on real phones. The rungs: ref/REF_ios_state.md
+OLDEST_LADDER="17.5 18.0 18.6"
 runtimes() { xcrun simctl list runtimes -j | python3 -I -c '
 import json, sys
 rs = [r for r in json.load(sys.stdin)["runtimes"] if r.get("platform", "iOS") == "iOS" and r.get("isAvailable")]
 rs.sort(key=lambda r: [int(x) for x in r["version"].split(".")])
 for r in rs: print(r["identifier"], r["version"], len(r.get("supportedDeviceTypes", [])))'; }
 { echo "== Xcode: $(xcodebuild -version | tr '\n' ' ')"; echo "== iOS runtimes available at start:"; runtimes; } > "$OUT/runtimes.txt"
-if [ "$WHICH" = oldest ]; then
-  have="$(runtimes | head -1 | awk '{print $2}')"
-  for v in 15.5 16.4 17.5; do
-    [ -n "$have" ] && [ "${have%%.*}" -le "${v%%.*}" ] && break
+# one rung: iOS $1 present (its version or $1.x), else downloaded now -> RTID / RTV; exit 1 = not to be had on this runner (written)
+rung() {
+  local v="$1" r; r="$(runtimes | awk -v v="$v" '$2 == v || index($2, v ".") == 1 { print $1 " " $2; exit }')"
+  if [ -z "$r" ]; then
     echo "== download iOS $v: xcodebuild -downloadPlatform iOS -buildVersion $v" >> "$OUT/runtimes.txt"
-    # macOS has no `timeout`: perl's alarm stops each download after 15 min (three tries <= 45 min of the job's 150)
-    if perl -e 'alarm shift; exec @ARGV' 900 xcodebuild -downloadPlatform iOS -buildVersion "$v" > "$OUT/download-$v.log" 2>&1; then
-      echo "   downloaded" >> "$OUT/runtimes.txt"; break
-    else echo "   FAILED (exit $?): $(grep -iE 'error|not|unable|unsupported' "$OUT/download-$v.log" | head -3 | tr '\n' ' ' | cut -c1-300)" >> "$OUT/runtimes.txt"; fi
-  done
-  { echo "== iOS runtimes after the download attempts:"; runtimes; } >> "$OUT/runtimes.txt"
+    # macOS has no `timeout`: perl's alarm stops each download after 15 min
+    if perl -e 'alarm shift; exec @ARGV' 900 xcodebuild -downloadPlatform iOS -buildVersion "$v" > "$OUT/download-$v.log" 2>&1; then echo "   downloaded" >> "$OUT/runtimes.txt"
+    else echo "   FAILED (exit $?): $(grep -iE 'error|not|unable|unsupported' "$OUT/download-$v.log" | head -3 | tr '\n' ' ' | cut -c1-300)" >> "$OUT/runtimes.txt"; return 1; fi
+    r="$(runtimes | awk -v v="$v" '$2 == v || index($2, v ".") == 1 { print $1 " " $2; exit }')"
+  fi
+  [ -n "$r" ] || { echo "   iOS $v: not in the runtime list after the download" >> "$OUT/runtimes.txt"; return 1; }
+  RTID="${r%% *}"; RTV="${r#* }"
+}
+RTID=""; RTV=""
+if [ "$WHICH" != oldest ]; then
+  RT="$(runtimes | tail -1 | awk '{print $1" "$2}')"; RTID="${RT%% *}"; RTV="${RT#* }"
+  echo "== chosen ($WHICH): $RTID ($RTV)" | tee -a "$OUT/runtimes.txt"
+  [ -n "$RTID" ] || { echo "::error::no iOS runtime"; exit 1; }
 fi
-RT="$( (runtimes | { [ "$WHICH" = oldest ] && head -1 || tail -1; }) | awk '{print $1" "$2}')"
-RTID="${RT%% *}"; RTV="${RT#* }"
-echo "== chosen ($WHICH): $RTID ($RTV)" | tee -a "$OUT/runtimes.txt"
-[ -n "$RTID" ] || { echo "::error::no iOS runtime"; exit 1; }
 # the device types this runtime serves: the NEWEST biggest iPhone (Pro Max: 1320 x 2868 = Apple's 6.9") and iPad (Pro 13": 2064 x 2752)
 devtype() { xcrun simctl list runtimes -j | python3 -I -c '
 import json, re, sys
@@ -113,7 +121,12 @@ launch() { # (re)start the app with its console captured; wait for a NEW «home 
   # compiles the WebKit caches) waits up to 300 s, every other launch 180 s; the time it took is written down (measured, not guessed)
   # cloud_44 (ios 45031613354: iPhone AND iPad 16.4 - a runtime DOWNLOADED in the job - printed nothing for 318 s): the first launch waits 600 s
   local tries=90 t0=$SECONDS n _; if [ "$WHICH" = oldest ] && [ "${FIRST_LAUNCH_DONE:-}" != "$TAG" ]; then tries=300; fi; FIRST_LAUNCH_DONE="$TAG"
-  for _ in $(seq 1 "$tries"); do n=$(grep -c 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null || true); [ "${n:-0}" -gt "$n0" ] && break; sleep 2; done
+  # cloud_45 (E6 of cloud_44 - read the console first): the loader's refusal ends the wait at once (exit 2 - the runtime cannot start this
+  # build; the oldest rung is then the next one), never 600 s of «nothing painted»
+  for _ in $(seq 1 "$tries"); do n=$(grep -c 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null || true); [ "${n:-0}" -gt "$n0" ] && break
+    if grep -aqE 'Library not loaded|Symbol not found' "$OUT/${TAG}_console.txt" 2>/dev/null; then
+      echo "launch $TAG: the loader refused after $((SECONDS - t0)) s - $(grep -aE -m1 'Library not loaded|Symbol not found' "$OUT/${TAG}_console.txt" | cut -c1-200)" >> "$OUT/nav.txt"; return 2; fi
+    sleep 2; done
   echo "launch $TAG: home painted after $((SECONDS - t0)) s (limit $((tries * 2)) s)" >> "$OUT/nav.txt"
   for _ in $(seq 1 30); do [ "$(curl -s localhost:8765/health | python3 -I -c 'import json,sys; a=json.load(sys.stdin)["ago"]; print(1 if a is not None and a < 20000 else 0)')" = 1 ] && return 0; sleep 2; done
   echo "the remote hand never asked the relay ($TAG)" | tee -a "$OUT/nav.txt"; return 1
@@ -133,6 +146,10 @@ reboot_sim() {
   xcrun simctl location "$U" set 50.4344,30.5571 2>>"$OUT/nav.txt" || true
   launch
 }
+
+# an A2 offer still open (ion-alert.soft-ask: «Повідомляти …?», a modal over every screen until answered) is answered «Ні, дякую» - THE one
+# copy of that tap (spot 14, the A8 frames, the live tap); the answer is the app's own (asked once, kept)
+answer_offers() { ev "(() => { Array.from(document.querySelectorAll('ion-alert.soft-ask:not(.overlay-hidden)')).forEach((a) => Array.from(a.querySelectorAll('.alert-button')).pop()?.click()); return 'ok'; })()" > /dev/null; sleep 2; }
 
 # a crash screen left by the step before (A-48's «Щось пішло не так») is written down with its code and the app restarted - one fault, one line
 guard_crash() {
@@ -180,15 +197,6 @@ a3_walk() {
     local back; back=$(ev "(() => (document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed') + ' ' + location.pathname)()")
     case "$v $back" in *' / '*' closed /monasteries/242') a3 "gallery link $f (A-166)" PASS "viewer $v; closed -> $back";; *) a3 "gallery link $f (A-166)" FAIL "viewer $v; after close $back";; esac
   done
-  # cloud_44 A-161 (3): the widget's live row - the address inokapp://tab/streams?play=<id> handed to the app's ONE link path (as the gallery links
-  # above). Not `simctl openurl`: it raises the system's «Open in “inok.info”?» alert (no DOM; ios 45031613354 - the alert then blocked the next
-  # spot); a widget's own Link opens with no alert (the owner's iPhone). «Трансляції», the stream's sheet on top (no DOM: the frame), closed
-  nav go /home; sleep 2
-  ev "(window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'inokapp://tab/streams?play=DWCj8tI47q4' })), 'ok')" > /dev/null; sleep 8
-  v=$(ev "location.pathname"); shot "$OUT/a3-live-tap-sheet__$TAG.png"
-  ev "Capacitor.Plugins.Browser.close().then(() => 'closed').catch(() => 'none')" > /dev/null; sleep 3
-  local after; after=$(ev "location.pathname"); shot "$OUT/a3-live-tap-back__$TAG.png"
-  if [ "$v" = /streams ] && [ "$after" = /streams ]; then a3 "live tap -> «Трансляції» + the stream (A-161 (3))" PASS "the address -> $v; sheet closed -> $after"; else a3 "live tap -> «Трансляції» + the stream (A-161 (3))" FAIL "the address -> $v; after $after"; fi
   # 0b cloud_40 (A1 g): «Про застосунок» - «Перевірка Apple: …» on a simulator = «not supported by this device» (Apple's own answer), never
   # «the call failed» (= the plugin not in the bridge); «Скопіювати подробиці» shows the text (no key id / install id in it)
   nav go /more/about; sleep 3
@@ -344,7 +352,7 @@ a3_walk() {
   # and answered «Ні, дякую» before the star
   OFFER14=$(ev "(() => { const a = Array.from(document.querySelectorAll('ion-alert.soft-ask--articles')).find((e) => !e.classList.contains('overlay-hidden')); return a ? 'offer: ' + a.querySelector('.alert-title')?.textContent + ' / ' + Array.from(a.querySelectorAll('.alert-button')).map((b) => b.textContent.trim()).join(' | ') : 'no offer'; })()")
   shotof "$OUT/a3-push-offer__$TAG.png" 'ion-alert.soft-ask--articles' > /dev/null
-  ev "(() => { const b = Array.from(document.querySelectorAll('ion-alert.soft-ask:not(.overlay-hidden) .alert-button')).pop(); b && b.click(); return 'ok'; })()" > /dev/null; sleep 2
+  answer_offers
   local r0 r1 rt v0 v1 vs
   r0=$(ev "(document.querySelector('.ion-page:not(.ion-page-hidden) [data-testid=star-5]')||{}).disabled ? 'cast before' : 'open'")
   ev "window.__inokLastCast = null, 'ok'" > /dev/null; toast_watch
@@ -386,8 +394,7 @@ a3_walk() {
     name="${sc%%:*}"; path="${sc#*:}"; guard_crash "a8-$name"
     case "$name" in map|eparchy|contacts) AFTER_GL=1;; esac   # a WebGL map (or mini-map) on this screen
     nav go "$path"; sleep 5; [ "$name" = map ] && node "$NAVJS" drawn >> "$OUT/nav.txt" 2>&1
-    # an A2 offer left open (a modal over every screen until answered - ios run 2's sheet) is answered «Ні, дякую» before the frame
-    ev "(() => { Array.from(document.querySelectorAll('ion-alert.soft-ask:not(.overlay-hidden)')).forEach((a) => Array.from(a.querySelectorAll('.alert-button')).pop()?.click()); return 'ok'; })()" > /dev/null; sleep 2
+    answer_offers   # an A2 offer left open (a modal over every screen until answered - ios run 2's sheet): «Ні, дякую» before the frame
     v=$(ev "(() => { const pg = Array.from(document.querySelectorAll('ion-tabs ion-router-outlet > .ion-page')).filter((x) => !x.classList.contains('ion-page-hidden')).pop(); if (!pg) return 'no page';
       const t = Array.from(pg.querySelectorAll('[data-testid=page-title], ion-title')).find((e) => e.getClientRects().length > 0); const ov = document.documentElement.scrollWidth > innerWidth + 1;
       return (document.querySelector('[data-testid=crash]') ? 'CRASH' : 'ok') + ' title «' + ((t && t.textContent) || '').trim().slice(0, 40) + '» ' + (ov ? 'SIDEWAYS' : 'fits') + ' ' + location.pathname + location.search; })()")
@@ -408,6 +415,17 @@ a3_walk() {
     fi
     case "$name" in map|eparchy|contacts) reboot_sim;; esac   # a WebGL map on screen: the next frame from a fresh simulator (D12)
   done
+  # cloud_45 (E8 of cloud_44, release ring 45052241324): the LAST spot - after the walk's own «Трансляції» (A8) met and answered the A2 offer
+  # «Повідомляти, коли починається трансляція?»; opened earlier, that offer covered «Перевірка Apple» and «rating cast» (FAIL)
+  # cloud_44 A-161 (3): the widget's live row - the address inokapp://tab/streams?play=<id> handed to the app's ONE link path (as the gallery links
+  # above). Not `simctl openurl`: it raises the system's «Open in “inok.info”?» alert (no DOM; ios 45031613354 - the alert then blocked the next
+  # spot); a widget's own Link opens with no alert (the owner's iPhone). «Трансляції», the stream's sheet on top (no DOM: the frame), closed
+  nav go /home; sleep 2; answer_offers
+  ev "(window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'inokapp://tab/streams?play=DWCj8tI47q4' })), 'ok')" > /dev/null; sleep 8
+  v=$(ev "location.pathname"); shot "$OUT/a3-live-tap-sheet__$TAG.png"
+  ev "Capacitor.Plugins.Browser.close().then(() => 'closed').catch(() => 'none')" > /dev/null; sleep 3
+  local after; after=$(ev "location.pathname"); shot "$OUT/a3-live-tap-back__$TAG.png"
+  if [ "$v" = /streams ] && [ "$after" = /streams ]; then a3 "live tap -> «Трансляції» + the stream (A-161 (3))" PASS "the address -> $v; sheet closed -> $after"; else a3 "live tap -> «Трансляції» + the stream (A-161 (3))" FAIL "the address -> $v; after $after"; fi
   a3 "VoiceOver" NOT-PROVABLE "the simulator has no VoiceOver - names / roles / order are the a11y tree of the same DOM (axe 0); the owner's iPhone"
   a3 "share sheet / call / directions (Apple Maps)" NOT-PROVABLE "system sheets and other apps - the owner's iPhone"
 }
@@ -463,14 +481,10 @@ visited_frame() { # set dir
   for c in 242 111 98; do mark_visited "$c" off; done
 }
 
-node "$ROOT/scripts/ios_relay.mjs" > "$OUT/relay.log" 2>&1 &
-RELAY=$!
-trap 'kill $RELAY 2>/dev/null' EXIT
-RC=0
-KINDS="iPhone iPad"; case "$DEV" in iphone) KINDS=iPhone;; iphone63) KINDS=iPhone63;; ipad) KINDS=iPad;; esac
-for kind in $KINDS; do
-  TAG="$(echo "$kind" | tr 'A-Z' 'a-z')"
-  DT="$(devtype "$kind")"; [ -n "$DT" ] || { echo "::error::no $kind for $RTID"; RC=1; continue; }
+# one device of $1 (iPhone | iPhone63 | iPad) on RTID, booted, the app installed and started: 0 = started; 1 = no «home painted» / no remote
+# hand; 2 = the loader refused the build (this runtime cannot start it); 4 = no device type
+start_on() {
+  DT="$(devtype "$1")"; [ -n "$DT" ] || { echo "::error::no $1 for $RTID"; return 4; }
   U="$(xcrun simctl create "inok-$TAG-$WHICH" "${DT%%|*}" "$RTID")"
   echo "== $TAG: ${DT#*|} on iOS $RTV ($U)" | tee -a "$OUT/runtimes.txt"
   xcrun simctl boot "$U"; xcrun simctl bootstatus "$U" -b > /dev/null
@@ -479,8 +493,37 @@ for kind in $KINDS; do
   xcrun simctl location "$U" set 50.4344,30.5571 2>>"$OUT/nav.txt" || true   # the Lavra: «Поруч»
   xcrun simctl install "$U" "$APP"
   xcrun simctl privacy "$U" grant location "$BUNDLE" 2>>"$OUT/nav.txt" || true
-  # cloud_44: a cold simulator's FIRST start may never paint (its caches build meanwhile) - ONE more launch, written down, before «start» fails
-  if ! launch && { echo "launch $TAG: once more after a cold first start" >> "$OUT/nav.txt"; ! launch; }; then a3 "start" FAIL "no «home painted» / no remote hand - ${TAG}_console.txt"; RC=1; xcrun simctl shutdown "$U"; continue; fi
+  # cloud_44: a cold simulator's FIRST start may never paint (its caches build meanwhile) - ONE more launch, written down; never after a refusal
+  local r; launch; r=$?
+  if [ "$r" = 1 ]; then echo "launch $TAG: once more after a cold first start" >> "$OUT/nav.txt"; launch; r=$?; fi
+  return "$r"
+}
+
+node "$ROOT/scripts/ios_relay.mjs" > "$OUT/relay.log" 2>&1 &
+RELAY=$!
+trap 'kill $RELAY 2>/dev/null' EXIT
+RC=0
+KINDS="iPhone iPad"; case "$DEV" in iphone) KINDS=iPhone;; iphone63) KINDS=iPhone63;; ipad) KINDS=iPad;; esac
+for kind in $KINDS; do
+  TAG="$(echo "$kind" | tr 'A-Z' 'a-z')"
+  if [ "$WHICH" != oldest ]; then start_on "$kind"; LRC=$?
+  else # A-169: the rungs from the lowest; the first whose simulator starts the build is «oldest» (written with every refusal before it)
+    LRC=3; for v in $OLDEST_LADDER; do
+      rung "$v" || continue
+      FIRST_LAUNCH_DONE=""; start_on "$kind"; LRC=$?
+      [ "$LRC" = 2 ] || break
+      echo "== iOS $RTV: cannot start this Xcode's simulator build - $(grep -aE -m1 'Library not loaded|Symbol not found' "$OUT/${TAG}_console.txt" | cut -c1-200)" | tee -a "$OUT/runtimes.txt"
+      mv "$OUT/${TAG}_console.txt" "$OUT/${TAG}_console-$RTV.txt"; xcrun simctl shutdown "$U" > /dev/null 2>&1; xcrun simctl delete "$U" > /dev/null 2>&1 || true
+    done
+    [ "$LRC" = 0 ] && echo "== chosen (oldest): $RTID ($RTV) - the lowest rung of «${OLDEST_LADDER}» that starts this Xcode's simulator build (A-169)" | tee -a "$OUT/runtimes.txt"
+  fi
+  case "$LRC" in
+    0) ;;
+    2|3) if [ "$WHICH" = oldest ]; then a3 "start" FAIL "no rung of ${OLDEST_LADDER} started the app (runtimes.txt: each rung's download / loader line)"
+      else a3 "start" FAIL "the loader refused the build on iOS $RTV - ${TAG}_console.txt"; xcrun simctl shutdown "$U"; fi; RC=1; continue;;
+    4) RC=1; continue;;
+    *) a3 "start" FAIL "no «home painted» / no remote hand - ${TAG}_console.txt"; RC=1; xcrun simctl shutdown "$U"; continue;;
+  esac
   a3 "start + live import" PASS "$(grep -a 'InokBoot' "$OUT/${TAG}_console.txt" | tail -2 | sed 's/.*InokBoot: //' | tr '\n' ';' | cut -c1-200)"
   # A-144 (cloud_43): a fresh simulator = an empty database -> the directory built into the app is imported first (no network wait)
   if grep -aq 'InokBoot: bundled export .* imported' "$OUT/${TAG}_console.txt"; then a3 "bundled directory (A-144)" PASS "$(grep -a 'InokBoot: bundled export' "$OUT/${TAG}_console.txt" | head -1 | sed 's/.*InokBoot: //')"
