@@ -33,7 +33,7 @@ describe('version (A-62)', () => {
     expect(gradle.match(/return x \* 10000 \+ y \* 100 \+ z/g)).toHaveLength(1);
   });
   it('the rule: 1.0.0 -> 10000, 1.2.3 -> 10203, X.99.99 the top of X; Y / Z > 99 and non-X.Y.Z fail', () => {
-    expect(oracle(APP_VERSION)).toBe(10017); // 1.0.17 (cloud_43, A-150 ... A-157) - Play AND the App Store
+    expect(oracle(APP_VERSION)).toBe(10018); // 1.0.18 (cloud_44, A-160 ... A-168) - Play AND the App Store
     expect(oracle('1.0.1')).toBe(10001);
     expect(oracle('1.2.3')).toBe(10203);
     expect(oracle('1.99.99')).toBe(19999);
