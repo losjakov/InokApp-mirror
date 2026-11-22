@@ -111,7 +111,8 @@ launch() { # (re)start the app with its console captured; wait for a NEW «home 
   # cloud_44 (REVIEW cloud_43 backlog): `grep -c … || echo 0` printed «0» TWICE (grep prints 0 and exits 1) -> «[: 0\n0: integer expression
   # expected»; the same form as n0 above. The OLDEST runtime's FIRST launch (iOS 16.4 iPad «start» timed out twice on 22.11: a cold simulator
   # compiles the WebKit caches) waits up to 300 s, every other launch 180 s; the time it took is written down (measured, not guessed)
-  local tries=90 t0=$SECONDS n _; if [ "$WHICH" = oldest ] && [ "${FIRST_LAUNCH_DONE:-}" != "$TAG" ]; then tries=150; fi; FIRST_LAUNCH_DONE="$TAG"
+  # cloud_44 (ios 45031613354: iPhone AND iPad 16.4 - a runtime DOWNLOADED in the job - printed nothing for 318 s): the first launch waits 600 s
+  local tries=90 t0=$SECONDS n _; if [ "$WHICH" = oldest ] && [ "${FIRST_LAUNCH_DONE:-}" != "$TAG" ]; then tries=300; fi; FIRST_LAUNCH_DONE="$TAG"
   for _ in $(seq 1 "$tries"); do n=$(grep -c 'home painted' "$OUT/${TAG}_console.txt" 2>/dev/null || true); [ "${n:-0}" -gt "$n0" ] && break; sleep 2; done
   echo "launch $TAG: home painted after $((SECONDS - t0)) s (limit $((tries * 2)) s)" >> "$OUT/nav.txt"
   for _ in $(seq 1 30); do [ "$(curl -s localhost:8765/health | python3 -I -c 'import json,sys; a=json.load(sys.stdin)["ago"]; print(1 if a is not None and a < 20000 else 0)')" = 1 ] && return 0; sleep 2; done
@@ -176,13 +177,15 @@ a3_walk() {
     local back; back=$(ev "(() => (document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed') + ' ' + location.pathname)()")
     case "$v $back" in *' / '*' closed /monasteries/242') a3 "gallery link $f (A-166)" PASS "viewer $v; closed -> $back";; *) a3 "gallery link $f (A-166)" FAIL "viewer $v; after close $back";; esac
   done
-  # cloud_44 A-161 (3): the widget's live row - the system opens inokapp://tab/streams?play=<id> (a REAL openurl): «Трансляції», the stream's sheet
-  # on top (SFSafariViewController - no DOM: the frame), closed -> «Трансляції»
-  xcrun simctl openurl "$U" 'inokapp://tab/streams?play=DWCj8tI47q4' 2>>"$OUT/nav.txt"; sleep 8
+  # cloud_44 A-161 (3): the widget's live row - the address inokapp://tab/streams?play=<id> handed to the app's ONE link path (as the gallery links
+  # above). Not `simctl openurl`: it raises the system's «Open in “inok.info”?» alert (no DOM; ios 45031613354 - the alert then blocked the next
+  # spot); a widget's own Link opens with no alert (the owner's iPhone). «Трансляції», the stream's sheet on top (no DOM: the frame), closed
+  nav go /home; sleep 2
+  ev "(window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'inokapp://tab/streams?play=DWCj8tI47q4' })), 'ok')" > /dev/null; sleep 8
   v=$(ev "location.pathname"); shot "$OUT/a3-live-tap-sheet__$TAG.png"
   ev "Capacitor.Plugins.Browser.close().then(() => 'closed').catch(() => 'none')" > /dev/null; sleep 3
   local after; after=$(ev "location.pathname"); shot "$OUT/a3-live-tap-back__$TAG.png"
-  if [ "$v" = /streams ] && [ "$after" = /streams ]; then a3 "live tap -> «Трансляції» + the stream (A-161 (3))" PASS "openurl -> $v; sheet closed -> $after"; else a3 "live tap -> «Трансляції» + the stream (A-161 (3))" FAIL "openurl -> $v; after $after"; fi
+  if [ "$v" = /streams ] && [ "$after" = /streams ]; then a3 "live tap -> «Трансляції» + the stream (A-161 (3))" PASS "the address -> $v; sheet closed -> $after"; else a3 "live tap -> «Трансляції» + the stream (A-161 (3))" FAIL "the address -> $v; after $after"; fi
   # 0b cloud_40 (A1 g): «Про застосунок» - «Перевірка Apple: …» on a simulator = «not supported by this device» (Apple's own answer), never
   # «the call failed» (= the plugin not in the bridge); «Скопіювати подробиці» shows the text (no key id / install id in it)
   nav go /more/about; sleep 3
@@ -473,7 +476,8 @@ for kind in $KINDS; do
   xcrun simctl location "$U" set 50.4344,30.5571 2>>"$OUT/nav.txt" || true   # the Lavra: «Поруч»
   xcrun simctl install "$U" "$APP"
   xcrun simctl privacy "$U" grant location "$BUNDLE" 2>>"$OUT/nav.txt" || true
-  if ! launch; then a3 "start" FAIL "no «home painted» / no remote hand - ${TAG}_console.txt"; RC=1; xcrun simctl shutdown "$U"; continue; fi
+  # cloud_44: a cold simulator's FIRST start may never paint (its caches build meanwhile) - ONE more launch, written down, before «start» fails
+  if ! launch && { echo "launch $TAG: once more after a cold first start" >> "$OUT/nav.txt"; ! launch; }; then a3 "start" FAIL "no «home painted» / no remote hand - ${TAG}_console.txt"; RC=1; xcrun simctl shutdown "$U"; continue; fi
   a3 "start + live import" PASS "$(grep -a 'InokBoot' "$OUT/${TAG}_console.txt" | tail -2 | sed 's/.*InokBoot: //' | tr '\n' ';' | cut -c1-200)"
   # A-144 (cloud_43): a fresh simulator = an empty database -> the directory built into the app is imported first (no network wait)
   if grep -aq 'InokBoot: bundled export .* imported' "$OUT/${TAG}_console.txt"; then a3 "bundled directory (A-144)" PASS "$(grep -a 'InokBoot: bundled export' "$OUT/${TAG}_console.txt" | head -1 | sed 's/.*InokBoot: //')"
