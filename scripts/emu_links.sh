@@ -47,7 +47,8 @@ open_link 'https://inok.info/articles/' '^/articles$' cold_list_articles_all col
 # closes the viewer and leaves the card (frames link_<name>_viewer / _back); a plain short link = the card only; a short path that is not a card
 # (in the filter by its digit) -> the browser. Running AND cold.
 NAV="$ROOT/scripts/emu_nav.mjs"
-viewer() { node "$NAV" eval "(() => { const m = document.querySelector('ion-modal.viewer:not(.overlay-hidden)'); if (!m) return 'closed'; const c = m.querySelector('[data-testid=viewer-count]'); return c ? c.textContent.trim() : 'open'; })()" 2>/dev/null || echo none; }
+# emu_nav's `eval` prints «eval: <value>» - the prefix is cut (emulator 45037147515: «eval: closed» read as not closed)
+viewer() { node "$NAV" eval "(() => { const m = document.querySelector('ion-modal.viewer:not(.overlay-hidden)'); if (!m) return 'closed'; const c = m.querySelector('[data-testid=viewer-count]'); return c ? c.textContent.trim() : 'open'; })()" 2>/dev/null | sed 's/^eval: //' || echo none; }
 gallery_link() { # url  code  shot-name  [cold]
   open_link "$1" "^/monasteries/$2\$" "$3" "${4:-}"
   local v=closed _; for _ in 1 2 3 4 5 6 7 8 9 10; do v=$(viewer); case "$v" in closed|none) sleep 2;; *) break;; esac; done

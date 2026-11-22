@@ -94,6 +94,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/p/Payload" && cp -R "$A" "$RUNNER_TEMP/p/Payload/" && (cd "$RUNNER_TEMP/p" && zip -qry ../unsigned.ipa Payload)
           echo "Release App.app (arm64, not signed): $(du -sk "$A" | cut -f1) KB; zipped as an IPA: $(stat -f%z "$RUNNER_TEMP/unsigned.ipa") b" | tee -a "$GITHUB_STEP_SUMMARY"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' -c 'Print :CFBundleVersion' -c 'Print :MinimumOSVersion' "$A/Info.plist" | tr '\n' ' ' | sed 's/^/version build minimumOS: /' | tee -a "$GITHUB_STEP_SUMMARY"; echo >> "$GITHUB_STEP_SUMMARY"
+          # cloud_44: the RELEASE binary must not need SwiftUICore (absent before iOS 18; the app's floor is 15.0) - a strong link = red
+          L=$(otool -L "$A/App" "$A/PlugIns/InokWidgets.appex/InokWidgets" | grep -i 'SwiftUICore' || true); echo "release links SwiftUICore: ${L:-none}" | tee -a "$GITHUB_STEP_SUMMARY"
+          if echo "$L" | grep -v 'weak' | grep -q SwiftUICore; then echo "::error::the release binary links SwiftUICore strongly - it would not start below iOS 18"; exit 1; fi
 
   # the SIGNED archive by the App Store Connect API key (cloud-managed signing), exported as a signed IPA (proof), or UPLOADED to
   # TestFlight on the release snapshot / a manual run with `upload`. A refusal by Apple is written as it comes (REPORT / QUESTIONS),
