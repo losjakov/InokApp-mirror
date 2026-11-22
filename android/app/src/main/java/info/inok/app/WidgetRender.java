@@ -7,28 +7,42 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.text.Layout;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.util.SizeF;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
-/** T9: THE drawing of the three widgets (RemoteViews; no Compose / Glance - no heavy dependency): WidgetModel decides, this draws. */
+/**
+ * THE drawing of the three widgets (RemoteViews; no Compose / Glance): WidgetModel decides, this draws. 1.0.18 (A-163, the CD kit): one
+ * layout per size bucket (2x1 tiny, 4x1 strip, 2x2 small, 4x2 / 4x4 list), the rows added one by one (widget_row_<kind>.xml); Android 12+
+ * gets one RemoteViews PER SIZE the launcher uses (OPTION_APPWIDGET_SIZES -> RemoteViews(Map<SizeF, RemoteViews>), developer.android.com
+ * «Responsive layouts»), Android 8-11 the portrait size (OPTION_APPWIDGET_MIN_WIDTH / MIN_HEIGHT). The rows that fit are MEASURED here
+ * (StaticLayout with the rows' own text settings: no hyphenation, whole words) - never guessed from a title's length.
+ */
 final class WidgetRender {
     private WidgetRender() { }
 
-    static final int[] ROW = { R.id.w_row1, R.id.w_row2, R.id.w_row3 };
-    static final int[] ROW_IMG = { R.id.w_row1_img, R.id.w_row2_img, R.id.w_row3_img };
-    static final int[] ROW_PIC = { R.id.w_row1_pic, R.id.w_row2_pic, R.id.w_row3_pic };
-    static final int[] ROW_DOT = { R.id.w_row1_dot, R.id.w_row2_dot, R.id.w_row3_dot };
-    static final int[] ROW_TITLE = { R.id.w_row1_title, R.id.w_row2_title, R.id.w_row3_title };
-    static final int[] ROW_SUB = { R.id.w_row1_sub, R.id.w_row2_sub, R.id.w_row3_sub };
-    static final int[] ROW_BELL = { R.id.w_row1_bell, R.id.w_row2_bell, R.id.w_row3_bell };
-
     static String kindOf(Class<?> p) { return p == LiveWidget.class ? WidgetModel.LIVE : p == UpcomingWidget.class ? WidgetModel.UPCOMING : WidgetModel.NEW; }
     static final Class<?>[] PROVIDERS = { LiveWidget.class, UpcomingWidget.class, NewWidget.class };
+    /** the kit's 4x2 (README «Measures»): the size a widget is drawn at when the launcher says none */
+    static final float DEFAULT_W = 344, DEFAULT_H = 176;
 
     static boolean anyWidget(Context c) {
         AppWidgetManager m = AppWidgetManager.getInstance(c);
@@ -44,67 +58,182 @@ final class WidgetRender {
     }
 
     static void draw(Context c, AppWidgetManager m, int id, String kind, WidgetModel.Data d) {
-        Bundle o = m.getAppWidgetOptions(id);
-        int minW = o == null ? 250 : o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
-        boolean small = minW < 200; // 2 cells wide = small (A-153: small 2x2 + medium 4x2)
-        float fs = c.getResources().getConfiguration().fontScale;
-        m.updateAppWidget(id, views(c, id, kind, small, fs, d));
+        m.updateAppWidget(id, forWidget(c, m.getAppWidgetOptions(id), id, kind, d));
     }
 
-    static RemoteViews views(Context c, int id, String kind, boolean small, float fs, WidgetModel.Data d) {
-        RemoteViews v = new RemoteViews(c.getPackageName(), small ? R.layout.widget_small : R.layout.widget_medium);
-        WidgetModel.View w = WidgetModel.build(kind, small, fs, d, System.currentTimeMillis(), ZoneId.systemDefault());
+    /** API 31+: a RemoteViews per size the launcher draws this widget at; older: the portrait size (min width x min height - never cut). */
+    static RemoteViews forWidget(Context c, Bundle o, int id, String kind, WidgetModel.Data d) {
+        if (Build.VERSION.SDK_INT >= 31 && o != null) {
+            ArrayList<SizeF> sizes = o.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES);
+            if (sizes != null && !sizes.isEmpty()) {
+                Map<SizeF, RemoteViews> map = new HashMap<>();
+                int n = 0;
+                for (SizeF s : sizes) if (!map.containsKey(s) && n < 16) map.put(s, views(c, id * 20 + (n++) * 2, kind, s.getWidth(), s.getHeight(), d));
+                return new RemoteViews(map);
+            }
+        }
+        float w = o == null ? 0 : o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+        float h = o == null ? 0 : o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
+        return views(c, id * 20, kind, w > 0 ? w : DEFAULT_W, h > 0 ? h : DEFAULT_H, d);
+    }
+
+    /** The text as the phone lays it out in the rows (the row layouts' settings: bold, line spacing 1.07, no hyphenation, simple breaks). */
+    static final class PhoneMeasure implements WidgetModel.Measure {
+        final Context c; final float density;
+        PhoneMeasure(Context c) { this.c = c; this.density = c.getResources().getDisplayMetrics().density; }
+        StaticLayout layout(String text, float widthDp, float sp, int maxLines) {
+            TextPaint p = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
+            p.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, c.getResources().getDisplayMetrics()));
+            p.setTypeface(Typeface.DEFAULT_BOLD);
+            StaticLayout.Builder b = StaticLayout.Builder.obtain(text, 0, text.length(), p, Math.max(1, Math.round(widthDp * density)))
+                .setLineSpacing(0f, LINE_SPACING).setIncludePad(true)
+                .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE).setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE);
+            if (maxLines > 0) b.setMaxLines(maxLines).setEllipsize(TextUtils.TruncateAt.END);
+            return b.build();
+        }
+        @Override public float height(String text, float widthDp, float sp, int maxLines) { return layout(text, widthDp, sp, maxLines).getHeight() / density; }
+        @Override public int lines(String text, float widthDp, float sp) { return layout(text, widthDp, sp, 0).getLineCount(); }
+    }
+    /** = android:lineSpacingMultiplier of the row layouts (line height ~1.25 em, the kit) */
+    static final float LINE_SPACING = 1.07f;
+
+    static int layoutOf(WidgetModel.Size s) {
+        switch (s) {
+            case TINY: return R.layout.widget_tiny;
+            case STRIP: return R.layout.widget_strip;
+            case SMALL: return R.layout.widget_small;
+            default: return R.layout.widget_list;
+        }
+    }
+
+    static RemoteViews views(Context c, int code, String kind, float wDp, float hDp, WidgetModel.Data d) {
+        float fs = c.getResources().getConfiguration().fontScale;
+        WidgetModel.View w = WidgetModel.build(kind, wDp, hDp, fs, d, System.currentTimeMillis(), ZoneId.systemDefault(), new PhoneMeasure(c));
+        RemoteViews v = new RemoteViews(c.getPackageName(), layoutOf(w.size));
         if (w.empty) { // first added before the app ever wrote its data: the name + «Відкрийте застосунок…» (x3 resources), never empty boxes
             v.setTextViewText(R.id.w_header, c.getString(kind.equals(WidgetModel.LIVE) ? R.string.widget_live : kind.equals(WidgetModel.UPCOMING) ? R.string.widget_upcoming : R.string.widget_new));
+            if (w.size == WidgetModel.Size.STRIP || w.size == WidgetModel.Size.TINY) v.setViewVisibility(R.id.w_head_row, View.VISIBLE);
             v.setTextViewText(R.id.w_note, c.getString(R.string.widget_open_app));
             v.setViewVisibility(R.id.w_note, View.VISIBLE);
-            for (int i = 0; i < rows(small); i++) v.setViewVisibility(ROW[i], View.GONE);
-            v.setViewVisibility(R.id.w_big, View.GONE);
-            v.setTextViewText(R.id.w_foot, ""); v.setTextViewText(R.id.w_updated, "");
-            v.setOnClickPendingIntent(R.id.w_root, open(c, id * 10 + 9, "inokapp://tab/" + (kind.equals(WidgetModel.NEW) ? "articles" : "streams")));
+            v.setOnClickPendingIntent(R.id.w_root, open(c, code + 1, kind.equals(WidgetModel.NEW) ? "inokapp://tab/articles" : WidgetModel.STREAMS));
             return v;
         }
         v.setTextViewText(R.id.w_header, w.header);
-        v.setOnClickPendingIntent(R.id.w_header, open(c, id * 10 + 8, w.headerUrl));
-        v.setViewVisibility(R.id.w_live_dot, kind.equals(WidgetModel.LIVE) && !w.rows.isEmpty() ? View.VISIBLE : View.GONE);
-        if (small) {
-            v.setViewVisibility(R.id.w_big, w.big.isEmpty() ? View.GONE : View.VISIBLE);
-            v.setTextViewText(R.id.w_big, w.big);
-        }
-        for (int i = 0; i < rows(small); i++) {
-            if (i >= w.rows.size()) { v.setViewVisibility(ROW[i], View.GONE); continue; }
-            WidgetModel.Row r = w.rows.get(i);
-            v.setViewVisibility(ROW[i], View.VISIBLE);
-            v.setTextViewText(ROW_TITLE[i], r.title);
-            v.setInt(ROW_TITLE[i], "setMaxLines", w.titleLines);
-            v.setViewVisibility(ROW_SUB[i], TextUtils.isEmpty(r.sub) ? View.GONE : View.VISIBLE);
-            v.setTextViewText(ROW_SUB[i], r.sub == null ? "" : r.sub);
-            v.setViewVisibility(ROW_BELL[i], r.bell ? View.VISIBLE : View.GONE);
-            v.setViewVisibility(ROW_DOT[i], r.live ? View.VISIBLE : View.GONE);
-            Bitmap b = r.image == null || small ? null : avatar(c, r.image); // a small widget gives its width to the words (emulator 44917561352)
-            if (b != null) { v.setImageViewBitmap(ROW_IMG[i], b); v.setViewVisibility(ROW_IMG[i], View.VISIBLE); }
-            else v.setViewVisibility(ROW_IMG[i], kind.equals(WidgetModel.NEW) || small ? View.GONE : View.VISIBLE);
-            // the picture's 34 dp box itself goes in a small widget and in «Нове на сайті» (emulator 44928369145: «С / ан-Франциського» cut mid-word)
-            v.setViewVisibility(ROW_PIC[i], kind.equals(WidgetModel.NEW) || small ? View.GONE : View.VISIBLE);
-            v.setContentDescription(ROW[i], r.say);
-            v.setOnClickPendingIntent(ROW[i], open(c, id * 10 + i, r.url));
-        }
-        if (small) v.setOnClickPendingIntent(R.id.w_root, open(c, id * 10 + 7, w.rows.isEmpty() ? w.headerUrl : w.rows.get(0).url));
+        v.setViewVisibility(R.id.w_live_dot, w.liveDot ? View.VISIBLE : View.GONE);
         v.setViewVisibility(R.id.w_note, w.note.isEmpty() ? View.GONE : View.VISIBLE);
         v.setTextViewText(R.id.w_note, w.note);
-        v.setTextViewText(R.id.w_foot, w.foot);
-        v.setTextViewText(R.id.w_updated, w.updated);
+        v.setOnClickPendingIntent(R.id.w_root, open(c, code + 1, w.url.isEmpty() ? w.headerUrl : w.url));
+        switch (w.size) {
+            case LIST: list(c, v, w, kind, code, d); break;
+            case SMALL: small(c, v, w, kind, code, d); break;
+            default: line(c, v, w, kind, d); break;
+        }
         return v;
     }
 
-    static int rows(boolean small) { return small ? 1 : 3; }
+    static void list(Context c, RemoteViews v, WidgetModel.View w, String kind, int code, WidgetModel.Data d) {
+        v.setOnClickPendingIntent(R.id.w_header, open(c, code + 1, w.headerUrl));
+        v.setTextViewText(R.id.w_updated, w.updated);
+        rows(c, v, w, kind, code, false, d);
+        v.setViewVisibility(R.id.w_foot, w.foot.isEmpty() ? View.GONE : View.VISIBLE);
+        v.setTextViewText(R.id.w_foot, w.foot);
+    }
 
-    /** A kept channel picture (files/kept, the app's own cache), scaled to the row's 40 dp - RemoteViews carry the bitmap, so it stays small. */
+    static void small(Context c, RemoteViews v, WidgetModel.View w, String kind, int code, WidgetModel.Data d) {
+        v.setViewVisibility(R.id.w_big, w.big.isEmpty() ? View.GONE : View.VISIBLE);
+        v.setTextViewText(R.id.w_big, w.big);
+        if (kind.equals(WidgetModel.NEW)) rows(c, v, w, kind, code, true, d);
+        else { // live / upcoming: ONE channel, its name whole (no picture: the width is the words')
+            v.removeAllViews(R.id.w_rows);
+            if (!w.rows.isEmpty()) {
+                RemoteViews r = new RemoteViews(c.getPackageName(), R.layout.widget_row_new);
+                r.setViewVisibility(R.id.w_dot, View.GONE);
+                r.setTextViewText(R.id.w_text, w.rows.get(0).text);
+                r.setTextViewTextSize(R.id.w_text, TypedValue.COMPLEX_UNIT_SP, WidgetModel.SMALL_SP);
+                if (w.titleLines > 0) r.setInt(R.id.w_text, "setMaxLines", w.titleLines);
+                r.setContentDescription(R.id.w_row, w.rows.get(0).say);
+                v.addView(R.id.w_rows, r);
+            }
+        }
+        v.setTextViewText(R.id.w_foot, w.foot);
+        v.setTextViewText(R.id.w_updated, w.updated);
+    }
+
+    /** 4x1 / 2x1: the header (live, upcoming), the big time, ONE line of words (shrinks to stay whole), the pictures */
+    static void line(Context c, RemoteViews v, WidgetModel.View w, String kind, WidgetModel.Data d) {
+        boolean strip = w.size == WidgetModel.Size.STRIP;
+        WidgetModel.Row r = w.rows.isEmpty() ? null : w.rows.get(0);
+        boolean head = kind.equals(WidgetModel.LIVE) || (!strip && kind.equals(WidgetModel.UPCOMING));
+        v.setViewVisibility(R.id.w_head_row, head ? View.VISIBLE : View.GONE);
+        v.setViewVisibility(R.id.w_big, w.big.isEmpty() ? View.GONE : View.VISIBLE);
+        v.setTextViewText(R.id.w_big, w.big);
+        boolean words = r != null && !(kind.equals(WidgetModel.UPCOMING) && !strip);
+        v.setViewVisibility(R.id.w_line, words ? View.VISIBLE : View.GONE);
+        if (r != null) { v.setTextViewText(R.id.w_line, r.text); v.setContentDescription(R.id.w_root, r.say); }
+        if (kind.equals(WidgetModel.NEW) && r != null) { v.setViewVisibility(R.id.w_dot, View.VISIBLE); dot(c, v, R.id.w_dot, r.dot, d); }
+        else v.setViewVisibility(R.id.w_dot, View.GONE);
+        if (strip) { v.setViewVisibility(R.id.w_foot, w.foot.isEmpty() ? View.GONE : View.VISIBLE); v.setTextViewText(R.id.w_foot, w.foot); }
+        int[] av = strip ? new int[] { R.id.w_av1, R.id.w_av2, R.id.w_av3, R.id.w_av4 } : new int[] { R.id.w_av1, R.id.w_av2, R.id.w_av3 };
+        v.setViewVisibility(R.id.w_avatars, w.avatars.isEmpty() ? View.GONE : View.VISIBLE);
+        for (int i = 0; i < av.length; i++) {
+            if (i >= w.avatars.size()) { v.setViewVisibility(av[i], View.GONE); continue; }
+            v.setViewVisibility(av[i], View.VISIBLE); picture(c, v, av[i], w.avatars.get(i));
+        }
+        if (!strip) { // 2x1 «Найближча»: the channel's picture beside the time
+            boolean side = kind.equals(WidgetModel.UPCOMING) && r != null;
+            v.setViewVisibility(R.id.w_side, side ? View.VISIBLE : View.GONE);
+            if (side) picture(c, v, R.id.w_side, r.image);
+        }
+    }
+
+    /** the rows the model kept, each from its kind's row layout; a tap opens its own address */
+    static void rows(Context c, RemoteViews v, WidgetModel.View w, String kind, int code, boolean small, WidgetModel.Data d) {
+        v.removeAllViews(R.id.w_rows);
+        int layout = kind.equals(WidgetModel.LIVE) ? R.layout.widget_row_live : kind.equals(WidgetModel.UPCOMING) ? R.layout.widget_row_upcoming : R.layout.widget_row_new;
+        for (int i = 0; i < w.rows.size(); i++) {
+            WidgetModel.Row row = w.rows.get(i);
+            RemoteViews r = new RemoteViews(c.getPackageName(), layout);
+            if (kind.equals(WidgetModel.UPCOMING)) {
+                SpannableString s = new SpannableString(row.text); // the time transparent here, drawn over it in the accent colour (w_time)
+                s.setSpan(new ForegroundColorSpan(Color.TRANSPARENT), 0, Math.min(row.time.length(), row.text.length()), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                r.setTextViewText(R.id.w_text, s);
+                r.setTextViewText(R.id.w_time, row.time);
+                r.setViewVisibility(R.id.w_bell, row.bell ? View.VISIBLE : View.GONE);
+            } else r.setTextViewText(R.id.w_text, row.text);
+            // a larger text size (A-155 (1)): at most 2 lines, «…» (the layouts' ellipsize="end" acts only under a line limit - never at the normal size)
+            if (w.titleLines > 0) r.setInt(R.id.w_text, "setMaxLines", w.titleLines);
+            if (small) r.setTextViewTextSize(R.id.w_text, TypedValue.COMPLEX_UNIT_SP, WidgetModel.SMALL_SP);
+            if (kind.equals(WidgetModel.NEW)) dot(c, r, R.id.w_dot, row.dot, d);
+            else picture(c, r, R.id.w_img, row.image);
+            r.setContentDescription(R.id.w_row, row.say);
+            r.setOnClickPendingIntent(R.id.w_row, open(c, code + 2 + i, row.url));
+            v.addView(R.id.w_rows, r);
+        }
+    }
+
+    /** the kind's dot: the kit's colour (a drawable per kind, the theme's own) or the site's ui-config colour (A-162 (2)) */
+    static void dot(Context c, RemoteViews v, int id, String kind, WidgetModel.Data d) {
+        v.setImageViewResource(id, WidgetModel.DOT_NEWS.equals(kind) ? R.drawable.widget_dot_news : WidgetModel.DOT_VIDEO.equals(kind) ? R.drawable.widget_dot_video : R.drawable.widget_dot_pub);
+        Integer col = WidgetStore.dotColor(c, d, kind);
+        if (col != null) v.setInt(id, "setColorFilter", col);
+    }
+
+    /** a channel picture: the kit's bundled one («av:<site channel id>», the samples) or the app's kept file; none = the app's icon */
+    static void picture(Context c, RemoteViews v, int id, String image) {
+        if (image != null && image.startsWith("av:")) {
+            int res = c.getResources().getIdentifier("widget_av_" + image.substring(3), "drawable", c.getPackageName());
+            if (res != 0) { v.setImageViewResource(id, res); return; }
+        }
+        Bitmap b = image == null ? null : avatar(c, image);
+        if (b != null) v.setImageViewBitmap(id, b); else v.setImageViewResource(id, R.mipmap.ic_launcher_round);
+    }
+
+    /** A kept channel picture (files/kept, the app's own cache), scaled to 34 dp - RemoteViews carry the bitmap, so it stays small. */
     static Bitmap avatar(Context c, String path) {
         try {
             BitmapFactory.Options o = new BitmapFactory.Options(); o.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(path, o);
-            int px = Math.round(40 * c.getResources().getDisplayMetrics().density);
+            int px = Math.round(WidgetModel.AVATAR * c.getResources().getDisplayMetrics().density);
             int s = 1; while (o.outWidth / (s * 2) >= px && o.outHeight / (s * 2) >= px) s *= 2;
             o = new BitmapFactory.Options(); o.inSampleSize = s;
             Bitmap b = BitmapFactory.decodeFile(path, o);
@@ -112,12 +241,11 @@ final class WidgetRender {
         } catch (Exception e) { return null; }
     }
 
-    /** A row / the header opens its screen: a YouTube broadcast in the YouTube app (as the app's live row, A-37); anything else = the app
-     *  itself with the address (inokapp://tab/…, https://inok.info/… - THE router, linkRoute). */
+    /** A row / the header opens the APP with its address (inokapp://tab/…, inokapp://tab/streams?play=<id> - A-161 (3): «Трансляції» first, the
+     *  stream on top, started FROM the app so Back returns to «Трансляції»; https://inok.info/… - THE router, linkRoute). Never straight to YouTube. */
     static PendingIntent open(Context c, int code, String url) {
-        Intent i;
-        if (url.startsWith("https://www.youtube.com/")) i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        else { i = new Intent(Intent.ACTION_VIEW, Uri.parse(url), c, MainActivity.class); i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP); }
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url), c, MainActivity.class);
+        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(c, code, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 }

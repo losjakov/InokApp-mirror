@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 1.0.18 (A-161 (1)): one «Нове на сайті» row - the kind's dot (news / publication / video) + the TITLE only, whole -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/w_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal"
+    android:gravity="top" android:paddingTop="2dp" android:paddingBottom="2dp">
+    <ImageView android:id="@+id/w_dot" android:layout_width="10dp" android:layout_height="10dp" android:layout_marginTop="5dp" android:layout_marginEnd="10dp" android:src="@drawable/widget_dot_news" android:importantForAccessibility="no" />
+    <TextView android:id="@+id/w_text" android:ellipsize="end" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="@color/widget_text"
+        android:textSize="14sp" android:textStyle="bold" android:hyphenationFrequency="none" android:breakStrategy="simple" android:includeFontPadding="true" android:lineSpacingMultiplier="1.07" android:importantForAccessibility="no" />
+</LinearLayout>

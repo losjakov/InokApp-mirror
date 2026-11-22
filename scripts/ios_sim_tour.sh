@@ -163,7 +163,26 @@ a3_walk() {
   v=$(ev "Capacitor.Plugins.InokWidgets.snapshot().then((x) => JSON.stringify(x)).catch((e) => 'REJECT ' + String((e && e.message) || e))")
   local wc wd; wc="$(xcrun simctl get_app_container "$U" "$BUNDLE" data 2>/dev/null || true)"; wd="$OUT/widgets-$TAG"; mkdir -p "$wd"
   [ -n "$wc" ] && cp "$wc"/Documents/widgets/*.png "$wd/" 2>/dev/null
-  if [ "$(find "$wd" -name '*.png' | wc -l | tr -d ' ')" -ge 12 ]; then a3 "widgets snapshot (T9)" PASS "$v"; else a3 "widgets snapshot (T9)" NOT-PROVABLE "${v:-no answer}"; fi
+  # 1.0.18: kind x small / medium / large x light / dark x (the app's data + the gallery sample uk / ru / en) = 72 (the kit's acceptance sheets)
+  if [ "$(find "$wd" -name '*.png' | wc -l | tr -d ' ')" -ge 72 ]; then a3 "widgets snapshot (A-163)" PASS "$v"; else a3 "widgets snapshot (A-163)" NOT-PROVABLE "${v:-no answer}"; fi
+  # cloud_44 A-166: the gallery links through THE router - the system's hand-over (Universal Links of the short forms need the site's AASA after
+  # the release, A-166 (4)): the card, ITS gallery on top «1 / N»; the viewer closed -> the card
+  local f; for f in 'https://inok.info/ru/242/g' 'https://inok.info/monasteries/242/?lang=ru&gallery=Y'; do
+    nav go /home; sleep 2
+    ev "(window.dispatchEvent(new CustomEvent('inok-url-open', { detail: '$f' })), 'ok')" > /dev/null
+    v=no; for _ in 1 2 3 4 5 6 7 8 9 10; do v=$(ev "(() => { const c = document.querySelector('ion-modal.viewer:not(.overlay-hidden) [data-testid=viewer-count]'); return (location.pathname === '/monasteries/242' && c) ? c.textContent.trim() : 'no'; })()"); [ "$v" != no ] && break; sleep 2; done
+    shot "$OUT/a3-link-gallery-$(echo "$f" | tr -c 'a-z0-9' '_' | cut -c1-40)__$TAG.png"
+    ev "(document.querySelector('ion-modal.viewer [data-testid=viewer-close]') || {}).click?.(), 'ok'" > /dev/null; sleep 2
+    local back; back=$(ev "(() => (document.querySelector('ion-modal.viewer:not(.overlay-hidden)') ? 'open' : 'closed') + ' ' + location.pathname)()")
+    case "$v $back" in *' / '*' closed /monasteries/242') a3 "gallery link $f (A-166)" PASS "viewer $v; closed -> $back";; *) a3 "gallery link $f (A-166)" FAIL "viewer $v; after close $back";; esac
+  done
+  # cloud_44 A-161 (3): the widget's live row - the system opens inokapp://tab/streams?play=<id> (a REAL openurl): «Трансляції», the stream's sheet
+  # on top (SFSafariViewController - no DOM: the frame), closed -> «Трансляції»
+  xcrun simctl openurl "$U" 'inokapp://tab/streams?play=DWCj8tI47q4' 2>>"$OUT/nav.txt"; sleep 8
+  v=$(ev "location.pathname"); shot "$OUT/a3-live-tap-sheet__$TAG.png"
+  ev "Capacitor.Plugins.Browser.close().then(() => 'closed').catch(() => 'none')" > /dev/null; sleep 3
+  local after; after=$(ev "location.pathname"); shot "$OUT/a3-live-tap-back__$TAG.png"
+  if [ "$v" = /streams ] && [ "$after" = /streams ]; then a3 "live tap -> «Трансляції» + the stream (A-161 (3))" PASS "openurl -> $v; sheet closed -> $after"; else a3 "live tap -> «Трансляції» + the stream (A-161 (3))" FAIL "openurl -> $v; after $after"; fi
   # 0b cloud_40 (A1 g): «Про застосунок» - «Перевірка Apple: …» on a simulator = «not supported by this device» (Apple's own answer), never
   # «the call failed» (= the plugin not in the bridge); «Скопіювати подробиці» shows the text (no key id / install id in it)
   nav go /more/about; sleep 3

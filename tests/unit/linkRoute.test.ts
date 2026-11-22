@@ -56,4 +56,11 @@ describe('linkRoute (StartRoute + useAppLinks + the article text)', () => {
       expect(await linkRoute(db, h, now), h).toEqual({ to: '/monasteries/242' });
     expect(await linkRoute(db, 'https://inok.info/999999/g', now)).toBeNull();
   });
+  it('A-161 (3) (cloud_44): a widget\'s live row `inokapp://tab/streams?play=<id>` -> «Трансляції» + that stream on top; a bad id -> «Трансляції» only', async () => {
+    expect(await linkRoute(db, 'inokapp://tab/streams?play=DWCj8tI47q4', now)).toEqual({ to: '/streams', play: 'DWCj8tI47q4' });
+    expect(await linkRoute(db, 'inokapp://tab/streams', now)).toEqual({ to: '/streams' });
+    for (const bad of ['inokapp://tab/streams?play=', 'inokapp://tab/streams?play=a"b<c', 'inokapp://tab/streams?play=../x'])
+      expect(await linkRoute(db, bad, now), bad).toEqual({ to: '/streams' });
+    expect(await linkRoute(db, 'inokapp://tab/map?play=abc123', now), 'play only on «Трансляції»').toEqual({ to: '/map' });
+  });
 });

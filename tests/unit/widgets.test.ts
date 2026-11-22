@@ -21,8 +21,12 @@ describe('widgetJson', () => {
       expect(Object.keys(j.words).sort()).toEqual([...WIDGET_WORDS].sort());
       for (const k of WIDGET_WORDS) expect(j.words[k], `${lang} widget.${k}`).not.toMatch(/^widget\./);
       expect(j.words.more).toContain('{n}'); expect(j.words.updated).toContain('{time}');
-      expect(j.items).toHaveLength(WIDGET_ITEMS);
-      expect(j.items[0]).toEqual({ id: items[0].id, kind: items[0].kind, title: items[0].title, published_at: items[0].published_at, site_url: items[0].site_url });
+      expect(j.items).toHaveLength(Math.min(WIDGET_ITEMS, items.length));
+      // A-161 (1): the newest by their placing on the site (`created`), any kind
+      const byCreated = [...items].sort((a, b) => (b.created_at ?? b.published_at).localeCompare(a.created_at ?? a.published_at));
+      expect(j.items[0]).toEqual({ id: byCreated[0].id, kind: byCreated[0].kind, title: byCreated[0].title, published_at: byCreated[0].published_at,
+        created_at: byCreated[0].created_at ?? byCreated[0].published_at, site_url: byCreated[0].site_url });
+      for (const k of ['say_news', 'say_pub', 'say_video'] as const) expect(j.words[k], `${lang}: the kind is spoken (WCAG 1.4.1)`).toContain('{title}');
       expect(j.api).toEqual({ base: 'https://inok.info/api/app/v1/', key: APP_KEY });
       expect(j.reminders).toEqual([{ channel_id: 1692, video_id: 'v', at: '2026-11-21T08:00:00Z' }]); // the key + the time only
       const c = channels.find((x) => x.avatar_url)!;

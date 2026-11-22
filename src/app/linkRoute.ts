@@ -3,7 +3,7 @@ import { getMonastery } from '@/data/repo/monasteries';
 import { getEparchy } from '@/data/repo/eparchies';
 import type { ArticleKind } from '@/data/source';
 import type { Db } from '@/data/db/types';
-import { quickRoute } from './quickActions';
+import { quickPlay, quickRoute } from './quickActions';
 
 /** A-138: the mark a site LIST link puts on its screen's entry: the list resets (filters, search, order, its kind tab) as if just opened -
  *  also when that screen was already open with filters. `reset` = a fresh number per link (a new link = a new reset; Back to the same entry
@@ -12,7 +12,9 @@ export type ListEntry = { reset: number; kind?: ArticleKind | 'all' };
 /** A-166 (cloud_44): a GALLERY link's mark on the card's entry - the card opens its gallery on top once per mark (a fresh number per link;
  *  Back to the same entry opens nothing again) by the SAME path as its «Фотогалерея» button */
 export type CardEntry = { gallery: number };
-export type LinkRoute = { to: string; entry?: ListEntry | CardEntry };
+export type LinkRoute = { to: string; entry?: ListEntry | CardEntry;
+  /** A-161 (3): a stream to open on top of «Трансляції» (the widget's live row) - src/app/streamsPlay.ts */
+  play?: string };
 
 const LIST_ROUTES: Record<SiteList, LinkRoute['to']> = {
   monasteries: '/monasteries', eparchies: '/more/eparchies', streams: '/streams', publication: '/articles', video: '/articles', news: '/articles', all: '/articles',
@@ -22,7 +24,8 @@ const LIST_ROUTES: Record<SiteList, LinkRoute['to']> = {
  *  (the screen asks the server for an id its cache lacks, R-35); a LIST page -> its list screen, reset; anything else -> null = the browser. */
 export async function linkRoute(db: Db, href: string, now: () => number = Date.now): Promise<LinkRoute | null> {
   const quick = quickRoute(href); // cloud_41 (A-133 C1): a quick action on the app icon = its tab
-  if (quick) return { to: quick };
+  const play = quickPlay(href); // A-161 (3): the widget's live row - the stream on top of «Трансляції»
+  if (quick) return play ? { to: quick, play } : { to: quick };
   const to = linkTarget(href);
   if (to?.kind === 'card') return (await getMonastery(db, to.code)) ? { to: `/monasteries/${to.code}`, ...(to.gallery ? { entry: { gallery: now() } } : {}) } : null;
   if (to?.kind === 'article') return { to: `/articles?id=${to.id}` };

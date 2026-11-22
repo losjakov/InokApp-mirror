@@ -207,4 +207,25 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     expect(nse).not.toMatch(/mutableCopy|bestAttemptContent\.(title|body|sound)\s*=/);
     expect(read('ios/App/App/InokBridgeViewController.swift')).toContain('registerPluginInstance(InokWidgetsPlugin())');
   });
+  // cloud_44 (A-160, A-161, A-163; the CD kit): small / medium / large on every iOS, the Lock Screen's two from iOS 16 only (the floor stays 15.0);
+  // the gallery = the kit's SAMPLE (never redacted, never «open the app»); the sample texts and the channel pictures in BOTH targets' bundles
+  it('widgets 1.0.18: families behind #available, samples in the gallery, the kit\'s files bundled, a live row opens «Трансляції» + the stream', () => {
+    const b = read('ios/App/InokWidgets/InokWidgetsBundle.swift'); const core = read('ios/App/Shared/WidgetCore.swift'); const pbx = read('ios/App/App.xcodeproj/project.pbxproj');
+    expect(b).toMatch(/if #available\(iOSApplicationExtension 16\.0, \*\) \{\s*return supportedFamilies\(\[\.systemSmall, \.systemMedium, \.systemLarge, \.accessoryInline, \.accessoryRectangular\]\)/);
+    expect(b).toMatch(/return supportedFamilies\(\[\.systemSmall, \.systemMedium, \.systemLarge\]\)/);
+    expect(b.match(/\.inokFamilies\(\)/g)).toHaveLength(3);
+    expect(b).toMatch(/if context\.isPreview \{ completion\(Entry\(date: Date\(\), data: WData\.sample\(\)/);
+    expect(b).toMatch(/func placeholder\(in context: Context\) -> Entry \{ Entry\(date: Date\(\), data: WData\.sample\(\)/);
+    expect(b + core).not.toMatch(/\.redacted\(/);
+    expect(b).toMatch(/articles\?lang=\\\(lang\)&limit=\\\(items\)&sort=created/);
+    expect(core).toMatch(/streams \+ "\?play=" \+ v/); // A-161 (3)
+    expect(core).toMatch(/hyphenationFactor = 0/);
+    expect(core).toMatch(/\\u\{2060\}/); // NOTE 1: no word broken
+    for (const f of ['widget_samples.json', 'av']) expect(pbx.match(new RegExp(`/\\* ${f} in Resources \\*/,`, 'g')), f).toHaveLength(2); // the app AND the widgets
+    expect(read('ios/App/InokWidgets/widget_samples.json')).toBe(read('android/app/src/main/res/raw/widget_samples.json'));
+    const ids = JSON.parse(read('ios/App/InokWidgets/widget_samples.json')).uk.live.map((c: { id: number }) => c.id);
+    for (const id of ids) expect(read(`ios/App/InokWidgets/av/${id}.webp`).length, `av/${id}.webp`).toBeGreaterThan(100);
+    expect(read('ios/App/App/InokWidgetsPlugin.swift')).toMatch(/copyAvatars\(json\)/); // A-163 (3): the pictures into the App Group
+    expect(core).toMatch(/InokShared\.avatarPath\(id\)/);
+  });
 });

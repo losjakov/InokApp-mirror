@@ -14,7 +14,7 @@ export function WidgetsHost(): null {
     if (!db) return;
     let on = true;
     const h = window.setTimeout(() => void (async () => {
-      const [channels, items] = await Promise.all([listChannels(db, lang), listArticles(db, lang, null, 3)]);
+      const [channels, items] = await Promise.all([listChannels(db, lang), listArticles(db, lang)]);
       if (on) await setWidgets(widgetJson({ t, lang, channels, dict, status: live?.status ?? null, items, reminders: list, now: Date.now() }));
     })(), 500);
     return () => { on = false; window.clearTimeout(h); };

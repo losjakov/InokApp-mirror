@@ -22,3 +22,11 @@ export function quickRoute(url: string | null | undefined): string | null {
   const id = url.slice(QUICK_PREFIX.length).replace(/[/?#].*$/, '');
   return [...QUICK_ACTIONS, ...SYSTEM_ROUTES].find((a) => a.id === id)?.to ?? null;
 }
+
+/** A-161 (3) (cloud_44): the widget's live row `inokapp://tab/streams?play=<video id>` - the stream to open ON TOP of «Трансляції» (a YouTube
+ *  video id only: letters, digits, «_», «-»; anything else = «Трансляції» alone); null for every other address */
+export function quickPlay(url: string | null | undefined): string | null {
+  if (quickRoute(url) !== '/streams') return null;
+  const v = /[?&]play=([^&#]*)/.exec(url!)?.[1] ?? '';
+  return /^[A-Za-z0-9_-]{6,20}$/.test(v) ? v : null;
+}

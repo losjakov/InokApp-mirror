@@ -42,6 +42,12 @@ DB_MAN=$("$BT/aapt2" dump xmltree --file AndroidManifest.xml "$DEBUG" | grep -c 
 echo "debug-only push entry PushTestReceiver: debug dex=$DB_DBG manifest=$DB_MAN; qa dex=$QA_DBG manifest=$QA_MAN"
 [ "${QA_DBG:-1}" = 0 ] && [ "$QA_MAN" = 0 ] || bad "the debug-only PushTestReceiver is in app-qa.apk"
 [ "${DB_DBG:-0}" -gt 0 ] && [ "$DB_MAN" -gt 0 ] || bad "PushTestReceiver missing from app-debug.apk (the emulator's notification proof needs it)"
+# 1.0.18 (A-168 (2)): the store frame's pin trigger is debug-only - never in qa (= the release build's code and manifest)
+QA_PIN=$("$BT/aapt2" dump xmltree --file AndroidManifest.xml "$QA" | grep -c WidgetPinActivity || true)
+DB_PIN=$("$BT/aapt2" dump xmltree --file AndroidManifest.xml "$DEBUG" | grep -c WidgetPinActivity || true)
+echo "debug-only widget pin trigger WidgetPinActivity: debug manifest=$DB_PIN; qa manifest=$QA_PIN"
+[ "$QA_PIN" = 0 ] || bad "the debug-only WidgetPinActivity is in app-qa.apk"
+[ "${DB_PIN:-0}" -gt 0 ] || bad "WidgetPinActivity missing from app-debug.apk (the 02-widgets store frame needs it)"
 
 # sizes: the unminified debug build (= 1.0.4's release code: minify was off) vs the R8 qa build
 echo "sizes: app-debug.apk $(size "$DEBUG") b, DEX $(dexsize "$DEBUG") b uncompressed | app-qa.apk $(size "$QA") b, DEX $(dexsize "$QA") b | app-qa.aab $(size "$AAB") b; mapping.txt $(wc -l < "$MAP") lines"

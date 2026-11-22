@@ -480,9 +480,11 @@ if [ "$WV" -ge "$FLOOR" ]; then
   STORE=n/a; case "$API" in 34-default*) bash "$ROOT/scripts/emu_store.sh" "$OUT" || true; STORE="$(grep -E '^store screenshots: [A-Z]+|^(missing|maps|pictures|anything|gallery|«Публікації»|language|unit words|status bar|colours|lavras|article top|on air)|^launcher label|STOPPED' "$OUT/store/sizes.txt" 2>/dev/null | sed 's/ (rules:.*//' | tr '\n' ';' || true)";; esac
   native_paths; quick_actions; edge_shots; a11y_dumps; r8_scan; notify_proof
   # T9 (cloud_43): the widgets' review snapshots + the push path (debug APK installed by notify_proof; informational - the verdict in widgets.txt)
-  bash "$ROOT/scripts/emu_widgets.sh" "$OUT" || true; WIDGETS="$(tail -1 "$OUT/widgets.txt" 2>/dev/null | sed 's/^widgets //' || true)"
+  bash "$ROOT/scripts/emu_widgets.sh" "$OUT" "$API" || true; WIDGETS="$(tail -1 "$OUT/widgets.txt" 2>/dev/null | sed 's/^widgets //' || true)"
+  # A-161 (3) (cloud_44): a live tap (the widget's row, the stream push) = «Трансляції» + the stream on top, Back -> «Трансляції» (debug APK installed)
+  bash "$ROOT/scripts/emu_livetap.sh" "$OUT" || true; LIVETAP="$(tail -1 "$OUT/livetap.txt" 2>/dev/null | sed 's/^livetap //' || true)"
   offline_first
-  echo "FULL offline=[$OFFLINE] widgets=[$WIDGETS] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] filter=[$FILTER] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
+  echo "FULL offline=[$OFFLINE] widgets=[$WIDGETS] livetap=[$LIVETAP] webview=$WV calendar=$CAL $(grep '^monasteries|' "$OUT/db_meta.txt") covers=$COVERS map_ink=$MAP_INK push=$PUSH avatars=$AVATARS articles=$ARTICLES back=$BACK nav=$NAV analytics=$ANALYTICS ask=[$ASK] links=[$LINKS] filter=[$FILTER] store=[$STORE] r8=[$R8] native=[$NATIVE] e2e=[$E2E] a11y=[$A11Y] notify=[$NOTIFY] quick=[$QUICK]" | tee "$OUT/result.txt"
 else
   sleep 20
   shot "$OUT/home.png"

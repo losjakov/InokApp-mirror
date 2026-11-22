@@ -19,32 +19,57 @@ public class InokWidgetsPlugin: CAPPlugin, CAPBridgedPlugin {
         guard let json = call.getString("json"), !json.isEmpty else { call.reject("json required"); return }
         guard let d = InokShared.defaults else { call.reject("no app group"); return }
         d.set(json, forKey: InokShared.appKey)
+        copyAvatars(json)
         if #available(iOS 14.0, *) { WidgetCenter.shared.reloadAllTimelines() }
         call.resolve()
     }
 
-    /// The REVIEW snapshots (A-156 (3): for the REPORT, never store frames): the SAME WidgetBody the extension draws, from the SAME App Group
-    /// data, rendered by ImageRenderer (iOS 16+) - kind x small / medium x light / dark -> Documents/widgets/*.png (the ring copies them).
+    /// A-163 (3) (cloud_44, supersedes A-158 (3)): the iPhone widgets draw the channel pictures like Android - the app copies its KEPT avatars
+    /// (Documents/kept/<name>, the same files its rows show offline) into the App Group (avatars/<channel id>) on every data write; a file
+    /// already there with the same size is left alone. Never throws: a missing picture = the widget's plain circle.
+    func copyAvatars(_ json: String) {
+        guard let data = json.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let chs = o["channels"] as? [String: [String: Any]], let dir = InokShared.avatarsDir else { return }
+        let fm = FileManager.default
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let kept = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("kept")
+        for (id, c) in chs {
+            guard let name = c["avatar"] as? String, !name.isEmpty else { continue }
+            let src = kept.appendingPathComponent(name), dst = dir.appendingPathComponent(id)
+            guard let a = try? fm.attributesOfItem(atPath: src.path) else { continue }
+            if let b = try? fm.attributesOfItem(atPath: dst.path), (b[.size] as? Int) == (a[.size] as? Int) { continue }
+            try? fm.removeItem(at: dst)
+            try? fm.copyItem(at: src, to: dst)
+        }
+    }
+
+    /// The REVIEW snapshots (for the REPORT, never store frames): the SAME WidgetBody the extension draws, rendered by ImageRenderer (iOS 16+)
+    /// 1.0.18: kind x small / medium / large x light / dark from the App Group data (`app-…`) AND from the gallery's sample in uk / ru / en
+    /// (`sample-…`, the kit's acceptance sheets) -> Documents/widgets/*.png (the ring copies them).
     @objc func snapshot(_ call: CAPPluginCall) {
         guard #available(iOS 16.0, *) else { call.resolve(["n": 0, "data": false]); return }
         Task { @MainActor in
-            let data = WData.load()
+            let real = WData.load()
             let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("widgets")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             var n = 0
-            for kind in WKind.allCases { for small in [true, false] { for dark in [false, true] {
-                let v = WModel.build(kind, small: small, large: false, data: data)
-                let body = WidgetBody(kind: kind, small: small, view: v, openApp: NSLocalizedString("widget_open_app", comment: ""))
-                    .padding(16).frame(width: small ? 170 : 364, height: 170)
-                    .background(dark ? Color(white: 0.11) : Color.white).cornerRadius(22)
-                    .environment(\.colorScheme, dark ? .dark : .light)
+            let sets: [(String, WData?)] = [("app", real)] + ["uk", "ru", "en"].map { ("sample-\($0)", WData.sample($0)) }
+            let boxes: [(WSize, CGSize)] = [(.small, CGSize(width: 170, height: 170)), (.medium, CGSize(width: 364, height: 170)), (.large, CGSize(width: 364, height: 382))]
+            for (tag, data) in sets { for kind in WKind.allCases { for (fam, box) in boxes { for dark in [false, true] {
+                let scheme: ColorScheme = dark ? .dark : .light
+                let v = WModel.build(kind, compact: fam == .small, data: data)
+                let inner = CGSize(width: box.width - 32, height: box.height - 32)
+                let body = WidgetBody(kind: kind, family: fam, view: v, data: data, openApp: NSLocalizedString("widget_open_app", comment: ""), size: inner)
+                    .padding(16).frame(width: box.width, height: box.height)
+                    .background(WStyle.background(scheme)).cornerRadius(22)
+                    .environment(\.colorScheme, scheme)
                 let r = ImageRenderer(content: body)
                 r.scale = 3
                 if let png = r.uiImage?.pngData() {
-                    try? png.write(to: dir.appendingPathComponent("\(kind.rawValue)-\(small ? "small" : "medium")-\(dark ? "dark" : "light").png")); n += 1
+                    try? png.write(to: dir.appendingPathComponent("\(tag)-\(kind.rawValue)-\(fam.rawValue)-\(dark ? "dark" : "light").png")); n += 1
                 }
-            } } }
-            call.resolve(["n": n, "data": data != nil])
+            } } } }
+            call.resolve(["n": n, "data": real != nil])
         }
     }
 

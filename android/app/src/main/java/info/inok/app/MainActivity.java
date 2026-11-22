@@ -45,6 +45,8 @@ public class MainActivity extends BridgeActivity {
         });
         // A-84 (f): the two channels exist from the first start of 1.0.5 (Android settings show them; the old one moves over)
         InokNotifications.of(this).ensureChannels();
+        // 1.0.18 (A-160): the widget picker's generated previews on Android 15+, once per version and language (WidgetSamples)
+        WidgetSamples.publishInBackground(this);
         // cloud_27: ONLY the qa build (R8, not debuggable; android/app/src/qa/res) keeps its WebView inspectable for the emulator's
         // DevTools steps (scripts/emu_nav.mjs); main = false, so release never does. After super.onCreate: Capacitor sets it there too.
         if (getResources().getBoolean(R.bool.inok_webview_inspectable)) WebView.setWebContentsDebuggingEnabled(true);

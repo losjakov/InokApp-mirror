@@ -4,6 +4,7 @@ import { openLink } from '@/native/intents';
 import { launchUrl, onUrlOpen } from '@/native/appLinks';
 import { useApp } from '@/state/AppContext';
 import { linkRoute } from './linkRoute';
+import { streamsPlay } from './streamsPlay';
 
 /** THE follow of a site link (one rule for html-lite taps and App Links): its in-app screen, else the browser. Never a dead screen. */
 export function useFollowLink(): (href: string) => Promise<void> {
@@ -11,7 +12,8 @@ export function useFollowLink(): (href: string) => Promise<void> {
   const navigate = useNavigate();
   return useCallback(async (href: string) => {
     const to = await linkRoute(db, href);
-    if (to) navigate(to.to, to.entry ? { state: to.entry } : undefined);
+    if (to?.play) streamsPlay((p) => navigate(p), to.play); // A-161 (3): «Трансляції» + the stream on top
+    else if (to) navigate(to.to, to.entry ? { state: to.entry } : undefined);
     else await openLink(href, lang);
   }, [db, lang, navigate]);
 }
@@ -34,6 +36,7 @@ export function StartRoute(): null {
     void launchUrl().then(async (u) => {
       const to = u ? await linkRoute(db, u) : null;
       navigate(to?.to ?? '/home', { replace: true, state: to ? { ...START, ...to.entry } : undefined });
+      if (to?.play) streamsPlay(() => undefined, to.play); // A-161 (3): the cold start's «Трансляції» is open - the stream on top
       if (u && !to) await openLink(u, lang);
     });
   }, [db, lang, navigate]);

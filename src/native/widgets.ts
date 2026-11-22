@@ -6,6 +6,7 @@ import { field, rowSubtitle, type ChannelRow } from '@/data/repo/types';
 import type { Article, LiveStatus } from '@/data/api/types';
 import type { Reminder } from './reminders';
 import type { Lang, Translate } from '@/i18n';
+import { sortArticles } from '@/data/repo/articleOrder';
 
 /**
  * T9 (A-153 (2), A-155, A-156 (1); cloud_43): THE data the three home-screen widgets read - written by the app on every refresh (live-status,
@@ -14,8 +15,9 @@ import type { Lang, Translate } from '@/i18n';
  * key `widgets` + every widget redrawn; iOS: the App Group `group.info.inok.app` + WidgetCenter.reloadAllTimelines (InokWidgetsPlugin).
  */
 export const WIDGET_WORDS = ['live_title', 'live_small', 'upcoming_title', 'nearest', 'new_title', 'more', 'updated', 'none_live', 'none_upcoming', 'none_new',
-  'tomorrow', 'remind', 'news', 'say_live', 'say_planned', 'only_one'] as const;
-export const WIDGET_ITEMS = 3;
+  'tomorrow', 'next', 'remind', 'say_live', 'say_planned', 'say_news', 'say_pub', 'say_video'] as const;
+/** 1.0.18 (A-161 (1), A-163): the newest items of ANY kind by their placing on the site (`created`) - as many as the largest widget shows */
+export const WIDGET_ITEMS = 8;
 
 export interface WidgetJson {
   v: 1; lang: Lang; updated_at: string;
@@ -23,7 +25,7 @@ export interface WidgetJson {
   words: Record<(typeof WIDGET_WORDS)[number], string>;
   channels: Record<string, { name: string; place: string; avatar: string }>;
   status: Pick<LiveStatus, 'live' | 'scheduled'> | null;
-  items: { id: number; kind: string; title: string; published_at: string; site_url: string }[];
+  items: { id: number; kind: string; title: string; published_at: string; created_at: string; site_url: string }[];
   reminders: { channel_id: number; video_id: string; at: string }[];
 }
 
@@ -39,7 +41,8 @@ export function widgetJson(o: { t: Translate; lang: Lang; channels: ChannelRow[]
     api: { base: 'https://inok.info/api/app/v1/', key: APP_KEY },
     words, channels,
     status: o.status ? { live: o.status.live, scheduled: o.status.scheduled ?? [] } : null,
-    items: o.items.slice(0, WIDGET_ITEMS).map((a) => ({ id: a.id, kind: a.kind, title: a.title, published_at: a.published_at, site_url: a.site_url })),
+    items: sortArticles(o.items, 'created').slice(0, WIDGET_ITEMS)
+      .map((a) => ({ id: a.id, kind: a.kind, title: a.title, published_at: a.published_at, created_at: a.created_at ?? a.published_at, site_url: a.site_url })),
     reminders: o.reminders.map((r) => ({ channel_id: r.channel_id, video_id: r.video_id, at: r.at })),
   };
 }

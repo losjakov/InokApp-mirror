@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- T9 (A-153 (2)): small 2x2 + medium 4x2 (resizable; WidgetRender draws by the width); updatePeriodMillis 0 = WidgetWorker every 30 min -->
+<!-- 1.0.18 (A-163): ONE resizable widget per kind, 2x1 ... 4x4 (WidgetRender draws the size bucket), 4x2 by default; the picker samples
+     (A-160): previewLayout = Android 12-14, previewImage = Android <= 11 (the kit's pictures), Android 15+ = WidgetSamples' generated preview.
+     updatePeriodMillis 0 = WidgetWorker every 30 min -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="110dp" android:minHeight="110dp" android:minResizeWidth="110dp" android:minResizeHeight="110dp"
+    android:minWidth="110dp" android:minHeight="40dp" android:minResizeWidth="110dp" android:minResizeHeight="40dp"
+    android:maxResizeWidth="530dp" android:maxResizeHeight="450dp"
     android:targetCellWidth="4" android:targetCellHeight="2" android:resizeMode="horizontal|vertical"
-    android:updatePeriodMillis="0" android:initialLayout="@layout/widget_medium" android:previewLayout="@layout/widget_medium"
-    android:previewImage="@mipmap/ic_launcher" android:description="@string/widget_live_desc" android:widgetCategory="home_screen" />
+    android:updatePeriodMillis="0" android:initialLayout="@layout/widget_list" android:previewLayout="@layout/widget_preview_live"
+    android:previewImage="@drawable/widget_preview_live" android:description="@string/widget_live_desc" android:widgetCategory="home_screen" />

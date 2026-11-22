@@ -1,0 +1,398 @@
+{
+ "uk": {
+  "sheet": "Зразки віджетів у списку вибору",
+  "live_total": 10,
+  "live_head": "Зараз в ефірі",
+  "live_head_small": "В ефірі",
+  "more_fmt": "+{n} ще",
+  "updated": "",
+  "live": [
+   {
+    "id": 1687,
+    "name": "Києво-Печерська Успенська Лавра"
+   },
+   {
+    "id": 1686,
+    "name": "Почаївська Успенська Лавра"
+   },
+   {
+    "id": 1690,
+    "name": "Свято-Успенська Святогірська Лавра"
+   },
+   {
+    "id": 1685,
+    "name": "Свято-Троїцький Іонинський чоловічий монастир"
+   },
+   {
+    "id": 1694,
+    "name": "Вознесенський Банченський чоловічий монастир"
+   },
+   {
+    "id": 1711,
+    "name": "Київська духовна академія і семінарія"
+   },
+   {
+    "id": 1697,
+    "name": "Духовний світ Буковини"
+   },
+   {
+    "id": 1696,
+    "name": "Свято-Макаріївський храм (м. Київ)"
+   }
+  ],
+  "up_title": "Найближчі трансляції",
+  "up_small": "Найближча",
+  "up": [
+   {
+    "id": 1685,
+    "when": "17:00",
+    "name": "Свято-Троїцький Іонинський чоловічий монастир"
+   },
+   {
+    "id": 1694,
+    "when": "18:00",
+    "name": "Вознесенський Банченський чоловічий монастир"
+   },
+   {
+    "id": 1687,
+    "when": "завтра 06:30",
+    "name": "Києво-Печерська Успенська Лавра"
+   },
+   {
+    "id": 1686,
+    "when": "завтра 07:00",
+    "name": "Почаївська Успенська Лавра"
+   },
+   {
+    "id": 1692,
+    "when": "завтра 08:00",
+    "name": "Кафедральний Хрестовоздвиженський собор (м. Ужгород)"
+   },
+   {
+    "id": 1701,
+    "when": "завтра 09:00",
+    "name": "Храм святителя Іоанна Шанхайського і Сан-Франциського (м. Ужгород)"
+   },
+   {
+    "id": 1690,
+    "when": "завтра 09:30",
+    "name": "Свято-Успенська Святогірська Лавра"
+   },
+   {
+    "id": 1711,
+    "when": "завтра 17:00",
+    "name": "Київська духовна академія і семінарія"
+   }
+  ],
+  "new_title": "Нове на сайті",
+  "new": [
+   {
+    "kind": "news",
+    "title": "Престольне свято Звіринецького монастиря"
+   },
+   {
+    "kind": "pub",
+    "title": "Ангели і біси. Таємниці духовного світу"
+   },
+   {
+    "kind": "video",
+    "title": "Мгарський чоловічий монастир. Фільм 2. Паломниця"
+   },
+   {
+    "kind": "video",
+    "title": "Герман. Історія одного ченця"
+   },
+   {
+    "kind": "news",
+    "title": "Верховний Суд скасував рішення у справі Почаївської Лаври"
+   },
+   {
+    "kind": "news",
+    "title": "ДЕСС визнала Управління Бориспільської єпархії афілійованим"
+   },
+   {
+    "kind": "news",
+    "title": "Суд повернув позов заповідника до Києво-Печерської Лаври"
+   },
+   {
+    "kind": "news",
+    "title": "Монастир у Сільці відзначив 25-річчя заснування"
+   }
+  ],
+  "cap": {
+   "live": "Зараз в ефірі",
+   "up": "Найближчі трансляції",
+   "new": "Нове на сайті"
+  },
+  "theme": {
+   "dark": "темна тема",
+   "light": "світла тема"
+  },
+  "tomorrow": "завтра",
+  "next": "наступна"
+ },
+ "ru": {
+  "sheet": "Образцы виджетов в списке выбора",
+  "live_head": "Сейчас в эфире",
+  "live_head_small": "В эфире",
+  "more_fmt": "+{n} ещё",
+  "up_title": "Ближайшие трансляции",
+  "up_small": "Ближайшая",
+  "new_title": "Новое на сайте",
+  "tomorrow": "завтра",
+  "next": "следующая",
+  "cap": {
+   "live": "Сейчас в эфире",
+   "up": "Ближайшие трансляции",
+   "new": "Новое на сайте"
+  },
+  "theme": {
+   "dark": "тёмная тема",
+   "light": "светлая тема"
+  },
+  "live_total": 10,
+  "updated": "",
+  "live": [
+   {
+    "id": 1687,
+    "name": "Киево-Печерская Успенская Лавра"
+   },
+   {
+    "id": 1686,
+    "name": "Почаевская Успенская Лавра"
+   },
+   {
+    "id": 1690,
+    "name": "Свято-Успенская Святогорская Лавра"
+   },
+   {
+    "id": 1685,
+    "name": "Свято-Троицкий Ионинский мужской монастырь"
+   },
+   {
+    "id": 1694,
+    "name": "Вознесенский Банченский мужской монастырь"
+   },
+   {
+    "id": 1711,
+    "name": "Киевская духовная академия и семинария"
+   },
+   {
+    "id": 1697,
+    "name": "Духовный мир Буковины"
+   },
+   {
+    "id": 1696,
+    "name": "Свято-Макариевский храм (г. Киев)"
+   }
+  ],
+  "up": [
+   {
+    "id": 1685,
+    "when": "17:00",
+    "name": "Свято-Троицкий Ионинский мужской монастырь"
+   },
+   {
+    "id": 1694,
+    "when": "18:00",
+    "name": "Вознесенский Банченский мужской монастырь"
+   },
+   {
+    "id": 1687,
+    "when": "завтра 06:30",
+    "name": "Киево-Печерская Успенская Лавра"
+   },
+   {
+    "id": 1686,
+    "when": "завтра 07:00",
+    "name": "Почаевская Успенская Лавра"
+   },
+   {
+    "id": 1692,
+    "when": "завтра 08:00",
+    "name": "Кафедральный Крестовоздвиженский собор (г. Ужгород)"
+   },
+   {
+    "id": 1701,
+    "when": "завтра 09:00",
+    "name": "Храм святителя Иоанна Шанхайского и Сан-Францисского (г. Ужгород)"
+   },
+   {
+    "id": 1690,
+    "when": "завтра 09:30",
+    "name": "Свято-Успенская Святогорская Лавра"
+   },
+   {
+    "id": 1711,
+    "when": "завтра 17:00",
+    "name": "Киевская духовная академия и семинария"
+   }
+  ],
+  "new": [
+   {
+    "kind": "news",
+    "title": "Престольный праздник Зверинецкого монастыря"
+   },
+   {
+    "kind": "pub",
+    "title": "Ангелы и бесы. Тайны духовного мира"
+   },
+   {
+    "kind": "video",
+    "title": "Мгарский мужской монастырь. Фильм 2. Паломница"
+   },
+   {
+    "kind": "video",
+    "title": "Герман. История одного монаха"
+   },
+   {
+    "kind": "news",
+    "title": "Верховный Суд отменил решения по делу Почаевской Лавры"
+   },
+   {
+    "kind": "news",
+    "title": "ДЕСС признала Управление Бориспольской епархии аффилированным"
+   },
+   {
+    "kind": "news",
+    "title": "Суд вернул иск заповедника к Киево-Печерской Лавре"
+   },
+   {
+    "kind": "news",
+    "title": "Монастырь в Сильце отметил 25-летие основания"
+   }
+  ]
+ },
+ "en": {
+  "sheet": "Widget samples in the picker",
+  "live_head": "Live now",
+  "live_head_small": "Live",
+  "more_fmt": "+{n} more",
+  "up_title": "Upcoming streams",
+  "up_small": "Next",
+  "new_title": "New on the site",
+  "tomorrow": "tomorrow",
+  "next": "next",
+  "cap": {
+   "live": "Live now",
+   "up": "Upcoming streams",
+   "new": "New on the site"
+  },
+  "theme": {
+   "dark": "dark theme",
+   "light": "light theme"
+  },
+  "live_total": 10,
+  "updated": "",
+  "live": [
+   {
+    "id": 1687,
+    "name": "Holy Dormition Kyiv-Pechersk Lavra"
+   },
+   {
+    "id": 1686,
+    "name": "Holy Dormition Pochaiv Lavra"
+   },
+   {
+    "id": 1690,
+    "name": "Holy Dormition Sviatohirsk Lavra"
+   },
+   {
+    "id": 1685,
+    "name": "Holy Trinity Ionynskyi Monastery"
+   },
+   {
+    "id": 1694,
+    "name": "Ascension Monastery of Banchen"
+   },
+   {
+    "id": 1711,
+    "name": "Kyiv Theological Academy and Seminary"
+   },
+   {
+    "id": 1697,
+    "name": "Spiritual World of Bukovyna"
+   },
+   {
+    "id": 1696,
+    "name": "St Macarius' Church (Kyiv)"
+   }
+  ],
+  "up": [
+   {
+    "id": 1685,
+    "when": "17:00",
+    "name": "Holy Trinity Ionynskyi Monastery"
+   },
+   {
+    "id": 1694,
+    "when": "18:00",
+    "name": "Ascension Monastery of Banchen"
+   },
+   {
+    "id": 1687,
+    "when": "tomorrow 06:30",
+    "name": "Holy Dormition Kyiv-Pechersk Lavra"
+   },
+   {
+    "id": 1686,
+    "when": "tomorrow 07:00",
+    "name": "Holy Dormition Pochaiv Lavra"
+   },
+   {
+    "id": 1692,
+    "when": "tomorrow 08:00",
+    "name": "Cathedral of the Exaltation of the Cross (Uzhhorod)"
+   },
+   {
+    "id": 1701,
+    "when": "tomorrow 09:00",
+    "name": "Church of St. John of Shanghai and San Francisco (Uzhhorod)"
+   },
+   {
+    "id": 1690,
+    "when": "tomorrow 09:30",
+    "name": "Holy Dormition Sviatohirsk Lavra"
+   },
+   {
+    "id": 1711,
+    "when": "tomorrow 17:00",
+    "name": "Kyiv Theological Academy and Seminary"
+   }
+  ],
+  "new": [
+   {
+    "kind": "news",
+    "title": "Zvirynetsky Monastery keeps its patronal feast"
+   },
+   {
+    "kind": "pub",
+    "title": "Angels and demons. Mysteries of the spiritual world"
+   },
+   {
+    "kind": "video",
+    "title": "Mhar Monastery. Film 2. The Pilgrim"
+   },
+   {
+    "kind": "video",
+    "title": "Herman. The Story of a Monk"
+   },
+   {
+    "kind": "news",
+    "title": "Supreme Court overturns rulings in Pochaiv Lavra case"
+   },
+   {
+    "kind": "news",
+    "title": "DESS rules the Boryspil Eparchy Administration affiliated"
+   },
+   {
+    "kind": "news",
+    "title": "Court returns Reserve's claim against Kyiv-Pechersk Lavra"
+   },
+   {
+    "kind": "news",
+    "title": "Siltse monastery marks 25 years since its founding"
+   }
+  ]
+ }
+}

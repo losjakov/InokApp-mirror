@@ -414,10 +414,12 @@
   "widget.none_live": "No broadcasts right now",
   "widget.none_upcoming": "No upcoming broadcasts announced yet",
   "widget.none_new": "No new publications yet",
+  "widget.next": "next {time}",
   "widget.tomorrow": "tomorrow",
   "widget.remind": "reminder at {time}",
-  "widget.news": "News",
   "widget.say_live": "{name}, live",
   "widget.say_planned": "{name}, at {time}",
-  "widget.only_one": "Other channels have not announced their next broadcast yet"
+  "widget.say_news": "News: {title}",
+  "widget.say_pub": "Article: {title}",
+  "widget.say_video": "Video: {title}"
 }

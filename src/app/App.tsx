@@ -17,6 +17,7 @@ import { useFitTabLabels } from './tabLabels';
 import { routeForPush } from '@/data/live/pushRoute';
 import { EPARCHIES_PATH, TabButton, useHardwareBack } from './nav';
 import { StartRoute, useAppLinks } from './links';
+import { streamsPlay } from './streamsPlay';
 import { openVideo } from '@/native/intents';
 import { logScreen, screenName, setAnalytics } from '@/native/analytics';
 import { AppProvider, useApp } from '@/state/AppContext';
@@ -81,12 +82,12 @@ function Tabs() {
   useFitTabLabels([t]); // NOTE 3 (cloud_38): the five labels whole at any width and text size
   useHardwareBack();
   useAppLinks(); // A-76: an inok.info article / card link from Telegram, mail… opens here (a cold start's: StartRoute, A-78 1)
-  // a tapped notification (contract §4): stream → the YouTube app (A-4.2) + the streams tab; article → the article
+  // a tapped notification (contract §4): stream → «Трансляції» + the stream on top (A-161 (3), THE rule of streamsPlay); article → the article
   useEffect(() => {
     if (!pushTap) return;
     const r = routeForPush(pushTap, live?.status);
     clearPushTap();
-    if (r?.kind === 'youtube') { navigate('/streams'); void openVideo(r.url); } else if (r?.kind === 'navigate') navigate(r.to);
+    if (r?.kind === 'streams-play') streamsPlay((p) => navigate(p), r.video); else if (r?.kind === 'navigate') navigate(r.to);
   }, [pushTap, clearPushTap, navigate, live]);
   // T8: a tapped reminder -> «Трансляції»; the stream itself when it is live by then (the row's own action, A-37)
   const liveRef = useRef(live);

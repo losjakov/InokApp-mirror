@@ -18,6 +18,13 @@ enum InokShared {
     }
     static var nowMs: Double { Date().timeIntervalSince1970 * 1000 }
 
+    /// A-163 (3) (cloud_44): the channel pictures the widgets draw - the app copies its kept avatars here (InokWidgetsPlugin.set), the widget reads
+    static var avatarsDir: URL? { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)?.appendingPathComponent("avatars", isDirectory: true) }
+    static func avatarPath(_ channel: Int) -> String? {
+        guard let p = avatarsDir?.appendingPathComponent("\(channel)").path, FileManager.default.fileExists(atPath: p) else { return nil }
+        return p
+    }
+
     /// A `stream_live` / `stream_ended` push into the widgets' live data at once (the payload's channel_id, video_id, title); false = not a
     /// stream push or nothing to change. Never throws.
     @discardableResult

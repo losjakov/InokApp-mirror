@@ -414,10 +414,12 @@
   "widget.none_live": "Зараз немає трансляцій",
   "widget.none_upcoming": "Наступних трансляцій ще не оголошено",
   "widget.none_new": "Нових публікацій поки немає",
+  "widget.next": "наступна {time}",
   "widget.tomorrow": "завтра",
   "widget.remind": "нагадаю о {time}",
-  "widget.news": "Новини",
   "widget.say_live": "{name}, в ефірі",
   "widget.say_planned": "{name}, о {time}",
-  "widget.only_one": "Інші канали ще не оголосили наступну трансляцію"
+  "widget.say_news": "Новина: {title}",
+  "widget.say_pub": "Стаття: {title}",
+  "widget.say_video": "Відео: {title}"
 }

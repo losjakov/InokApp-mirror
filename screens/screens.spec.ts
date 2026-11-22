@@ -2637,6 +2637,20 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(onShown(p, shown)).toBeVisible({ timeout: 20_000 });
     } },
   ]),
+  // A-161 (3) (cloud_44): the widget's LIVE row (`inokapp://tab/streams?play=<id>`, the app's own link path) = «Трансляції» FIRST, then the
+  // stream's own action on top (the row's `openVideo`: the YouTube app on Android, the sheet on iPhone) - running AND cold. Red before: the
+  // widget opened YouTube directly (Back left the app), the address knew no `play`.
+  ...(['warm', 'cold'] as const).map((how) => ({ name: `live-tap-${how}`, only: ['phone-light'], path: how === 'warm' ? '/home' : '/',
+    before: async (p: Page) => { await recordOpens(p); if (how === 'cold') await launchBy('inokapp://tab/streams?play=DWCj8tI47q4', 300)(p); },
+    ready: async (p: Page) => {
+      if (how === 'warm') {
+        await expect(onShown(p, 'home-new')).toBeVisible({ timeout: 20_000 });
+        await p.evaluate(() => window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'inokapp://tab/streams?play=DWCj8tI47q4' })));
+      }
+      await expect(p).toHaveURL(/\/streams$/, { timeout: 30_000 });
+      await expect.poll(() => p.evaluate(() => (window as any).__opened), { timeout: 10_000 }).toEqual(['https://www.youtube.com/watch?v=DWCj8tI47q4']);
+      await expect(onShown(p, 'streams').or(p.locator(SHOWN).locator('[data-testid^="srow-"]').first())).toBeVisible({ timeout: 20_000 });
+    } })),
   { name: 'cold-link-browser', only: UK, path: '/', before: async (p) => { await recordOpens(p); await launchBy('https://inok.info/monasteries/table/', 0)(p); }, ready: async (p) => {
       await expect(p).toHaveURL(/\/home$/, { timeout: 30_000 });
       await settled(p); await expect(onShown(p, 'home-new')).toBeVisible({ timeout: 20_000 });

@@ -131,6 +131,14 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- 1.0.18 (A-160): the language changed / the app updated -> the widget picker's generated previews (Android 15+) + the widgets redrawn -->
+        <receiver android:name=".WidgetLocaleReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <!-- T9 (cloud_43, A-153 (2)): the three home-screen widgets (WidgetRender / WidgetStore / WidgetWorker) -->
         <receiver android:name=".LiveWidget" android:exported="false" android:label="@string/widget_live">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>

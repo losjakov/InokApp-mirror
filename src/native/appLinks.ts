@@ -23,7 +23,10 @@ let waiting: string[] = [];
 let listeners: ((url: string) => void)[] = [];
 const deliver = (u: string) => { if (listeners.length) listeners.forEach((l) => l(u)); else waiting.push(u); };
 if (isNative()) void CapApp.addListener('appUrlOpen', (e) => deliver(e.url));
-else if (typeof window !== 'undefined') window.addEventListener('inok-url-open', (e) => deliver(String((e as CustomEvent<string>).detail)));
+// the browser ring; and the iOS SIMULATOR ring's bundle only (VITE_SIM_DRIVER=1, never a store build): a site address handed over as the system
+// would hand a Universal Link - the short / gallery forms reach the app only after the site's AASA (A-166 (4)), so the ring proves the router path
+if (typeof window !== 'undefined' && (!isNative() || import.meta.env.VITE_SIM_DRIVER === '1'))
+  window.addEventListener('inok-url-open', (e) => deliver(String((e as CustomEvent<string>).detail)));
 
 export function onUrlOpen(cb: (url: string) => void): () => void {
   listeners.push(cb);

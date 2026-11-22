@@ -25,12 +25,14 @@ import java.util.concurrent.TimeUnit;
 /**
  * T9 (A-153 (2)): the widgets refresh THEMSELVES - the app's JavaScript does not run while it is closed. ONE unique periodic job every
  * 30 min while any widget exists (enqueued by a provider's onEnabled, cancelled when the last is removed) + ONE «now» job on a `stream_live`
- * / `stream_ended` push (InokMessagingService). GET live-status and articles?lang=<lang>&limit=3 with the PUBLIC X-Inok-App key (contract §1);
+ * / `stream_ended` push (InokMessagingService). GET live-status and articles?lang=<lang>&limit=8&sort=created with the PUBLIC X-Inok-App key (contract §1);
  * any failure keeps the last data and its time (never empty boxes).
  */
 public class WidgetWorker extends Worker {
     static final String PERIODIC = "inok-widgets-30min", NOW = "inok-widgets-now";
     static final String API = "https://inok.info/api/app/v1/";
+    /** A-161 (1) / A-163: the newest items by their placing on the site, as many as the largest widget can show (src/native/widgets.ts WIDGET_ITEMS) */
+    static final int ITEMS = 8;
 
     public WidgetWorker(@NonNull Context c, @NonNull WorkerParameters p) { super(c, p); }
 
@@ -57,7 +59,7 @@ public class WidgetWorker extends Worker {
             WidgetStore.putOwn(c, WidgetStore.LIVE_KEY, new JSONObject().put("at", at).put("status", status));
         } catch (Exception e) { android.util.Log.i("InokWidgets", "live-status kept: " + e.getClass().getSimpleName()); }
         try {
-            JSONObject page = new JSONObject(get(API + "articles?lang=" + lang + "&limit=3", key, ua(c)));
+            JSONObject page = new JSONObject(get(API + "articles?lang=" + lang + "&limit=" + ITEMS + "&sort=created", key, ua(c)));
             JSONArray items = page.optJSONArray("items");
             if (items != null) WidgetStore.putOwn(c, WidgetStore.NEW_KEY, new JSONObject().put("at", at).put("lang", lang).put("items", items));
         } catch (Exception e) { android.util.Log.i("InokWidgets", "articles kept: " + e.getClass().getSimpleName()); }

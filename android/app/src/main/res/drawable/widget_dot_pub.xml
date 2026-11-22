@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 1.0.18 (A-161 (1)): the «Нове на сайті» dot of a pub item (the kit's colour, values-night for the dark theme) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/widget_dot_pub" />
+    <size android:width="10dp" android:height="10dp" />
+</shape>

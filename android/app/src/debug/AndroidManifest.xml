@@ -6,5 +6,7 @@
         <receiver android:name=".PushTestReceiver" android:exported="true" />
         <!-- T9 (cloud_43): the widgets' review snapshots (scripts/emu_widgets.sh) - debug only -->
         <activity android:name=".WidgetPreviewActivity" android:exported="true" android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+        <!-- 1.0.18 (A-168 (2)): the store frame «02-widgets» - asks the launcher to place a widget (scripts/emu_store_widgets.sh) - debug only -->
+        <activity android:name=".WidgetPinActivity" android:exported="true" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 </manifest>

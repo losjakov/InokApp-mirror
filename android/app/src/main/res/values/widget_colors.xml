@@ -6,4 +6,8 @@
     <color name="widget_muted">#FF5B6570</color>
     <color name="widget_accent">#FF0C6486</color>
     <color name="widget_live">#FFC62828</color>
+    <!-- 1.0.18 (A-161 (1), the kit README «Colours»): the «Нове на сайті» dots - news / publication / video -->
+    <color name="widget_dot_news">#FF1F6FC5</color>
+    <color name="widget_dot_pub">#FFA87A00</color>
+    <color name="widget_dot_video">#FF7A4FC4</color>
 </resources>

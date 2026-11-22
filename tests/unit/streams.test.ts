@@ -136,8 +136,8 @@ describe('A-37: a channel live NOW opens its broadcast', () => {
     ['no live-status yet (offline) → the channel page', 3, null, 'https://www.youtube.com/channel/UC3'],
   ])('%s', (_n, id, status, url) => expect(channelUrl(ch(id as number), status as LiveStatus | null)).toBe(url));
   it('a stream push: its own video, else the channel live one, else the streams tab', () => {
-    expect(route({ type: 'stream_live', data: { channel_id: '3', video_id: 'PUSHED' } }, st)).toEqual({ kind: 'youtube', url: videoUrl('PUSHED') });
-    expect(route({ type: 'stream_live', data: { channel_id: '3' } }, st)).toEqual({ kind: 'youtube', url: videoUrl('LIVE3') });
+    expect(route({ type: 'stream_live', data: { channel_id: '3', video_id: 'PUSHED' } }, st)).toEqual({ kind: 'streams-play', video: 'PUSHED' });
+    expect(route({ type: 'stream_live', data: { channel_id: '3' } }, st)).toEqual({ kind: 'streams-play', video: 'LIVE3' });
     expect(route({ type: 'stream_live', data: { channel_id: '5' } }, st)).toEqual({ kind: 'navigate', to: '/streams' });
   });
 });

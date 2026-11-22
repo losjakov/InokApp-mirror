@@ -35,7 +35,7 @@ describe('A-84 (h): taps', () => {
   it('the summary opens Home («Нове на сайті»); one article -> that article; a stream -> as before', () => {
     expect(routeForPush({ type: 'articles_summary', data: { type: 'articles_summary' } })).toEqual({ kind: 'navigate', to: '/home' });
     expect(routeForPush({ type: 'article', data: { type: 'article', id: '5' } })).toEqual({ kind: 'navigate', to: '/articles?id=5' });
-    expect(routeForPush({ type: 'stream_live', data: { video_id: 'abc' } })).toEqual({ kind: 'youtube', url: 'https://www.youtube.com/watch?v=abc' });
+    expect(routeForPush({ type: 'stream_live', data: { video_id: 'abc' } })).toEqual({ kind: 'streams-play', video: 'abc' });
     expect(routeForPush({ type: 'stream_ended', data: { channel_id: '3' } })).toBeNull();
   });
 });

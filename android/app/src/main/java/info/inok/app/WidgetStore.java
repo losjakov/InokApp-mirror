@@ -75,9 +75,35 @@ final class WidgetStore {
         long ownNewAt = ownNew == null ? 0L : ownNew.optLong("at", 0L);
         JSONArray items = ownNew != null && ownNewAt > appAt && lang.equals(ownNew.optString("lang")) ? ownNew.optJSONArray("items") : a.optJSONArray("items");
         if (items != null) for (int i = 0; i < items.length(); i++) { JSONObject it = items.optJSONObject(i); if (it != null)
-            d.items.add(new WidgetModel.Item(it.optInt("id"), it.optString("kind", ""), it.optString("title", ""), time(it.optString("published_at", "")), it.optString("site_url", ""))); }
+            d.items.add(new WidgetModel.Item(it.optInt("id"), it.optString("kind", ""), it.optString("title", ""), time(it.optString("created_at", it.optString("published_at", ""))), it.optString("site_url", ""))); }
+        // A-161 (1): the newest of ANY kind by their placing on the site (`created`) - the app's list and the widget's own fetch alike
+        d.items.sort((x, y) -> Long.compare(y.created, x.created));
+        // A-162 (2): the site's small settings (values only), already checked by the app (src/data/uiConfig.ts); anything else = the defaults
+        JSONObject ui = a.optJSONObject("ui");
+        if (ui != null) {
+            d.maxRows = Math.max(0, ui.optInt("max_rows", 0));
+            JSONObject dots = ui.optJSONObject("dots");
+            if (dots != null) {
+                d.dots = new HashMap<>();
+                for (String theme : new String[] { "light", "dark" }) {
+                    JSONObject t = dots.optJSONObject(theme);
+                    if (t != null) for (String k : new String[] { WidgetModel.DOT_NEWS, WidgetModel.DOT_PUB, WidgetModel.DOT_VIDEO }) {
+                        String hex = t.optString(k, "");
+                        if (hex.matches("#[0-9A-Fa-f]{6}")) d.dots.put(theme + "." + k, hex);
+                    }
+                }
+            }
+        }
         d.updated = Math.max(appAt, Math.max(ownLiveAt, ownNewAt));
         return d;
+    }
+
+    /** A-162 (2): the site's colour of a kind's dot for the phone's CURRENT theme, or null (the kit's colour of the drawable) */
+    static Integer dotColor(Context c, WidgetModel.Data d, String kind) {
+        if (d == null || d.dots == null) return null;
+        boolean night = (c.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        String hex = d.dots.get((night ? "dark." : "light.") + kind);
+        try { return hex == null ? null : android.graphics.Color.parseColor(hex); } catch (IllegalArgumentException e) { return null; }
     }
 
     /** live-status titles are {uk, ru, en}; the app's language, then uk / ru / en. */

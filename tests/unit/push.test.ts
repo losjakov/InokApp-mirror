@@ -11,7 +11,8 @@ describe('push payload → route', () => {
   const stream = { type: 'stream_live', data: { type: 'stream_live', channel_id: '1686', video_id: 'DWCj8tI47q4', title: '{"uk":"Літургія","ru":"Литургия","en":"Liturgy"}' } };
   const article = { type: 'article', data: { type: 'article', id: '2869', kind: 'news', title: '{"uk":"Новина","ru":"","en":null}' } };
   it('a stream opens the video in the YouTube app (A-4.2); without a video id — the streams tab', () => {
-    expect(routeForPush(stream)).toEqual({ kind: 'youtube', url: 'https://www.youtube.com/watch?v=DWCj8tI47q4' });
+    // A-161 (3) (cloud_44): «Трансляції» first, the stream on top (one rule with the widget's live row) - red before: straight to YouTube
+    expect(routeForPush(stream)).toEqual({ kind: 'streams-play', video: 'DWCj8tI47q4' });
     expect(routeForPush({ type: 'stream_live', data: {} })).toEqual({ kind: 'navigate', to: '/streams' });
   });
   it('an article opens the article; unknown types do nothing', () => {
