@@ -26,7 +26,7 @@ PAY=$(printf '{"type":"stream_live","channel_id":"1686","video_id":"%s","title":
 adb shell am broadcast -n "$PKG/.PushTestReceiver" --es payload "$PAY" > /dev/null; sleep 2
 adb shell cmd statusbar expand-notifications 2>/dev/null; sleep 2; adb exec-out screencap -p > "$OUT/livetap_push_shade.png"
 adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; adb exec-out cat /sdcard/ui.xml > "$OUT/livetap_ui.xml" 2>/dev/null
-XY=$(python3 -I -c 'import re,sys; s=open(sys.argv[1],encoding="utf-8",errors="ignore").read(); m=re.search(r"text=\"Почаївська Лавра \(тест\)\"[^>]*bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]\"", s); print("" if not m else f"{(int(m[1])+int(m[3]))//2} {(int(m[2])+int(m[4]))//2}")' "$OUT/livetap_ui.xml" 2>/dev/null || true)
+XY=$(python3 -I -c 'import re,sys; s=open(sys.argv[1],encoding="utf-8",errors="ignore").read(); m=re.search(r"text=\"(?:Почаївська Лавра|Почаевская Лавра|Pochaiv Lavra) \((?:тест|test)\)\"[^>]*bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]\"", s); print("" if not m else f"{(int(m[1])+int(m[3]))//2} {(int(m[2])+int(m[4]))//2}")' "$OUT/livetap_ui.xml" 2>/dev/null || true)
 echo "push in the shade at: ${XY:-not found}" >> "$L"
 if [ -n "$XY" ]; then adb shell input tap $XY; after push; else RES="FAIL:push not found in the shade"; adb shell cmd statusbar collapse 2>/dev/null; fi
 echo "livetap $RES" | tee -a "$L"

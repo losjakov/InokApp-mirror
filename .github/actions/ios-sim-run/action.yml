@@ -19,12 +19,13 @@ runs:
       run: |
         set -o pipefail
         xcodebuild -project "$PROJECT" -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-          -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C" ENABLE_DEBUG_DYLIB=NO build > "$RUNNER_TEMP/sim-build.log" 2>&1 \
+          -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$V" CURRENT_PROJECT_VERSION="$C" ENABLE_DEBUG_DYLIB=NO OTHER_LDFLAGS='$(inherited) -Wl,-weak_framework,SwiftUICore' build > "$RUNNER_TEMP/sim-build.log" 2>&1 \
           || { grep -E 'error:|warning: .*deprecated' "$RUNNER_TEMP/sim-build.log" | head -40; tail -60 "$RUNNER_TEMP/sim-build.log"; exit 1; }
         tail -3 "$RUNNER_TEMP/sim-build.log"; grep -m1 'GoogleService-Info.plist:' "$RUNNER_TEMP/sim-build.log" | tee -a "$GITHUB_STEP_SUMMARY" || true
         echo "simulator App.app: $(du -sk "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" | cut -f1) KB" | tee -a "$GITHUB_STEP_SUMMARY"
         # cloud_44 (ios 45037644332: iOS 16.4 «dyld: Library not loaded: SwiftUICore … Referenced from App.debug.dylib» - Xcode 26's DEBUG dylib
-        # links SwiftUICore, absent before iOS 18): the simulator build links like the release (ENABLE_DEBUG_DYLIB=NO); how the binary links SwiftUI*
+        # links SwiftUICore, absent before iOS 18). ios 45043064388: the SIMULATOR app links it strongly even without the debug dylib (the device
+        # archive does not: «release links SwiftUICore: none») -> here it is WEAK (the ring starts on 16.4; SwiftUI drawing there = NOT-PROVABLE)
         otool -L "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app/App" | grep -i swiftui | sed 's/^/App links: /' | tee -a "$GITHUB_STEP_SUMMARY" || true
     - name: The tour - ${{ inputs.task }} on the ${{ inputs.runtime }} iOS, ${{ inputs.device }}
       shell: bash

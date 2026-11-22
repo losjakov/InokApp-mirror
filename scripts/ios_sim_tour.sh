@@ -161,7 +161,10 @@ a3_walk() {
     *) a3 "local plugins answer (A1)" FAIL "${v:-no answer}";; esac
   # cloud_43 (T9, A-156 (3)): the widgets' REVIEW snapshots - the SAME WidgetBody the extension draws, from the App Group data the app wrote
   # (InokWidgets.set), rendered in the app (ImageRenderer, iOS 16+) and copied out of its container; informational (the REPORT's frames)
-  v=$(ev "Capacitor.Plugins.InokWidgets.snapshot().then((x) => JSON.stringify(x)).catch((e) => 'REJECT ' + String((e && e.message) || e))")
+  # cloud_44: the simulator build weak-links SwiftUICore (Xcode 26; absent before iOS 18) - SwiftUI drawing cannot run on an older SIMULATOR
+  # runtime; the release binary needs no SwiftUICore (ios.yml archive check) - iOS 16 / 17 widgets = the owner's phone
+  if [ "${RTV%%.*}" -lt 17 ] 2>/dev/null; then v="skipped on iOS $RTV (the simulator build's weak SwiftUICore)"; else
+  v=$(ev "Capacitor.Plugins.InokWidgets.snapshot().then((x) => JSON.stringify(x)).catch((e) => 'REJECT ' + String((e && e.message) || e))"); fi
   local wc wd; wc="$(xcrun simctl get_app_container "$U" "$BUNDLE" data 2>/dev/null || true)"; wd="$OUT/widgets-$TAG"; mkdir -p "$wd"
   [ -n "$wc" ] && cp "$wc"/Documents/widgets/*.png "$wd/" 2>/dev/null
   # 1.0.18: kind x small / medium / large x light / dark x (the app's data + the gallery sample uk / ru / en) = 72 (the kit's acceptance sheets)

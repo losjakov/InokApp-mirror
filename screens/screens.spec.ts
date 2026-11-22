@@ -1403,6 +1403,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(gallery(p).list, 'the list asked once').toHaveLength(1);
       await expect(p.getByTestId('viewer-img')).toHaveAttribute('src', /\/monasteries\/242\/00\.jpg$/);
       await picturesLoaded(p, '[data-testid="viewer-img"]', 1);
+      await p.waitForFunction(() => { const m = document.querySelector('ion-modal.viewer'); return !!m && m.getAnimations({ subtree: true }).every((a) => a.playState !== 'running'); });
+      await p.waitForTimeout(300); // the frame = the viewer at rest over the card (not its opening animation)
       await p.screenshot({ path: shotPath(p, `link-gallery-${how}-viewer`) });
       await systemBack(p);
       await viewerGone(p);
