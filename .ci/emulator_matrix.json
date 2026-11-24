@@ -1,0 +1,1 @@
+[{"api-level":26,"target":"google_apis","required":false},{"api-level":31,"target":"google_apis","required":true},{"api-level":34,"target":"default","required":true},{"api-level":35,"target":"google_apis","required":true}]
