@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import type { MapPoint } from '@/data/repo/types';
 import { hasWebGL } from '@/data/map/webgl';
 import { online } from '@/native/network';
+import { mapGlFailed } from '@/app/mapGlFailure';
 import { useApp } from '@/state/AppContext';
 
 const Canvas = lazy(() => import('./MiniMapCanvas'));
@@ -21,13 +22,17 @@ export function MiniMap({ houses, place, label, onOpen, testId }: { houses?: Map
   const [stub, setStub] = useState(() => !hasWebGL());
   const [credit, setCredit] = useState('');
   useEffect(() => { let on = true; void online().then((o) => { if (on && !o) setStub(true); }); return () => { on = false; }; }, []);
+  // A-182: a device whose GL failed a map shows NO mini-map at all (the page keeps its address / «Маршрут»); unknown yet = nothing drawn
+  const [gl, setGl] = useState<'wait' | 'ok' | 'failed'>('wait');
+  useEffect(() => { let on = true; void mapGlFailed().then((f) => { if (on) setGl(f ? 'failed' : 'ok'); }); return () => { on = false; }; }, []);
+  if (gl === 'failed') return null;
   return (
     <figure className="minimap" data-stub={stub ? '1' : '0'}>
       <button type="button" className="minimap__box" onClick={onOpen} data-testid={testId}>
         {stub ? (
           <span className="minimap__stub" data-testid="minimap-stub"><IonIcon icon={cloudOfflineOutline} aria-hidden="true" /><span>{t('map.mini_offline')}</span></span>
         ) : (
-          styleUrl && <Suspense fallback={null}><Canvas key={styleUrl} styleUrl={styleUrl} houses={houses} place={place} onStub={() => setStub(true)} onCredit={setCredit} /></Suspense>
+          styleUrl && gl === 'ok' && <Suspense fallback={null}><Canvas key={styleUrl} styleUrl={styleUrl} houses={houses} place={place} onStub={() => setStub(true)} onCredit={setCredit} onGlFail={() => setGl('failed')} /></Suspense>
         )}
         <span className="minimap__chip over-map"><IonIcon icon={mapOutline} aria-hidden="true" /><span>{label}</span></span>
       </button>

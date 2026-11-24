@@ -139,6 +139,30 @@ const drawnMarks = (p: Page, global: '__inokMap' | '__inokMiniMap') => p.evaluat
   const edge = (k: 'l' | 'r' | 't' | 'b', pick: (...v: number[]) => number) => pick(...boxes.map((b: any) => b[k]));
   return { n: feats.length, z: map.getZoom(), w: c.width, h: c.height, l: edge('l', Math.min), r: edge('r', Math.max), t: edge('t', Math.min), b: edge('b', Math.max), under: [...new Set(under)] };
 }, global);
+/** A-170: the phone platform class Ionic sets on a device (screens run in desktop mode - no `plt-mobile`, so no `user-select:none`) */
+const mobileMode = async (p: Page) => { await p.addInitScript(() => document.addEventListener('DOMContentLoaded', () => document.documentElement.classList.add('plt-mobile'))); };
+/** A-170: the computed `user-select` of the FIRST visible element of each selector on the shown page */
+const selectStyles = (p: Page, sels: string[]) => p.evaluate(([shown, ss]) => ss.map((sel) => {
+  const page = document.querySelector(shown) ?? document;
+  const el = [...page.querySelectorAll(sel), ...document.querySelectorAll(sel)].find((e) => (e as HTMLElement).getBoundingClientRect().width > 0);
+  if (!el) return `missing ${sel}`;
+  const cs = getComputedStyle(el); return cs.userSelect || cs.webkitUserSelect;
+}), [SHOWN, sels] as const);
+/** A-170: the stylesheet keeps `-webkit-touch-callout:none` on pictures inside a selectable text (WebKit-only property: read the rule) */
+const calloutRule = (p: Page) => p.evaluate(async () => {
+  const texts = await Promise.all([...document.styleSheets].map((sh) => sh.href ? fetch(sh.href).then((r) => r.text()) : Promise.resolve(sh.ownerNode?.textContent ?? '')));
+  return texts.some((t) => /\.selectable img\s*\{[^}]*-webkit-touch-callout:\s*none/.test(t));
+});
+/** A-170: the frame shows a REAL selection of the first paragraph (the system bar is the device's - emulator / iPhone) */
+const selectSentence = async (p: Page, sel: string) => {
+  const n = await p.evaluate((s) => { const el = document.querySelector(s); if (!el) return 0;
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: (t) => ((t.textContent ?? '').trim().length > 80 ? 1 : 3) });
+    const t = w.nextNode(); if (!t) return 0;
+    (t.parentElement as HTMLElement).scrollIntoView({ block: 'center' });
+    const r = document.createRange(); r.setStart(t, 0); r.setEnd(t, Math.min(140, (t.textContent ?? '').length)); const g = getSelection()!; g.removeAllRanges(); g.addRange(r);
+    return g.toString().length; }, sel);
+  expect(n, 'a sentence selected').toBeGreaterThan(20);
+};
 /** A-40 (owner 03.11): the article's lead (анонс) after the date and before the text - one block, italic, a thin brand line at the left, the body's size */
 const leadShown = async (p: Page) => {
   const lead = onShown(p, 'article').locator('.aview__lead');
@@ -847,7 +871,20 @@ const arrowsOverControls = (p: Page) => arrowsOwner(p).evaluate(async (art) => {
   }
   return [...hits];
 });
-const screens: { name: string; path: string; tall?: number; width?: number; font?: number; only?: string[]; before?: (p: Page) => Promise<void>; ready: (p: Page) => Promise<void> }[] = [
+/** A-182 (cloud_46): the iPhone 7 / iOS 15.8 failure made REAL in the browser - every WebGL program «fails to link» with WebKit's own words, so
+ *  MapLibre throws its own «Program failed to link: Internal error compiling shader with Metal backend.» from its frame (no app code faked) */
+const GL_LINK_FAILS = /Program failed to link: Internal error compiling shader with Metal backend/;
+const breakGlLink = async (p: Page) => { await p.addInitScript(() => {
+  for (const C of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) {
+    if (!C) continue;
+    const param = C.prototype.getProgramParameter;
+    C.prototype.getProgramParameter = function (prog: WebGLProgram, pname: number) { return pname === 0x8b82 ? false : param.call(this, prog, pname); };
+    C.prototype.getProgramInfoLog = () => 'Internal error compiling shader with Metal backend.';
+  }
+}); };
+const screens: { name: string; path: string; tall?: number; width?: number; font?: number; only?: string[]; before?: (p: Page) => Promise<void>; ready: (p: Page) => Promise<void>;
+  /** A-182: an uncaught error the screen EXPECTS (the browser reports it as a page error; the app contained it) */
+  expectError?: RegExp }[] = [
   { name: 'home', path: '/home', ready: async (p) => {
       // the old flake of home phone-ru (run 41339874788): live-status is loaded on purpose AFTER the first screen (D22, `afterFirstScreen`:
       // two frames + 800 ms, then the fetch) — on a busy runner that passed the default 5 s; the wait is for that load, not a sleep
@@ -2311,6 +2348,57 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await body.locator('h2').first().evaluate((e) => e.scrollIntoView({ block: 'center' }));
     } })),
   // A-50 #1 (R-34, site fix): the RU lead of 2869 arrives as ONE paragraph (the live answer, fixtures/articles_ru.json) - shown as the site shows it
+  // A-170 (T1): the system's selection on READING texts only. `plt-mobile` is set as Ionic sets it on a phone (its `html.plt-mobile ion-app
+  // {user-select:none}` is the cause, SPEC T1); the gesture itself = the emulator pass / the iPhone. Rows, tabs, buttons stay `none`.
+  { name: 'select-article', only: UK, path: '/articles?id=2869', before: mobileMode, ready: async (p) => {
+      await expect(onShown(p, 'article')).toContainText('Обитель дитячої радості');
+      expect(await selectStyles(p, ['article h1.card__title', 'article .aview__lead', 'article .aview__body'])).toEqual(['text', 'text', 'text']);
+      expect(await selectStyles(p, ['ion-tab-button', '[data-testid="article"] ion-button, [data-testid="article"] button'])).toEqual(['none', 'none']);
+      expect(await calloutRule(p), 'pictures inside a text keep no callout').toBe(true);
+      await selectSentence(p, 'article .aview__body');
+    } },
+  { name: 'select-card', only: UK, path: '/monasteries/242', before: mobileMode, ready: async (p) => {
+      await expect(onShown(p, 'actions')).toBeVisible();
+      expect(await selectStyles(p, ['h1.card__title', '.card__sub', '.history', '.info:not(.info--tap) .info__value'])).toEqual(['text', 'text', 'text', 'text']);
+      expect(await selectStyles(p, ['.info--tap .info__value', '.actions__btn'])).toEqual(['none', 'none']);
+    } },
+  { name: 'select-calendar', only: ['phone-light'], path: '/streams', before: mobileMode, ready: async (p) => {
+      await expect(onShown(p, 'calendar')).toBeVisible();
+      expect(await selectStyles(p, ['.cal__body'])).toEqual(['text']);
+      await p.goto('/monasteries'); await expect(p.locator('[data-testid^="mrow-"]').first()).toBeVisible({ timeout: 20_000 });
+      expect(await selectStyles(p, ['.mrow']), 'a list row keeps A-142 (the held finger = the quick sheet)').toEqual(['none']);
+    } },
+  // A-182: the map's GL fails in a later frame -> the «Карта» tab shows the note + the houses list (never the stop screen), the flag is kept
+  { name: 'map-gl-failed', only: [...UK, 'phone-ru'], path: '/map', before: breakGlLink, expectError: GL_LINK_FAILS, ready: async (p) => {
+      await expect(onShown(p, 'map-fallback')).toBeVisible({ timeout: 30_000 });
+      await expect(p.getByTestId('crash')).toHaveCount(0);
+      await expect(onShown(p, 'map-gl-note')).toContainText(/Карта не відображається|Карта не отображается|The map cannot be shown/);
+      await expect(onShown(p, 'map-gl-retry')).toBeVisible();
+      await expect(onShown(p, 'map-fallback-list').locator('[data-testid^="mrow-"]').first()).toBeVisible();
+      await expect(p.locator('[data-testid="map"]')).toHaveCount(0);
+      expect(await p.evaluate(() => localStorage.getItem('CapacitorStorage.map_gl_failed')), 'the flag for the next opening').toMatch(/"app_version"/);
+      // an eparchy page then shows NO mini-map (its houses list and the rest stay)
+      await p.goto('/more/eparchies/1');
+      await expect(p.getByTestId('eparchy-title').locator('visible=true')).toBeVisible({ timeout: 20_000 });
+      await expect(p.locator('.minimap')).toHaveCount(0);
+      await p.goto('/map');
+      await expect(onShown(p, 'map-fallback')).toBeVisible({ timeout: 20_000 });
+    } },
+  // A-182 (2): the second opening goes straight to the list (no try); «Спробувати показати карту» clears the flag and the map is drawn
+  { name: 'map-gl-retry', only: ['phone-light'], path: '/map', expectError: GL_LINK_FAILS, before: async (p) => {
+      await p.addInitScript(() => { if (sessionStorage.getItem('gl-once')) return; sessionStorage.setItem('gl-once', '1'); // the FIRST opening only
+        for (const C of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) { if (!C) continue; const param = C.prototype.getProgramParameter;
+          C.prototype.getProgramParameter = function (prog: WebGLProgram, n: number) { return n === 0x8b82 ? false : param.call(this, prog, n); };
+          C.prototype.getProgramInfoLog = () => 'Internal error compiling shader with Metal backend.'; } });
+    }, ready: async (p) => {
+      await expect(onShown(p, 'map-fallback')).toBeVisible({ timeout: 30_000 });
+      await p.reload(); // the second opening: the GL would work now, but the flag sends it straight to the list - no try, no crash loop
+      await expect(onShown(p, 'map-fallback')).toBeVisible({ timeout: 30_000 });
+      await expect(p.locator('[data-testid="map"]')).toHaveCount(0);
+      await onShown(p, 'map-gl-retry').click(); // «Спробувати показати карту»: the flag cleared, ONE try
+      await expect(onShown(p, 'map')).toHaveAttribute('data-ready', '1', { timeout: 30_000 });
+      expect(await p.evaluate(() => localStorage.getItem('CapacitorStorage.map_gl_failed'))).toBeNull();
+    } },
   { name: 'article-lead-ru', only: ['phone-ru'], path: '/articles?id=2869', before: async (p) => {
       await p.route(FEED_AND_ITEM, (r) => r.fulfill({ contentType: 'application/json', body: readFileSync('fixtures/articles_ru.json', 'utf8') }));
     }, ready: async (p) => {
@@ -4467,7 +4555,7 @@ for (const [profile, cfg] of Object.entries(profiles)) {
         if (process.env.THROTTLE) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.THROTTLE) });
         const errors: string[] = [];
         // D33: the error WITH its first stack frames — a flaky error must name where it comes from
-        page.on('pageerror', (e) => benignPageError(e) || errors.push(`${String(e)} @ ${(e.stack ?? '').split('\n').slice(1, 12).map((l) => l.trim()).join(' < ')}`));
+        page.on('pageerror', (e) => benignPageError(e) || (s.expectError?.test(e.message) ?? false) || errors.push(`${String(e)} @ ${(e.stack ?? '').split('\n').slice(1, 12).map((l) => l.trim()).join(' < ')}`));
         if (s.tall || s.width) await page.setViewportSize({ width: s.width ?? cfg.viewport.width, height: s.tall ?? cfg.viewport.height });
         // the system font scale: the WebView's text zoom = the root size (every size of the app is in rem)
         if (s.font) await page.addInitScript((f) => document.addEventListener('DOMContentLoaded', () => {

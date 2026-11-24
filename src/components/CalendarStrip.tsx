@@ -24,7 +24,7 @@ export function CalendarStrip() {
     return (
       <section className="streams__cal cal" aria-label={t('streams.calendar')} data-testid="calendar">
         {view.tomorrow && <p className="cal__note" data-testid="calendar-tomorrow">{t('calendar.tomorrow')}</p>}
-        <HtmlLite html={shown.join('')} className="cal__body" />
+        <HtmlLite html={shown.join('')} className="cal__body selectable" />
         {/* A-152 (variant A): «Джерело: blagovist.info» at the right, small and muted, ONLY when expanded; the link through THE external opener */}
         {open && (
           <p className="cal__source" data-testid="calendar-source"><span aria-hidden="true">{t('calendar.source')}</span>

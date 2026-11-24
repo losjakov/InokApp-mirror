@@ -433,6 +433,46 @@ a3_walk() {
   if [ "$v" = /streams ] && [ "$after" = /streams ]; then a3 "live tap -> «Трансляції» + the stream (A-161 (3))" PASS "the address -> $v; sheet closed -> $after"; else a3 "live tap -> «Трансляції» + the stream (A-161 (3))" FAIL "the address -> $v; after $after"; fi
   a3 "VoiceOver" NOT-PROVABLE "the simulator has no VoiceOver - names / roles / order are the a11y tree of the same DOM (axe 0); the owner's iPhone"
   a3 "share sheet / call / directions (Apple Maps)" NOT-PROVABLE "system sheets and other apps - the owner's iPhone"
+  a3_cloud46   # 1.0.19's own spots - after every older one (E8: a new spot goes last)
+}
+
+# ---- cloud_46 (1.0.19): A-170 selection styles in WKWebView; A-183 Apple's map where our WebGL map cannot draw (the flag set by the ring)
+a3_cloud46() {
+  local v
+  guard_crash spot46
+  # A-170: the reading texts take the system's selection (computed in WebKit itself); a list row keeps A-142's held finger (no selection)
+  nav go /monasteries/242; node "$NAVJS" wait '.history' >> "$OUT/nav.txt" 2>&1; sleep 2
+  v=$(ev "(() => { const u = (s) => { const e = Array.from(document.querySelectorAll(s)).find((x) => x.getClientRects().length > 0); return e ? getComputedStyle(e).webkitUserSelect || getComputedStyle(e).userSelect : 'missing'; };
+    return [u('h1.card__title'), u('.history'), document.documentElement.classList.contains('plt-mobile') ? 'plt-mobile' : 'no plt-mobile'].join(' / '); })()")
+  nav go /monasteries; node "$NAVJS" wait '[data-testid^="mrow-"]' >> "$OUT/nav.txt" 2>&1; sleep 2
+  local r; r=$(ev "(() => { const e = document.querySelector('.mrow'); return e ? getComputedStyle(e).webkitUserSelect || getComputedStyle(e).userSelect : 'missing'; })()")
+  case "$v|$r" in 'text / text / plt-mobile|none') a3 "text selection styles (A-170)" PASS "card title / history / platform: $v; list row: $r";;
+    *) a3 "text selection styles (A-170)" FAIL "card title / history / platform: $v; list row: $r";; esac
+  # A-183: the A-182 flag of THIS app + OS version (what a real GL failure writes) -> the «Карта» tab = Apple's map with our houses
+  local ver; ver=$(node -p "require('$ROOT/package.json').version")
+  v=$(ev "(async () => { const i = await Capacitor.Plugins.Device.getInfo(); await Capacitor.Plugins.Preferences.set({ key: 'map_gl_failed', value: JSON.stringify({ app_version: '$ver', os_version: String(i.osVersion) }) }); return 'set ' + i.osVersion; })()")
+  echo "A-183 flag: $v" >> "$OUT/nav.txt"
+  launch; answer_offers
+  nav go /map; sleep 6
+  local st n; st=$(ev "Capacitor.Plugins.InokAppleMap.state().then((x) => JSON.stringify(x)).catch((e) => 'REJECT ' + String((e && e.message) || e))")
+  n=$(ev "(document.querySelector('[data-testid=apple-map]') || { dataset: {} }).dataset.houses || 'none'")
+  shot "$OUT/a3-apple-map__$TAG.png"
+  xcrun simctl ui "$U" appearance dark; sleep 3; shot "$OUT/a3-apple-map-dark__$TAG.png"; xcrun simctl ui "$U" appearance light; sleep 2
+  local nh hid; nh=$(printf '%s' "$st" | sed -n 's/.*"houses":\([0-9]*\).*/\1/p'); case "$st" in *'"hidden":false'*) hid=no;; *) hid=yes;; esac
+  if [ -n "$nh" ] && [ "$nh" = "$n" ] && [ "$hid" = no ]; then a3 "Apple map when our map cannot draw (A-183)" PASS "native $st = the page's houses $n"
+  else a3 "Apple map when our map cannot draw (A-183)" FAIL "native ${st:-no answer}; the page's houses $n"; fi
+  # a web overlay over the map -> the native view hidden; closed -> shown
+  local h1 h2; h1=$(ev "(async () => { const a = document.createElement('ion-alert'); a.header = 'ring'; a.buttons = ['OK']; a.id = 'ring-alert'; document.body.append(a); await a.present(); await new Promise((r) => setTimeout(r, 1500)); return JSON.stringify(await Capacitor.Plugins.InokAppleMap.state()); })()")
+  h2=$(ev "(async () => { await document.getElementById('ring-alert').dismiss(); await new Promise((r) => setTimeout(r, 1500)); return JSON.stringify(await Capacitor.Plugins.InokAppleMap.state()); })()")
+  case "$h1|$h2" in *'"hidden":true'*'|'*'"hidden":false'*) a3 "Apple map hides under a sheet (A-183 (3))" PASS "open: $h1; closed: $h2";;
+    *) a3 "Apple map hides under a sheet (A-183 (3))" FAIL "open: $h1; closed: $h2";; esac
+  # a pin's «›» -> the house card (the callout's own path, the pin selected on the map)
+  v=$(ev "Capacitor.Plugins.InokAppleMap.selectForRing({ code: 242 }).then((x) => JSON.stringify(x))"); sleep 4
+  local at; at=$(ev "location.pathname"); local gone; gone=$(ev "Capacitor.Plugins.InokAppleMap.state().then((x) => JSON.stringify(x))")
+  shot "$OUT/a3-apple-map-card__$TAG.png"
+  case "$v|$at|$gone" in '{"found":true}|/monasteries/242|'*'"hidden":true'*|'{"found":true}|/monasteries/242|{"exists":false}') a3 "Apple map pin -> the card (A-183 (2))" PASS "$v -> $at; the map then $gone";;
+    *) a3 "Apple map pin -> the card (A-183 (2))" FAIL "$v -> $at; the map then $gone";; esac
+  ev "Capacitor.Plugins.Preferences.remove({ key: 'map_gl_failed' }).then(() => 'cleared')" >> "$OUT/nav.txt"
 }
 
 # ---- the App Store set (newest runtime only): the frames of store_frames.txt, uk / ru / en, the LIVE export

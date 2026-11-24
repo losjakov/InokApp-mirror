@@ -12,6 +12,8 @@ import { COUNT_FONT, LOCAL_STYLE, UKRAINE_BOUNDS, splitLavras } from './geojson'
 import countGlyphs from '@/assets/glyphs/count-0-255.pbf?url';
 import type { Lang } from '@/i18n';
 import { onNetChange, online } from '@/native/network';
+import { isMapGlFailure, markMapGlFailed, onMapGlFailure } from '@/app/mapGlFailure';
+import { reportQuietly } from '@/app/crash';
 setWorkerUrl(mapWorkerUrl);
 /**
  * cloud_37 (the iOS simulator, ios run 4: every map stayed empty - the style never loaded, no worker was ever fetched; MapLibre's style waits
@@ -190,13 +192,26 @@ export interface InokMapOptions {
   onBasemap?: () => void;
   /** our sources and layers exist (again: a style switch drops them) — the screen adds its own layers here */
   onLayers?: (map: MLMap) => void;
+  /** A-182: the device's GL could not draw the map (the map is already removed) - the screen shows its fallback */
+  onGlFail?: () => void;
 }
 
 /** MapLibre's current Style object (internal): its identity tells a replaced style apart; `_loaded` = what addSource checks */
 const styleOf = (map: MLMap) => (map as unknown as { style?: { _loaded?: boolean } }).style;
 
-/** One map of the app: created once per mount, removed with `remove()`. */
+/** One map of the app: created once per mount (`InokMap.open`), removed with `remove()`. */
 export class InokMap {
+  /** A-182: THE way to create a map - a GL failure while MapLibre builds it (iOS 15 «Program failed to link») = no map, the screen's
+   *  fallback (`onGlFail`), the flag for the next opening and one auto report; never the stop screen. Any other error is thrown as before. */
+  static open(o: InokMapOptions): InokMap | null {
+    try { return new InokMap(o); } catch (e) {
+      if (!isMapGlFailure(e)) throw e;
+      InokMap.failed(e, o);
+      return null;
+    }
+  }
+  private static failed(e: unknown, o: InokMapOptions) { reportQuietly(e, 'error', true); void markMapGlFailed(); o.onGlFail?.(); }
+  private unroute: () => void = () => undefined;
   readonly map: MLMap;
   private appliedStyle: string | null;
   private appliedLang: Lang;
@@ -226,6 +241,8 @@ export class InokMap {
     };
     const map = new MLMap(opts);
     this.map = map;
+    // A-182: while this map exists, a GL failure thrown later (a frame's shader link, `window.error` in the map chunk) is routed to `fail`
+    this.unroute = onMapGlFailure(() => this.fail());
     // cloud_38 D16 - THE cause of the Play map frames drawn in a ~400 x 300 corner: a map resized while its page is hidden (0 x 0) takes
     // MapLibre's 400 x 300 fallback, and the emulator's WebView did not resize it back when shown. A hidden map is never resized (MapLibre's
     // own observer, the screens' observers and the language restyle all come here); shown again, the observers size it to its box.
@@ -260,6 +277,7 @@ export class InokMap {
       map.on('data', collapse);
     }
     map.on('error', (e: ErrorEvent & { sourceId?: string }) => {
+      if (isMapGlFailure(e.error)) { reportQuietly(e.error, 'error', true); this.fail(); return; } // A-182: MapLibre's own error event
       noteMapError(e);
       // a base map tile that failed (offline after the style came): the note; our own sources are GeoJSON, never fetched
       if (e.sourceId && map.getSource(e.sourceId)?.type !== 'geojson') { this.tileErrors++; this.loseTiles(); }
@@ -446,5 +464,16 @@ export class InokMap {
     }
   }
 
-  remove() { this.removed = true; clearTimeout(this.tileTimer); this.stopNet(); this.map.remove(); }
+  remove() {
+    if (this.removed) return;
+    this.removed = true; clearTimeout(this.tileTimer); this.stopNet(); this.unroute();
+    try { this.map.remove(); } catch (e) { noteMapError({ error: { message: `remove: ${String(e)}` } }); } // a map whose GL died
+  }
+  /** A-182: THE one fall-back of a map whose GL failed: removed, the flag kept (next opening = the list), the screen told */
+  fail() {
+    if (this.removed) return;
+    this.remove();
+    void markMapGlFailed();
+    this.o.onGlFail?.();
+  }
 }

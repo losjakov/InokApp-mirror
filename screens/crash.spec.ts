@@ -57,6 +57,9 @@ for (const profile of REVIEW) {
       }), { timeout: 10_000, message: 'stroked shapes of the crash icon' }).toBeGreaterThanOrEqual(2);
       // D64: no «надішліть нам» without a way - the line names inok.info and its «Контакти»
       await expect(page.getByTestId('crash-photo')).toContainText('inok.info');
+      // A-181 (2): «Надіслати розробнику» - a real button with its label, right under «Спробувати ще раз»
+      await expect(page.getByRole('button', { name: 'Надіслати розробнику' })).toBeVisible();
+      expect(await page.evaluate(() => document.querySelector('[data-testid="crash-retry"]')?.nextElementSibling?.getAttribute('data-testid'))).toBe('crash-send');
       await expect(c).not.toContainText('надішліть');
       // the whole column on the screen, the button full-width
       const box = await c.boundingBox();
@@ -91,6 +94,54 @@ test.describe('A-48 crash paths', () => {
     await page.reload();
     await expect(page.getByTestId('tiles')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('crash')).toHaveCount(0);
+  });
+  // A-181 (1): every crash = ONE fire-and-forget POST error-report with exactly the contract keys; the same code again today = none
+  test('A-181: an uncaught error sends ONE anonymous report (the contract keys), the same code again sends none', async ({ page }) => {
+    const posts: Record<string, unknown>[] = [];
+    await page.route('**/api/app/v1/error-report', (r) => { posts.push(r.request().postDataJSON()); return r.fulfill({ status: 404 }); }); // 404 = dropped silently
+    await page.addInitScript(() => localStorage.setItem('inok.errreport', 'on')); // the browser seam (a native app always sends)
+    await localPictures(page);
+    await page.goto('/home');
+    await expect(page.getByTestId('tiles')).toBeVisible({ timeout: 30_000 });
+    await page.evaluate(() => { setTimeout(() => { throw new SyntaxError('probe: reported'); }, 0); });
+    await crashScreen(page, /E-SyntaxError-/);
+    await expect.poll(() => posts.length).toBe(1);
+    expect(Object.keys(posts[0]).sort()).toEqual(['app_version', 'at', 'build', 'code', 'kind', 'lang', 'line', 'model', 'os_version', 'platform', 'where']);
+    expect(posts[0]).toMatchObject({ kind: 'auto', line: 'probe: reported', lang: 'uk' });
+    await page.getByTestId('crash-retry').click(); // reloads (the tree was dead)
+    await expect(page.getByTestId('crash')).toHaveCount(0);
+    await expect(page.getByTestId('tiles')).toBeVisible({ timeout: 30_000 });
+    await page.evaluate(() => { setTimeout(() => { throw new SyntaxError('probe: reported'); }, 0); });
+    await crashScreen(page, /E-SyntaxError-/);
+    await page.waitForTimeout(500);
+    expect(posts).toHaveLength(1);
+  });
+  // A-181 (2): the button opens the site's form prefilled; without a network the text is copied and the screen says so (A-125)
+  test('A-181: «Надіслати розробнику» - online the site form with the report; offline the text copied + the note', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.addInitScript(() => { (window as unknown as { __opened: string[] }).__opened = []; window.open = ((u: string) => { (window as unknown as { __opened: string[] }).__opened.push(u); return null; }) as typeof window.open; });
+    await localPictures(page);
+    await page.goto('/home');
+    await expect(page.getByTestId('tiles')).toBeVisible({ timeout: 30_000 });
+    await page.evaluate(() => { setTimeout(() => { throw new SyntaxError('probe: send'); }, 0); });
+    const code = await (await crashScreen(page, /E-SyntaxError-/)).getAttribute('data-code');
+    await page.getByTestId('crash-send').click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __opened: string[] }).__opened.length)).toBe(1);
+    const url = new URL(await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened[0]));
+    expect(`${url.origin}${url.pathname}`).toBe('https://inok.info/app/');
+    expect(url.searchParams.get('lang')).toBe('uk');
+    expect(url.hash.startsWith('#report=')).toBe(true); // the fragment: never reaches the server (its cache), the form reads it
+    const text = decodeURIComponent(url.hash.slice('#report='.length));
+    expect(text.split('\n')[0]).toBe(`Код: ${code}`);
+    expect(text).toContain('probe: send');
+    expect(text.length).toBeLessThanOrEqual(1000);
+    await page.evaluate(() => localStorage.setItem('inok.net', JSON.stringify({ connected: false, metered: false, dataSaver: false })));
+    await page.getByTestId('crash-send').click();
+    await expect(page.getByTestId('crash-send-offline')).toBeVisible();
+    await expect(page.getByTestId('crash-send-offline')).toHaveAttribute('role', 'status');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+    expect(await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened.length)).toBe(1);
+    await page.screenshot({ path: `${OUT}crash-send-offline__phone-light.png` });
   });
   test('a window error without an Error object (ResizeObserver notice) is not a crash', async ({ page }) => {
     await localPictures(page);

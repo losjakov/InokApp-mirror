@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useApp } from '@/state/AppContext';
 import { ARROWS_IDLE_MS, ARROWS_SCROLL_END_MS, NO_ARROWS, arrowTarget, arrowsShown, scrollPlan, type ArrowsShown, type ScrollDir } from '@/state/scrollArrows';
 import { scrollRoot } from './SplitContent';
-import { overlayOpen } from './UpdateOffer';
+import { overlayOpen } from './overlays';
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 /** a press this long shows the arrow's words (the long-press tooltip of an icon-only control) */

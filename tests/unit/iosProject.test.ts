@@ -59,6 +59,8 @@ describe('iOS project', () => {
     const pi = read('ios/App/App/PrivacyInfo.xcprivacy');
     expect(plistValue(pi, 'NSPrivacyTracking')?.[1]).toBe('false');
     expect(pi).not.toMatch(/NSPrivacyCollectedDataTypePreciseLocation|NSPrivacyCollectedDataTypeCoarseLocation/); // read on the phone only
+    // A-181 (cloud_46): the automatic error report = Crash Data, not linked, not tracking, app functionality
+    expect(pi).toMatch(/<string>NSPrivacyCollectedDataTypeCrashData<\/string>\s*<key>NSPrivacyCollectedDataTypeLinked<\/key>\s*<false\/>\s*<key>NSPrivacyCollectedDataTypeTracking<\/key>\s*<false\/>\s*<key>NSPrivacyCollectedDataTypePurposes<\/key>\s*<array>\s*<string>NSPrivacyCollectedDataTypePurposeAppFunctionality<\/string>/);
   });
 });
 
@@ -227,5 +229,25 @@ describe('ios.yml (A-118): the mirror only, never a pull request, no secret prin
     for (const id of ids) expect(read(`ios/App/InokWidgets/av/${id}.webp`).length, `av/${id}.webp`).toBeGreaterThan(100);
     expect(read('ios/App/App/InokWidgetsPlugin.swift')).toMatch(/copyAvatars\(json\)/); // A-163 (3): the pictures into the App Group
     expect(core).toMatch(/InokShared\.avatarPath\(id\)/);
+  });
+});
+
+describe('A-183 (cloud_46): Apple\'s map plugin in the App target', () => {
+  const sw = read('ios/App/App/InokAppleMapPlugin.swift'); const pbx = read('ios/App/App.xcodeproj/project.pbxproj');
+  it('compiled into the App target and registered by the bridge; jsName = the JS registerPlugin name', () => {
+    expect(pbx).toMatch(/InokAppleMapPlugin\.swift in Sources \*\/,/);
+    expect(read('ios/App/App/InokBridgeViewController.swift')).toMatch(/registerPluginInstance\(InokAppleMapPlugin\(\)\)/);
+    expect(sw).toMatch(/jsName = "InokAppleMap"/);
+    expect(read('src/native/appleMap.ts')).toMatch(/registerPlugin<AppleMapPlugin>\('InokAppleMap'\)/);
+    for (const m of ['show', 'setRect', 'setVisible', 'setHouses', 'destroy', 'state', 'selectForRing']) expect(sw).toContain(`CAPPluginMethod(name: "${m}"`);
+  });
+  it('markers in the app colours, system clustering (lavras never), VoiceOver names, the location never asked from here', () => {
+    expect(sw).toMatch(/MKMarkerAnnotationView/);
+    expect(sw).toMatch(/clusteringIdentifier = h\.lavra \? nil : "inok\.houses"/);
+    expect(sw).toMatch(/accessibilityLabel = h\.title/);
+    expect(sw).toMatch(/open\.accessibilityLabel = openLabel/);
+    expect(sw).toMatch(/showsUserLocation = self\.granted\(\)/);
+    expect(sw).not.toMatch(/requestWhenInUseAuthorization|requestAlwaysAuthorization/);
+    expect(sw).toMatch(/notifyListeners\("open"/);
   });
 });

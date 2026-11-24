@@ -3,6 +3,11 @@ import { warningOutline } from 'ionicons/icons';
 import { defineCustomElement as defineIonIcon } from 'ionicons/components/ion-icon.js';
 import { langFromTag, LANGS, makeT, type Lang } from '@/i18n';
 import { isUserCancel } from './userCancel';
+import { isMapGlFailure, routeMapGlFailure } from './mapGlFailure';
+import { flushReports, reportText, reportUrl, sendAuto } from './errorReport';
+import { copyText, openLink } from '@/native/intents';
+import { online } from '@/native/network';
+import { glInfo } from '@/data/map/webgl';
 
 /**
  * A-48 (a): the app NEVER dies white. ONE place for every fatal path of the page:
@@ -85,6 +90,18 @@ export function showCrash(c: Crash, dead: boolean): void {
   btn.type = 'button';
   add('p', 'first-run__code crash__code', t('data.fail_code', { code: c.code }), 'crash-code');
   add('p', 'crash__line', [c.line, c.where].filter(Boolean).join(' · '), 'crash-line');
+  // A-181 (2): «Надіслати розробнику» under «Спробувати ще раз» - the site's feedback form with the report prefilled; offline: the text copied
+  const send = add('button', 'crash__btn crash__btn--send', t('crash.send'), 'crash-send') as HTMLButtonElement;
+  send.type = 'button';
+  el.insertBefore(send, btn.nextSibling);
+  send.onclick = async () => {
+    const text = await reportText(c, t('data.fail_code', { code: c.code }));
+    if (await online()) { void openLink(reportUrl(text, lang()), lang()); return; }
+    await copyText(text);
+    if (!el.querySelector('[data-testid="crash-send-offline"]')) el.insertBefore(Object.assign(document.createElement('p'), {
+      className: 'crash__text', textContent: t('crash.send_offline') }), send.nextSibling).setAttribute('data-testid', 'crash-send-offline');
+    el.querySelector('[data-testid="crash-send-offline"]')?.setAttribute('role', 'status');
+  };
   btn.onclick = () => {
     clear();
     if (dead) { location.reload(); return; }
@@ -98,25 +115,43 @@ export function reportCrash(err: unknown, src: CrashSource, dead = true): void {
   const c = crashOf(err, src);
   console.error(`InokBoot: ${src === 'promise' ? 'rejection' : 'error'} ${c.code} ${c.line} ${c.where}`);
   save(c);
+  sendAuto(c); // A-181 (1): the automatic anonymous report, always
   showCrash(c, dead);
+}
+
+/** A-182: an error that is NOT the stop screen (a map's GL failure contained by the map; Apple's map failing - A-183) - logged and
+ *  auto-reported only; `gl` (A-183 (6)): a GL failure carries the device's WebGL version + renderer */
+export function reportQuietly(err: unknown, src: CrashSource, gl = false): void {
+  const c = crashOf(err, src);
+  console.error(`InokBoot: contained ${c.code} ${c.line} ${c.where}`);
+  sendAuto(c, gl ? { gl: glInfo() } : {});
 }
 
 /** Once, first thing in main.tsx: the global handlers, the native renderer hook, and the crash kept from the last launch. */
 export function installCrashGuard(): void {
-  window.addEventListener('error', (e) => { if (e.error) reportCrash(e.error, 'error'); });
+  window.addEventListener('error', (e) => {
+    // A-182: a map's GL failure while a map is mounted = that map falls back to its list; never the stop screen
+    if (routeMapGlFailure(e.error ?? e.message)) { reportQuietly(e.error ?? new Error(e.message), 'error', true); return; }
+    if (e.error) reportCrash(e.error, 'error');
+  });
   window.addEventListener('unhandledrejection', (e) => {
     const why = (e as PromiseRejectionEvent).reason;
     if (isUserCancel(why)) { console.warn('InokBoot: a user cancel, not a crash'); return; } // T2: a closed share sheet is no crash
+    if (routeMapGlFailure(why)) { reportQuietly(why, 'promise', true); return; }
     reportCrash(why, 'promise');
   });
   (window as { inokNativeCrash?: (code: string) => void }).inokNativeCrash = (code) => {
     const c: Crash = { code, line: '', where: '', at: new Date().toISOString() };
     console.error(`InokBoot: error ${code}`);
     save(c);
+    sendAuto(c);
     showCrash(c, false);
   };
   const last = savedCrash();
-  if (last) showCrash(last, false);
+  // A-182: a map GL failure kept by 1.0.18 (it showed the stop screen) is not shown again - the map now falls back by itself
+  if (last && isMapGlFailure(last.line)) clear();
+  else if (last) showCrash(last, false);
+  setTimeout(() => void flushReports(), 3000); // A-181: the reports kept while offline go at this start, after the first screen
 }
 
 /** THE React boundary around the whole app: a render error shows the error screen instead of an empty page. */

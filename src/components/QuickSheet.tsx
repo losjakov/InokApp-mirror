@@ -13,7 +13,7 @@ import { articleItems, monasteryItems, type ArticleItem, type MonasteryItem } fr
 import { noteHintUsed, takeHint } from '@/state/quickHint';
 import { useToast } from './toast';
 import { callPhone, shareUrl, siteUrl } from '@/native/intents';
-import { overlayOpen } from './UpdateOffer';
+import { overlayOpen } from './overlays';
 import { useOpenChannel } from './StreamRow';
 import { directionButtons } from './DirectionsSheet';
 import { useFavToast, useVisitedToast } from './FavMark';

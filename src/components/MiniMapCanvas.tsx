@@ -16,21 +16,22 @@ const creditOf = (sources: Record<string, unknown>) => [...new Set(Object.values
 
 /** PLAN 5: the mini-map's MapLibre part (lazy: the eparchy page and «Контакти» do not pay for MapLibre before it is shown).
  *  The ONE set-up (inokMap.ts), not interactive; the houses framed as the main map frames them (`?eparchy=`), or one place. */
-export default function MiniMapCanvas({ styleUrl, houses, place, onStub, onCredit }: { styleUrl: string; houses?: MapPoint[]; place?: [number, number]; onStub: () => void; onCredit: (c: string) => void }) {
+export default function MiniMapCanvas({ styleUrl, houses, place, onStub, onCredit, onGlFail }: { styleUrl: string; houses?: MapPoint[]; place?: [number, number]; onStub: () => void; onCredit: (c: string) => void; onGlFail: () => void }) {
   const { lang } = useApp();
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!box.current) return;
     const b = houses ? boundsOf(houses) : null;
-    const c = new InokMap({ container: box.current, styleUrl, lang, interactive: false,
+    const c = InokMap.open({ container: box.current, styleUrl, lang, interactive: false, onGlFail,
       ...(place ? { center: place, zoom: PLACE_ZOOM } : b ? { bounds: b } : {}), onFallback: onStub,
       onLayers: (m) => {
-        c.setHouses(houses ? splitLavras(houses, lang) : null);
-        c.setPlace(place ?? null);
+        c!.setHouses(houses ? splitLavras(houses, lang) : null);
+        c!.setPlace(place ?? null);
         if (b) fitHouses(m, b, MINI_CHROME); // D50: THE fit of the main map, clear of its own label
         onCredit(creditOf(m.getStyle().sources));
         m.getContainer().dataset.ready = '1';
       } });
+    if (!c) return; // A-182: the GL failed at once - the owner hides the mini-map
     if (!isNative()) (window as unknown as { __inokMiniMap?: unknown }).__inokMiniMap = c.map;
     const ro = new ResizeObserver(() => c.map.resize());
     ro.observe(box.current);

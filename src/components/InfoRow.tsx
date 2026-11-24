@@ -29,7 +29,8 @@ function FactRow({ lead, label, children, caption, onClick, end, className, hint
       </span>
       <span className="info__text">
         {label && <span className="info__label">{label}</span>}
-        <span className="info__value">{children}</span>
+        {/* A-170: a plain fact (no tap) is reading text - selectable; a tappable row stays a control */}
+        <span className={onClick ? 'info__value' : 'info__value selectable'}>{children}</span>
         {caption && <span className="info__label">{caption}</span>}
         {hint && <span className="sr-only">{` (${hint})`}</span>}
       </span>

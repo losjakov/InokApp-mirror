@@ -94,15 +94,15 @@ export function ArticleView({ id }: { id: number }) {
     <PhotoScope>
     <article ref={root} className="aview arrows-host" data-testid="article" style={articleScaleStyle(settings.articleScale)} data-scale={settings.articleScale}>
       {header && <CoverImage code={`a${a.id}`} url={header.url} alt={a.title} className="aview__cover" full openable />}
-      <h1 className="card__title">{a.title}</h1>
+      <h1 className="card__title selectable">{a.title}</h1>
       {gone && <p className="aview__gone" role="note" data-testid="article-gone">{t('articles.saved_gone')}</p>}
-      {a.subtitle && <p className="aview__subtitle">{a.subtitle}</p>}
+      {a.subtitle && <p className="aview__subtitle selectable">{a.subtitle}</p>}
       <MetaLine className="card__sub" groups={[t(`kind1.${a.kind}`), longDate(a.published_at, lang), eye]} stickyLast />
       <LoadAllPhotos />
       {video && <VideoButton video={video} />}
       {/* A-40: the lead (анонс) after the date and before the text, one block as on the site; the body alone below it */}
-      {lead && <HtmlLite html={lead} className="aview__lead" photoKey={`a${a.id}`} />}
-      {a.body && <HtmlLite html={a.body} className="history aview__body" photoKey={`a${a.id}`} />}
+      {lead && <HtmlLite html={lead} className="aview__lead selectable" photoKey={`a${a.id}`} />}
+      {a.body && <HtmlLite html={a.body} className="history aview__body selectable" photoKey={`a${a.id}`} />}
       {readOnSite(a) && <IonButton fill="outline" expand="block" onClick={site} data-testid="read-site">{t('articles.read_site')}</IonButton>}
       {a.kind !== 'news' && (
         <section className="aview__rate" data-testid="rating">

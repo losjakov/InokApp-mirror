@@ -14,8 +14,8 @@
     "max_bytes": 12000
   },
   "ref/REF_app_api_contract.md": {
-    "max_bytes": 48000,
-    "note": "CD 01.11.2026: raised to 24000; CD S263 02.11.2026: 28000 (R-27 next); D71 cloud_19: 32000 - one contract byte-equal in two repos (InokSite budget row mirrors this); InokSite C29 13.11.2026: 36000 (R-44 / R-45); InokSite C34 14.11.2026: 40000 (R-49); InokSite C37 16.11.2026: 44000 (R-53 / R-52); InokSite C39 17.11.2026: 48000 (R-57 / R-58)"
+    "max_bytes": 52000,
+    "note": "CD 01.11.2026: raised to 24000; CD S263 02.11.2026: 28000 (R-27 next); D71 cloud_19: 32000 - one contract byte-equal in two repos (InokSite budget row mirrors this); InokSite C29 13.11.2026: 36000 (R-44 / R-45); InokSite C34 14.11.2026: 40000 (R-49); InokSite C37 16.11.2026: 44000 (R-53 / R-52); InokSite C39 17.11.2026: 48000 (R-57 / R-58); cloud_46 24.11.2026: 52000 (R-64 / R-65 written by CD S336 at 48580 b - content unchanged; the InokSite budget row mirrors it)"
   },
   "ref/REF_app_architecture.md": {
     "max_bytes": 14000
@@ -65,5 +65,13 @@
   },
   ".claude/commands/build_android.md": {
     "max_bytes": 4000
+  },
+  "ref/DECISIONS_28.md": {
+    "max_bytes": 16000,
+    "note": "cloud_46 24.11.2026: a CLOSED part (CD S335 opened DECISIONS_29 because _28 stood at 15494 b); rulings are never split mid-entry"
+  },
+  "ref/DECISIONS_30.md": {
+    "max_bytes": 15000,
+    "note": "cloud_46 24.11.2026: a CLOSED part (A-182 written at 14462 b; CD S336 opened DECISIONS_31 for A-183)"
   }
 }

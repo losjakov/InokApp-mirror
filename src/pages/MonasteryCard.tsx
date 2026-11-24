@@ -198,11 +198,11 @@ function Detail({ code }: { code: number }) {
         {row.photo_count > 0 && (inApp || row.gallery_url) && <GalleryEntry configKnown={config !== null} run={galleryAction} />}
       </div>
       {/* D49: on ≥600 dp (no toolbar of its own) the star sits at the end of the title row — the cover carries only the open sign and «Фотогалерея» */}
-      <div className="card__title-row"><h1 className="card__title">{name}</h1>{wide && <span className="card__marks"><VisitedButton code={row.code} /><FavButton code={row.code} /></span>}</div>
+      <div className="card__title-row"><h1 className="card__title selectable">{name}</h1>{wide && <span className="card__marks"><VisitedButton code={row.code} /><FavButton code={row.code} /></span>}</div>
       {/* A-140 (2): whose house - «↳ <parent> ›» right under the name, a tap opens the parent's card (the facts' row below stays) */}
       <ParentLine row={row} onOpen={() => navigate(`/monasteries/${row.parent_code}`)} className="card__parent" />
       {/* owner 12.11.2026 (cloud_29): the card's eye stands at the RIGHT edge, on the place line's last line, without the « · » */}
-      <div className="card__subrow"><p className="card__sub">{rowSubtitle(row, lang, dict) && <PlaceLine row={row} wide={wide} />}</p>{eye}</div>
+      <div className="card__subrow"><p className="card__sub selectable">{rowSubtitle(row, lang, dict) && <PlaceLine row={row} wide={wide} />}</p>{eye}</div>
       <LoadAllPhotos />
       <nav className="actions" ref={sideRow} aria-label={t('monasteries.title')} data-testid="actions">
         {actions.map((a) => (
@@ -260,7 +260,7 @@ function Detail({ code }: { code: number }) {
             ))}
           </h2>
           <Collapsible testId="history">
-            <HtmlLite html={history} className="history" />
+            <HtmlLite html={history} className="history selectable" />
             {sources.length > 0 && (
               <section className="sources" data-testid="sources">
                 <h2 className="inok-heading">{t('card.sources')}</h2>

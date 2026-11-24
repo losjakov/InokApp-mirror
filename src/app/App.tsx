@@ -1,4 +1,5 @@
-import { UpdateOffer, overlayOpen } from '@/components/UpdateOffer';
+import { UpdateOffer } from '@/components/UpdateOffer';
+import { overlayOpen } from '@/components/overlays';
 import { maybeAskReview, noteStart } from '@/state/reviewAsk';
 import { requestStoreReview } from '@/native/inAppReview';
 import { checkUpdate } from '@/native/play';

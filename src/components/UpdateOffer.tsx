@@ -5,10 +5,7 @@ import { useApp } from '@/state/AppContext';
 import { startupOffer } from '@/state/updateOffer';
 import { useBanner } from './toast';
 
-/** An open dialog (Ionic keeps closed overlays in the DOM with `overlay-hidden`): the banner never comes over it (A-80 ADDENDUM 1, A-73). */
-export const overlayOpen = (doc: Document = document): boolean =>
-  Array.from(doc.querySelectorAll('ion-alert, ion-modal, ion-action-sheet, ion-popover, ion-loading'))
-    .some((e) => !e.classList.contains('overlay-hidden') && e.getBoundingClientRect().width > 0);
+import { overlayOpen } from './overlays';
 const CLEAR_POLL_MS = 1000;
 const CLEAR_WAIT_TRIES = 300; // ~5 min of dialogs, then the banner waits for the next day's check
 

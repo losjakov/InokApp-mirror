@@ -21,6 +21,11 @@ import { currentPosition, type Position } from '@/native/geolocation';
 import { useApp } from '@/state/AppContext';
 import { tCount } from '@/i18n';
 import { sideRow } from '@/components/sideRow';
+import { MapFallback } from '@/components/MapFallback';
+import { clearMapGlFailed, mapGlFailed } from '@/app/mapGlFailure';
+import { AppleMapPane } from '@/components/AppleMapPane';
+import { appleMapPossible, mapMode } from '@/native/appleMap';
+import { online, onNetChange } from '@/native/network';
 
 /** D35: what the main map draws over its edges in a scope — the chip on top (8 + 40 + 8), the zoom buttons at the right; the pins' clearance is THE rule (fitHouses) */
 const SCOPE_CHROME = { top: 56, right: 6, bottom: 4, left: 2 };
@@ -45,7 +50,16 @@ export function MapPage() {
   // every (re)build of the screen's layers — the first style and a later config style (`restyle`) both start with EMPTY sources
   const [layersGen, setLayersGen] = useState(0);
   const [offline, setOffline] = useState(false);
-  const [noWebgl] = useState(() => !hasWebGL());
+  const [noWebgl] = useState(() => !hasWebGL()); // A-182 (3): the pre-flight - no context at all = the list without a try
+  // A-182 (2): a GL failure on this app + OS version = the list at once (no crash loop); 'wait' while the flag is read
+  const [gl, setGl] = useState<'wait' | 'try' | 'failed'>('wait');
+  useEffect(() => { let on = true; if (!noWebgl) void mapGlFailed().then((f) => { if (on) setGl(f ? 'failed' : 'try'); }); return () => { on = false; }; }, [noWebgl]);
+  const retryMap = useCallback(() => { void clearMapGlFailed().then(() => setGl('try')); }, []);
+  // A-183: on an iPhone the tab then shows Apple's own map; its failure (or Android) = A-182's list
+  const [appleFailed, setAppleFailed] = useState(false);
+  const mode = mapMode({ glOk: !noWebgl && gl !== 'failed', ios: appleMapPossible(), appleFailed });
+  const [netOff, setNetOff] = useState(false); // A-183 (4): Apple's tiles need the network - the note says so, the pins stay
+  useEffect(() => { if (mode !== 'apple') return; const read = () => void online().then((o) => setNetOff(!o)); read(); return onNetChange(read); }, [mode]);
   const [selected, setSelected] = useState<number | null>(params.get('code') ? Number(params.get('code')) : null);
   const [pos, setPos] = useState<Position | null>(null);
   const [locating, setLocating] = useState(false);
@@ -74,8 +88,9 @@ export function MapPage() {
 
   // the map is created once per mount (the ONE set-up: inokMap.ts); style failures fall back to the flat style (markers still render)
   useEffect(() => {
-    if (!box.current || mapRef.current) return;
-    const c = new InokMap({ container: box.current, styleUrl, lang, center: at ?? undefined, zoom: at ? PLACE_ZOOM : undefined, onFallback: () => setOffline(true), onTilesLost: () => setOffline(true), onBasemap: () => setOffline(false),
+    if (gl !== 'try' || !box.current || mapRef.current) return;
+    const c = InokMap.open({ container: box.current, styleUrl, lang, center: at ?? undefined, zoom: at ? PLACE_ZOOM : undefined, onFallback: () => setOffline(true), onTilesLost: () => setOffline(true), onBasemap: () => setOffline(false),
+      onGlFail: () => { mapRef.current = null; ctl.current = null; setReady(false); setGl('failed'); }, // A-182: the list instead
       onLayers: (m) => { // the screen's own layers: the «near me» ring under the houses, the person's dot above them
         m.addSource('me', { type: 'geojson', data: EMPTY });
         m.addSource('radius', { type: 'geojson', data: EMPTY });
@@ -85,6 +100,7 @@ export function MapPage() {
         setReady(true);
         setLayersGen((g) => g + 1);
       } });
+    if (!c) return;
     const map = c.map;
     ctl.current = c;
     mapRef.current = map;
@@ -121,7 +137,7 @@ export function MapPage() {
       ctl.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [gl]);
 
   // the style URL arrives after the config loads; the interface language changes the labels (A-24) — the module decides
   useEffect(() => { ctl.current?.restyle(styleUrl, lang); }, [styleUrl, lang]);
@@ -235,14 +251,20 @@ export function MapPage() {
         <IonButton onClick={() => (nearOn ? setNearOn(false) : void locate())} aria-label={t('map.near_me')} data-testid="near-me" fill={nearOn ? 'solid' : 'clear'} color={nearOn ? 'secondary' : undefined}>
           <IonIcon slot="icon-only" icon={locateOutline} aria-hidden="true" />
         </IonButton>} />
+      {mode === 'list' ? (
+        <IonContent><MapFallback pos={nearOn ? pos : null} eparchyId={eparchyId} onRetry={noWebgl ? undefined : retryMap} /></IonContent>
+      ) : mode === 'apple' ? (
+        <IonContent scrollY={false}>
+          <div className="map-split map-split--apple">
+            {netOff && <p className="map-fallback__note" role="status" data-testid="map-offline">{t('map.offline')}</p>}
+            <div className="map-pane"><AppleMapPane rows={rows} center={at ? { lat: at[1], lon: at[0] } : undefined} onFail={() => setAppleFailed(true)} /></div>
+          </div>
+        </IonContent>
+      ) : (
       <IonContent scrollY={false}>
         <div className={`map-split${near ? ' map-split--near' : ''}`}>
           <div className="map-pane">
-            {noWebgl ? (
-              <div className="empty" data-testid="map-no-webgl">{t('map.no_webgl')}</div>
-            ) : (
-              <div ref={box} className="map-canvas" data-testid="map" data-ready={ready ? '1' : '0'} aria-label={t('map.title')} role="application" />
-            )}
+            <div ref={box} className="map-canvas" data-testid="map" data-ready={ready ? '1' : '0'} aria-label={t('map.title')} role="application" />
             {scope && (
               <div className="map-scope">
                 <ChipButton color="primary" className="over-map" onClick={() => setParams((p) => { p.delete('eparchy'); return p; }, { replace: true, state: OPENED_FROM })} aria-label={`${t('map.scope_clear')}: ${scope}`} data-testid="map-scope">
@@ -298,6 +320,7 @@ export function MapPage() {
           )}
         </div>
       </IonContent>
+      )}
     </IonPage>
   );
 }

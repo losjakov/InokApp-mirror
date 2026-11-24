@@ -246,6 +246,8 @@ ion-tab-button { position: relative; }
 .crash__title { font-size: var(--inok-type-heading); margin: 0; }
 .crash__text { margin: 0; color: var(--ion-color-medium); line-height: 1.45; }
 .crash__btn { min-height: 48px; padding: 12px 20px; border: 0; border-radius: 8px; font: inherit; font-weight: 600; background: var(--ion-color-primary); color: var(--ion-color-primary-contrast); }
+/* A-181 (2): «Надіслати розробнику» - the second, outlined button under «Спробувати ще раз» */
+.crash__btn--send { background: transparent; color: var(--ion-color-primary); box-shadow: inset 0 0 0 1.5px var(--ion-color-primary); }
 .crash__code, .crash__line { margin: 0; }
 .crash__line { font-family: monospace; font-size: var(--inok-type-secondary); color: var(--ion-color-medium); overflow-wrap: anywhere; user-select: all; }
 /* D4: the search field lives in the toolbar */
@@ -634,3 +636,10 @@ ion-searchbar .searchbar-clear-button { min-width: 24px; }
 .aview__gone { margin: 0 16px 8px; padding: 8px 12px; border-radius: 8px; background: var(--inok-tile-bg); font-size: var(--inok-type-secondary); color: var(--ion-text-color); }
 /* A-142: a held finger on a row is the quick-actions sheet on BOTH platforms - not iOS's text callout / selection, nor Android's */
 .mrow { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* A-170: the system's own selection + «Копіювати» on READING texts only (Ionic sets ion-app user-select:none on phones); pictures keep no callout */
+.selectable { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.selectable img { -webkit-touch-callout: none; }
+/* A-182: the «Карта» tab when the device cannot draw the map - the note, the retry, the houses as list rows */
+.map-fallback__note { margin: 12px 16px 4px; padding: 10px 12px; border-radius: 8px; background: var(--inok-tile-bg); color: var(--ion-text-color); font-size: var(--inok-type-secondary); line-height: 1.4; }
+.map-fallback__retry { margin: 4px 16px 0; }
+.map-split--apple { flex-direction: column; } /* A-183: the offline note above Apple's map, on a tablet too */

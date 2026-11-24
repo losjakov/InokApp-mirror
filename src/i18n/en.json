@@ -107,7 +107,6 @@
   "map.nearby": "Nearby: {n} within {km} km",
   "map.nearby_empty": "No monasteries within {km} km. Increase the radius.",
   "map.offline": "Map offline: the basemap is unavailable; monasteries from the database are shown.",
-  "map.no_webgl": "This device does not support WebGL — the map is unavailable. Use the “Near me” list.",
   "map.details": "Details",
   "map.locating": "Finding your location…",
   "map.close": "Close",
@@ -421,5 +420,10 @@
   "widget.say_planned": "{name}, at {time}",
   "widget.say_news": "News: {title}",
   "widget.say_pub": "Article: {title}",
-  "widget.say_video": "Video: {title}"
+  "widget.say_video": "Video: {title}",
+  "map.gl_failed": "The map cannot be shown on this device — here is the list of monasteries; directions open in Maps.",
+  "map.gl_retry": "Try the map again",
+  "crash.send": "Send to the developer",
+  "crash.send_offline": "No internet connection. The report text is copied — send it when the network is back.",
+  "map.apple_open": "Open the card"
 }
