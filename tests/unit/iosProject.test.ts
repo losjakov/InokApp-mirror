@@ -251,3 +251,23 @@ describe('A-183 (cloud_46): Apple\'s map plugin in the App target', () => {
     expect(sw).toMatch(/notifyListeners\("open"/);
   });
 });
+
+describe('A-173 (A) / (B) (cloud_46): the Lock Screen widgets', () => {
+  const core = read('ios/App/Shared/WidgetCore.swift'); const bundle = read('ios/App/InokWidgets/InokWidgetsBundle.swift');
+  it('the rectangle draws the system plate (iOS 16+), the live one the first channel picture (accentable), a muted third line', () => {
+    expect(core).toMatch(/if #available\(iOS 16\.0, \*\) \{ AccessoryWidgetBackground\(\)/);
+    expect(core).toMatch(/ZStack \{\s*LockPlate\(\)/);
+    expect(core).toMatch(/kind == \.live, let img = WStyle\.image\(view\.rows\.first\?\.image\)[\s\S]{0,200}\.accentable\(\)/);
+    expect(core).toMatch(/if let t = third \{ Text\(t\)\.font\(\.caption2\)\.opacity\(0\.7\)/);
+  });
+  it('two circular kinds in the bundle, accessoryCircular from iOS 16 and NONE below; a gauge of count / 5; names x3', () => {
+    expect(bundle).toMatch(/LiveWidget\(\); UpcomingWidget\(\); NewWidget\(\); LiveRoundWidget\(\); NextRoundWidget\(\)/);
+    expect(bundle).toMatch(/if #available\(iOSApplicationExtension 16\.0, \*\) \{ return supportedFamilies\(\[\.accessoryCircular\]\) \}\s*return supportedFamilies\(\[\]\)/);
+    expect(core).toMatch(/static let gaugeMax = 5\.0/);
+    expect(core).toMatch(/\.gaugeStyle\(\.accessoryCircular\)/);
+    for (const [l, a, b] of [['uk', 'Ефір', 'Найближча'], ['ru', 'Эфир', 'Ближайшая'], ['en', 'Live', 'Next']]) {
+      const s = read(`ios/App/InokWidgets/${l}.lproj/Localizable.strings`);
+      expect(s).toContain(`"widget_round_live" = "${a}";`); expect(s).toContain(`"widget_round_next" = "${b}";`);
+    }
+  });
+});

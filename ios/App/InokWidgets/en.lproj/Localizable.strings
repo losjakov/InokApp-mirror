@@ -6,3 +6,12 @@
 "widget_upcoming_desc" = "The next announced broadcasts and your reminders";
 "widget_new_desc" = "The newest publications and news of inok.info";
 "widget_open_app" = "Open the app to load the data";
+/* cloud_46 (A-173 (A) / (B)): the Lock Screen widgets - the plate's third line, the two circular kinds */
+"widget_round_live" = "Live";
+"widget_round_live_desc" = "How many monasteries are live now";
+"widget_round_next" = "Next";
+"widget_round_next_desc" = "The next broadcast and how long until it";
+"round_live" = "LIVE";
+"round_in_h" = "in %d h";
+"round_in_m" = "in %d min";
+"lock_more_new" = "+%d new";

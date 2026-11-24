@@ -73,5 +73,8 @@
   "ref/DECISIONS_30.md": {
     "max_bytes": 15000,
     "note": "cloud_46 24.11.2026: a CLOSED part (A-182 written at 14462 b; CD S336 opened DECISIONS_31 for A-183)"
+  },
+  "ref/REF_gotchas_7.md": {
+    "max_bytes": 12000
   }
 }

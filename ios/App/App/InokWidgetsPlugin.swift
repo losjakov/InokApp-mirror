@@ -69,6 +69,24 @@ public class InokWidgetsPlugin: CAPPlugin, CAPBridgedPlugin {
                     try? png.write(to: dir.appendingPathComponent("\(tag)-\(kind.rawValue)-\(fam.rawValue)-\(dark ? "dark" : "light").png")); n += 1
                 }
             } } } }
+            // cloud_46 (A-173 (A) / (B)): the Lock Screen kinds - the rectangle with its plate and the two circles, x light / dark wallpaper
+            // x normal / large text, from the same data (the system's vibrant tint is the phone's own: these show the layout and the words)
+            for (tag, data) in sets { for kind in WKind.allCases { for dark in [false, true] { for big in [false, true] {
+                let scheme: ColorScheme = dark ? .dark : .light
+                let wall = dark ? Color(red: 0.08, green: 0.13, blue: 0.28) : Color(red: 0.84, green: 0.89, blue: 0.95)
+                let size: DynamicTypeSize = big ? .accessibility1 : .large
+                let rect = LockBody(kind: kind, inline: false, view: WModel.build(kind, compact: true, data: data), data: data)
+                    .frame(width: 172, height: 76).padding(14).background(wall).cornerRadius(24)
+                    .environment(\.colorScheme, scheme).environment(\.dynamicTypeSize, size).foregroundColor(dark ? .white : .black)
+                let suffix = "\(dark ? "dark" : "light")\(big ? "-big" : "")"
+                let rr = ImageRenderer(content: rect); rr.scale = 3
+                if let png = rr.uiImage?.pngData() { try? png.write(to: dir.appendingPathComponent("lock-\(tag)-\(kind.rawValue)-rect-\(suffix).png")); n += 1 }
+                guard kind != .new else { continue }
+                let round = RoundBody(kind: kind, data: data).frame(width: 76, height: 76).clipShape(Circle()).padding(14).background(wall).cornerRadius(24)
+                    .environment(\.colorScheme, scheme).environment(\.dynamicTypeSize, size).foregroundColor(dark ? .white : .black)
+                let ro = ImageRenderer(content: round); ro.scale = 3
+                if let png = ro.uiImage?.pngData() { try? png.write(to: dir.appendingPathComponent("lock-\(tag)-\(kind.rawValue)-round-\(suffix).png")); n += 1 }
+            } } } }
             call.resolve(["n": n, "data": real != nil])
         }
     }

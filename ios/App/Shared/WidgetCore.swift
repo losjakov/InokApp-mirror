@@ -384,13 +384,32 @@ struct LockBody: View {
     var body: some View {
         if inline { Text(line) }
         else {
-            VStack(alignment: .leading, spacing: 1) {
-                Text((kind == .live && !view.rows.isEmpty ? "● " : "") + view.header).font(.caption2.weight(.semibold)).textCase(.uppercase).lineLimit(1)
-                Text(view.rows.first?.text ?? view.note).font(.headline).lineLimit(2)
-                if kind == .live && view.total > 1 { Text(WModel.fill(data?.w("more") ?? "", "n", "\(view.total - 1)")).font(.caption2) }
+            // cloud_46 (A-173 (A)): the system's own backing plate under the rectangle (iOS 16+; the system tints it to the wallpaper) +
+            // the live one's first channel picture (accentable: the system renders it monochrome) beside the label / bold title / muted third line
+            ZStack {
+                LockPlate()
+                HStack(spacing: 6) {
+                    if kind == .live, let img = WStyle.image(view.rows.first?.image) {
+                        Image(uiImage: img).resizable().scaledToFill().frame(width: 28, height: 28).clipShape(Circle()).accentable().accessibilityHidden(true)
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text((kind == .live && !view.rows.isEmpty ? "● " : "") + view.header).font(.caption2.weight(.semibold)).textCase(.uppercase).lineLimit(1)
+                        Text(view.rows.first?.text ?? view.note).font(.headline.weight(.bold)).lineLimit(2).minimumScaleFactor(0.85)
+                        if let t = third { Text(t).font(.caption2).opacity(0.7).lineLimit(1) }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 6).padding(.vertical, 3)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
+        }
+    }
+    /// «+2 ще» (live) / «+2 нових» (new) / the next one's time (upcoming) - the muted third line
+    var third: String? {
+        switch kind {
+        case .live: return view.total > 1 ? WModel.fill(data?.w("more") ?? "", "n", "\(view.total - 1)") : nil
+        case .new: return view.rows.count > 1 ? String(format: NSLocalizedString("lock_more_new", comment: ""), view.rows.count - 1) : nil
+        case .upcoming: return view.rows.count > 1 ? view.rows[1].text : nil
         }
     }
     /// «● Зараз в ефірі · 10 · наступна 17:00» / «17:00 · <channel>» / the newest title
@@ -402,5 +421,54 @@ struct LockBody: View {
         case .upcoming: return view.rows.first?.text ?? view.note
         case .new: return view.rows.first?.text ?? view.note
         }
+    }
+}
+
+
+// MARK: cloud_46 (A-173 (A) / (B)) - the Lock Screen's plate and the two CIRCULAR widgets («Ефір», «Найближча»), iOS 16+ (the app's floor 15.0)
+struct LockPlate: View {
+    var body: some View {
+        if #available(iOS 16.0, *) { AccessoryWidgetBackground().clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous)) } else { Color.clear }
+    }
+}
+extension View {
+    /// the system's accent group on the Lock Screen (iOS 16+); a no-op below
+    @ViewBuilder func accentable() -> some View { if #available(iOS 16.0, *) { widgetAccentable() } else { self } }
+}
+/// «Ефір»: the live count big, a gauge (count / 5), «ЕФІР»; «Найближча»: a short name above, the next time big, «через N год» below
+struct RoundBody: View {
+    let kind: WKind
+    let data: WData?
+    var now = Date()
+    static let gaugeMax = 5.0
+    var body: some View {
+        ZStack {
+            if #available(iOS 16.0, *) { AccessoryWidgetBackground() }
+            if kind == .live { live } else { next }
+        }
+        .accessibilityElement(children: .combine)
+    }
+    @ViewBuilder var live: some View {
+        let n = WModel.build(.live, compact: true, data: data, now: now).total
+        if #available(iOS 16.0, *) {
+            Gauge(value: min(Double(n), RoundBody.gaugeMax), in: 0...RoundBody.gaugeMax) { Text(NSLocalizedString("round_live", comment: "")).font(.system(size: 8, weight: .semibold)) }
+                currentValueLabel: { Text("\(n)").font(.system(size: 20, weight: .bold).monospacedDigit()) }
+                .gaugeStyle(.accessoryCircular).accentable()
+        } else { Text("\(n)") }
+    }
+    var next: some View {
+        let d = data
+        let p = d.map { x in (x.sampleWhen != nil ? x.planned : x.planned.filter { $0.at > now }.sorted { $0.at < $1.at }).first } ?? nil
+        let name = p.flatMap { d?.channels[$0.ch]?.name } ?? ""
+        let short = name.split(separator: " ").first(where: { $0.count > 3 }).map(String.init) ?? name
+        let hours = p.map { max(0, Int(($0.at.timeIntervalSince(now) / 3600).rounded(.down))) } ?? 0
+        let mins = p.map { max(0, Int(($0.at.timeIntervalSince(now) / 60).rounded(.down))) } ?? 0
+        let when = hours >= 1 ? String(format: NSLocalizedString("round_in_h", comment: ""), hours) : String(format: NSLocalizedString("round_in_m", comment: ""), mins)
+        return VStack(spacing: 0) {
+            Text(short).font(.system(size: 8, weight: .semibold)).textCase(.uppercase).lineLimit(1).minimumScaleFactor(0.7)
+            Text(p.map { WModel.hhmm($0.at) } ?? "–").font(.system(size: 17, weight: .bold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.6).accentable()
+            if p != nil { Text(when).font(.system(size: 8)).lineLimit(1).minimumScaleFactor(0.7) }
+        }
+        .padding(4)
     }
 }

@@ -123,10 +123,37 @@ struct NewWidget: Widget {
     }
 }
 
+extension WidgetConfiguration {
+    /// cloud_46 (A-173 (B)): the circular Lock Screen widgets exist from iOS 16 only - none offered below
+    func roundFamilies() -> some WidgetConfiguration {
+        if #available(iOSApplicationExtension 16.0, *) { return supportedFamilies([.accessoryCircular]) }
+        return supportedFamilies([])
+    }
+}
+struct RoundView: View {
+    let kind: WKind
+    let entry: Entry
+    var body: some View {
+        RoundBody(kind: kind, data: entry.data, now: entry.date).widgetURL(URL(string: WModel.streams)!).lockBackground()
+    }
+}
+struct LiveRoundWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "info.inok.app.widget.live_round", provider: Provider()) { RoundView(kind: .live, entry: $0) }
+            .configurationDisplayName(Text("widget_round_live")).description(Text("widget_round_live_desc")).roundFamilies()
+    }
+}
+struct NextRoundWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "info.inok.app.widget.next_round", provider: Provider()) { RoundView(kind: .upcoming, entry: $0) }
+            .configurationDisplayName(Text("widget_round_next")).description(Text("widget_round_next_desc")).roundFamilies()
+    }
+}
+
 @main
 struct InokWidgetsBundle: WidgetBundle {
     var body: some Widget {
-        LiveWidget(); UpcomingWidget(); NewWidget()
+        LiveWidget(); UpcomingWidget(); NewWidget(); LiveRoundWidget(); NextRoundWidget()
         // cloud_46 (A-173 (C)): the reminder's Live Activity UI (ActivityKit) - iOS 16.1+ only; below it the bundle is the three widgets of 1.0.18
         if #available(iOSApplicationExtension 16.1, *) { InokCountdownLive() }
     }

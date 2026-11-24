@@ -585,6 +585,9 @@ start_on() {
   xcrun simctl location "$U" set 50.4344,30.5571 2>>"$OUT/nav.txt" || true   # the Lavra: «Поруч»
   xcrun simctl install "$U" "$APP"
   xcrun simctl privacy "$U" grant location "$BUNDLE" 2>>"$OUT/nav.txt" || true
+  # cloud_46 (T9, CD S335 on artifact 45087016904: the 6.3" frames said «Місцезнаходження недоступне»): the place set AGAIN once the app's
+  # permission exists - a simulator that had no location client yet may keep no fix from the first `set`
+  xcrun simctl location "$U" set 50.4344,30.5571 2>>"$OUT/nav.txt" || true
   # cloud_44: a cold simulator's FIRST start may never paint (its caches build meanwhile) - ONE more launch, written down; never after a refusal
   local r; launch; r=$?
   if [ "$r" = 1 ]; then echo "launch $TAG: once more after a cold first start" >> "$OUT/nav.txt"; launch; r=$?; fi
