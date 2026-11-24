@@ -15,8 +15,10 @@ ART=$(curl -s -H 'X-Inok-App: eb741a6e64315c8aff6281ad13c21378' 'https://inok.in
 echo "article: ${ART:-none}" >> "$L"
 adb shell am start -n "$PKG/.MainActivity" > /dev/null; sleep 6
 if [ -n "$ART" ]; then
-  node "$NAV" go "/articles?id=$ART" >> "$L" 2>&1
-  # emulator 45338314385 (E5): a news item may carry no body and the item is fetched from the site - a PUBLICATION, its body waited for (<= 20 s)
+  # emulator 45338314385 / 45350296754 (E5, E7): `go /articles?id=` showed no article - the article is opened as a person does: «Публікації»
+  # («Статті», a publication) and a tap on its first row (the app's own navigation); its body waited for (<= 20 s)
+  node "$NAV" go /articles >> "$L" 2>&1; sleep 4
+  ev "(() => { const r = Array.from(document.querySelectorAll('[data-testid^=arow-]')).find((x) => !x.closest('.ion-page-hidden') && x.getClientRects().length > 0); if (!r) return 'no row'; r.click(); return 'tapped ' + r.dataset.testid; })()" >> "$L"
   xy=none; for _ in 1 2 3 4 5 6 7 8 9 10; do sleep 2; xy=$(centre '[data-testid=article] .aview__body p'); [ "$xy" = none ] && xy=$(centre '[data-testid=article] .aview__body'); [ "$xy" != none ] && [ -n "$xy" ] && break; done
   echo "body at: $xy" >> "$L"; sleep 1
   if [ "$xy" != none ] && [ -n "$xy" ]; then

@@ -153,8 +153,10 @@ answer_offers() { ev "(() => { Array.from(document.querySelectorAll('ion-alert.s
 
 # a crash screen left by the step before (A-48's «Щось пішло не так») is written down with its code and the app restarted - one fault, one line
 guard_crash() {
-  local c; c=$(ev "(() => { const e = document.querySelector('[data-testid=crash]'); return e ? ((e.innerText.match(/R-[A-Za-z]+-[0-9a-f]+/) || ['crash'])[0] + ' ' + (e.innerText.split('\\n').pop() || '').slice(0, 120)) : 'ok'; })()")
+  # cloud_46 E8 (ios 45350214881 oldest iPhone: FAIL with an EMPTY answer, its frame = Home without any crash): no answer = asked again
+  local c="" i; for i in 1 2 3; do c=$(ev "(() => { const e = document.querySelector('[data-testid=crash]'); return e ? ((e.innerText.match(/R-[A-Za-z]+-[0-9a-f]+/) || ['crash'])[0] + ' ' + (e.innerText.split('\\n').pop() || '').slice(0, 120)) : 'ok'; })()"); [ -n "$c" ] && break; echo "guard $1: no answer ($i)" >> "$OUT/nav.txt"; sleep 5; done
   [ "$c" = ok ] && return 0
+  [ -n "$c" ] || c="no answer from the page after 3 asks"
   shot "$OUT/a3-crash-before-$1__$TAG.png"; a3 "no crash before «${1}»" FAIL "$c"
   # «Спробувати ще раз» clears the kept crash and reloads (a plain restart shows the last launch's crash again - ios run 2)
   ev "(document.querySelector('#inok-crash button') || {}).click?.(), 'ok'" > /dev/null; sleep 12
@@ -498,7 +500,9 @@ apns() { # file type extra-json-fields [category]
 a3_tray() {
   local v d st
   v=$(ev "Capacitor.Plugins.FcmTopics.trayState().then((x) => JSON.stringify(x)).catch((e) => 'REJECT ' + String((e && e.message) || e))")
-  case "$v" in *'"INOK_ARTICLE"'*'"INOK_MARK_READ"'*) a3 "category INOK_ARTICLE + «Позначити прочитаним» registered (A6)" PASS "$v";;
+  # (E8: a Swift dictionary's key order is random per launch - cloud_40's lesson: each word read on its own)
+  case "$v" in *'"INOK_ARTICLE"'*) case "$v" in *'"INOK_MARK_READ"'*) a3 "category INOK_ARTICLE + «Позначити прочитаним» registered (A6)" PASS "$v";;
+      *) a3 "category INOK_ARTICLE + «Позначити прочитаним» registered (A6)" FAIL "$v";; esac;;
     *) a3 "category INOK_ARTICLE + «Позначити прочитаним» registered (A6)" FAIL "${v:-no answer}";; esac
   d="$OUT/apns-$TAG"; mkdir -p "$d"
   apns "$d/live3.apns" stream_live ', "channel_id": "3", "video_id": "ring3"'
