@@ -1,5 +1,5 @@
 import type { Db } from '@/data/db/types';
-import type { Article, ArticlesPage, Cover, RatingAnswer, VideoLink } from '@/data/api/types';
+import type { Article, ArticlesPage, Cover, RatingAnswer, RatingPrior, VideoLink } from '@/data/api/types';
 import { videoUrl } from '@/data/live/streams';
 import { sendCast } from './cast';
 import { ApiError } from '@/data/api/client';
@@ -22,12 +22,17 @@ const KINDS = new Set(['publication', 'video', 'news']);
 const older = new Map<number, Article>();
 
 /** Keeps the items the app can show: a known kind, an id, a title, a date (unknown fields are ignored, contract §0). */
+const priorOf = (p: unknown): RatingPrior | null => {
+  const r = p as Partial<RatingPrior> | null | undefined;
+  return r && typeof r.mean === 'number' && Number.isFinite(r.mean) && typeof r.weight === 'number' && r.weight > 0 ? { mean: r.mean, weight: r.weight } : null;
+};
 export function parseArticles(j: unknown): ArticlesPage {
   const x = j as Partial<ArticlesPage> | null;
   const items = Array.isArray(x?.items) ? x!.items : [];
   return {
     items: items.filter((a): a is Article => !!a && typeof a.id === 'number' && KINDS.has(a.kind) && !!a.title && !!a.published_at),
     next: typeof x?.next === 'string' && x.next ? x.next : null,
+    ...(priorOf(x?.rating_prior) ? { rating_prior: priorOf(x?.rating_prior)! } : {}), // R-64; an old answer without it parses as before
   };
 }
 
@@ -93,44 +98,52 @@ export async function fetchArticle(db: Db, id: number, lang: Lang): Promise<Arti
 }
 
 /**
- * A-128 (owner 16.11.2026) - the home's two blocks of the site's materials, the SAME four places each, in a fixed order: the 2 newest
- * «Статті», the newest «Відео», the newest «Новина» (`BLOCK_SLOTS`), each kind asked as ITS section list in the block's order (R-19 + R-44 /
- * R-48: `kind` + `sort` + `limit` - the order code is the «Публікації» screen's own, `ArticleSort`). «Нове на сайті» = `created` (by the date of
- * placing on the site), «Популярне за тиждень» = `views_week`. A kind with nothing = no row. Each block's last answer is kept per language
- * (so it shows and its articles open offline); a kind that failed keeps its kept rows.
+ * A-128 / A-176 (owner 24.11.2026) - the home's two blocks of the site's materials. Each block = 3 rows from ONE queue of «Статті» + «Відео»
+ * (merged by the block's order - `sortArticles`, the «Публікації» screen's own comparator; no quota per kind) + the first «Новина». The
+ * candidates: each kind asked as ITS section list (R-19 + R-44 / R-48: `kind` + `sort` + `limit` BLOCK_FETCH), «Нове на сайті» = `created`,
+ * «Популярне за тиждень» = `views_week`. «Популярне» never repeats what «Нове» shows (its 4 ids skipped - the 3 rows AND the news row; the next
+ * in the order instead; fewer left = fewer rows). Each block's candidates are kept per language (offline the same rule on the kept ones);
+ * a kind that failed keeps its kept candidates.
  */
 export type HomeBlockSort = Extract<ArticleSort, 'created' | 'views_week'>;
-export const BLOCK_SLOTS: { kind: ArticleKind; n: number }[] = [{ kind: 'publication', n: 2 }, { kind: 'video', n: 1 }, { kind: 'news', n: 1 }];
+/** candidates asked per kind: 4 skipped by «Популярне» still leave 3 + 1 */
+export const BLOCK_FETCH = 7;
+export const BLOCK_ROWS = 3;
+const BLOCK_KINDS: ArticleKind[] = ['publication', 'video', 'news'];
 const blockKey = (sort: ArticleSort, lang: Lang) => `home_block:${sort}:${lang}`;
 const BLOCK_SORTS: ArticleSort[] = ['created', 'views_week', 'published'];
 
-/** The block's rows in the slots' order from the rows found per kind (at most n of each; a kind without rows = no row). */
-export const blockRows = (byKind: Partial<Record<ArticleKind, Article[]>>): Article[] =>
-  BLOCK_SLOTS.flatMap(({ kind, n }) => (byKind[kind] ?? []).filter((a) => a.kind === kind).slice(0, n));
-const byKindOf = (items: Article[]): Partial<Record<ArticleKind, Article[]>> =>
-  Object.fromEntries(ARTICLE_KINDS.map((k) => [k, items.filter((a) => a.kind === k)]));
+/** THE rows of a block from its candidates: publications + video in the block's order, `skip` out, the first 3; then the first news not skipped */
+export function blockRows(pool: Article[], sort: ArticleSort, skip: ReadonlySet<number> = new Set()): Article[] {
+  const fresh = (a: Article) => !skip.has(a.id);
+  const main = sortArticles(pool.filter((a) => a.kind === 'publication' || a.kind === 'video'), sort).filter(fresh).slice(0, BLOCK_ROWS);
+  const news = sortArticles(pool.filter((a) => a.kind === 'news'), sort).filter(fresh).slice(0, 1);
+  return [...main, ...news];
+}
+/** the ids a block SHOWS (what «Популярне» skips) */
+export const shownIds = (rows: Article[]): Set<number> => new Set(rows.map((a) => a.id));
 
-/** The kept block (null = never received). `created` without a kept answer: the saved feed in that order (as «Нове на сайті» always did). */
+/** The kept candidates (null = never received). `created` without a kept answer: the saved feed (as «Нове на сайті» always did). */
 export async function cachedBlock(db: Db, lang: Lang, sort: ArticleSort): Promise<Article[] | null> {
   const kept = (await cacheGet<Article[]>(db, blockKey(sort, lang)))?.value;
   if (kept) return kept;
   if (sort === 'views_week') return null; // a week's views are never guessed from saved copies (A-128: the last list received, or the line)
   const local = await listArticles(db, lang);
-  return local.length ? blockRows(byKindOf(sortArticles(local, sort))) : null;
+  return local.length ? local : null;
 }
 
-/** The block from the server (3 requests: one per kind). Every kind failed = throws the first failure (the caller says why);
- *  a kind failed = its kept rows stay. */
+/** The candidates from the server (3 requests: one per kind). Every kind failed = throws the first failure (the caller says why);
+ *  a kind failed = its kept candidates stay. */
 export async function fetchBlock(db: Db, lang: Lang, sort: ArticleSort): Promise<Article[]> {
-  const pages = await Promise.allSettled(BLOCK_SLOTS.map(({ kind, n }) => queryPage(db, lang, { kind, sort, limit: n }, null)));
+  const pages = await Promise.allSettled(BLOCK_KINDS.map((kind) => queryPage(db, lang, { kind, sort, limit: BLOCK_FETCH }, null)));
   if (pages.every((p) => p.status === 'rejected')) throw (pages[0] as PromiseRejectedResult).reason;
-  const kept = byKindOf((await cacheGet<Article[]>(db, blockKey(sort, lang)))?.value ?? []);
-  const rows = blockRows(Object.fromEntries(BLOCK_SLOTS.map(({ kind }, i) => {
+  const kept = (await cacheGet<Article[]>(db, blockKey(sort, lang)))?.value ?? [];
+  const pool = BLOCK_KINDS.flatMap((kind, i) => {
     const p = pages[i];
-    return [kind, p.status === 'fulfilled' ? p.value.items : kept[kind] ?? []];
-  })));
-  await cacheSet(db, blockKey(sort, lang), rows);
-  return rows;
+    return (p.status === 'fulfilled' ? p.value.items : kept).filter((a) => a.kind === kind);
+  });
+  await cacheSet(db, blockKey(sort, lang), pool);
+  return pool;
 }
 
 /**
@@ -255,8 +268,12 @@ export const fetchQuery = (db: Db, lang: Lang, kind: ArticleKind | null, q: stri
 async function queryPage(db: Db, lang: Lang, f: ArticleFilter, cursor: string | null, signal?: AbortSignal): Promise<ArticlesPage> {
   const page = remember(parseArticles(await dataSource().articles(lang, cursor, f, signal)));
   await keepWeek(db, lang, page.items);
+  if (page.rating_prior) await cacheSet(db, priorKey(lang), page.rating_prior); // A-179: the offline order uses the last C received
   return page;
 }
+const priorKey = (lang: Lang) => `rating_prior:${lang}`;
+/** A-179: the server's last `rating_prior` in this language (null = never received: the old rule, no guess) */
+export const keptPrior = async (db: Db, lang: Lang): Promise<RatingPrior | null> => (await cacheGet<RatingPrior>(db, priorKey(lang)))?.value ?? null;
 /** The R-48 numbers of a sorted answer into the copies saved in THAT language (an unsaved item stays unsaved, A-19). */
 async function keepWeek(db: Db, lang: Lang, items: Article[]): Promise<void> {
   for (const a of items) {
@@ -284,4 +301,4 @@ export const matchesQuery = (a: Pick<Article, 'title' | 'subtitle'>, q: string):
  * uses too (`articleOrder`): `created` by what the item carries (`created_at`, else the publication date), `views_week` / `rating` by the
  * saved `views_week` (absent = 0) and `rating`; a tie keeps the list's order.
  */
-export const localQuery = (items: Article[], q: string, sort: ArticleSort): Article[] => sortArticles(items.filter((a) => matchesQuery(a, q)), sort);
+export const localQuery = (items: Article[], q: string, sort: ArticleSort, prior?: RatingPrior | null): Article[] => sortArticles(items.filter((a) => matchesQuery(a, q)), sort, prior);

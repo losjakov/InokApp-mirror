@@ -68,3 +68,16 @@ describe('AppleMapView (A-183 (2) (3) (8))', () => {
     expect(p.calls.some(([k]) => k === 'destroy')).toBe(true);
   });
 });
+
+describe('AppleMapView waits for a size (cloud_46 E2: ring 45328638031 iPad - the houses came while the area was 0 x 0)', () => {
+  it('no rect yet -> nothing shown; the first sync with a rect shows the kept houses (once)', async () => {
+    const p = fakePlugin(); let rect: typeof RECT | null = null;
+    const v = new AppleMapView(p, () => rect, vi.fn(), vi.fn(), () => false);
+    await v.start(appleHouses([pt(1, 50.1), pt(2, 49)], 'uk'), 'Відкрити картку');
+    expect(p.calls.filter(([k]) => k === 'show')).toHaveLength(0);
+    rect = RECT; await v.sync(); await v.sync();
+    const shows = p.calls.filter(([k]) => k === 'show');
+    expect(shows).toHaveLength(1);
+    expect((shows[0][1] as { houses: unknown[] }).houses).toHaveLength(2);
+  });
+});

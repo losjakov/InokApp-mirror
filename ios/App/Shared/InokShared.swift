@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 /// T9 / T13 (cloud_43, A-153 (2), A-155 (2)): THE App Group store of the widgets - one file in THREE targets (the app, the widget extension,
 /// the notification service extension). The app writes `widgets` (src/native/widgets.ts via InokWidgetsPlugin), the widget's own fetch
@@ -43,5 +44,51 @@ enum InokShared {
         status["live"] = live
         put(liveKey, ["at": nowMs, "status": status])
         return true
+    }
+}
+
+/// cloud_46 (A-171 Part A, ref/FUTURE_notifications_ios.md §4): the A-84 tray rules on iPhone - the app, the notification service extension
+/// and the background push remove DELIVERED notifications by their REAL identifiers, read back from `getDeliveredNotifications` (a guessed id
+/// fails now and then - Apple forums 721873); the site's `apns-collapse-id` (`live_<channel>` / `art_<id>`) replaces a repeat by itself.
+/// Never touches what it is not asked to: articles never remove «ефір», «ефір» rules never remove an article.
+enum InokTray {
+    static let articleCategory = "INOK_ARTICLE"
+    static let markRead = "INOK_MARK_READ"
+    static func str(_ v: Any?) -> String? { v as? String ?? (v as? NSNumber)?.stringValue }
+    private static func kind(_ n: UNNotification) -> String? { n.request.content.userInfo["type"] as? String }
+
+    /// A2 / A5 / A6: the delivered article notifications - all (`ids` nil) or those of the given ids - removed
+    static func removeArticles(_ ids: Set<String>?, done: ((Int) -> Void)? = nil) {
+        let c = UNUserNotificationCenter.current()
+        c.getDeliveredNotifications { ns in
+            let gone = ns.filter { kind($0) == "article" && (ids == nil || ids!.contains(str($0.request.content.userInfo["id"]) ?? "")) }
+                .map { $0.request.identifier }
+            if !gone.isEmpty { c.removeDeliveredNotifications(withIdentifiers: gone) }
+            done?(gone.count)
+        }
+    }
+    /// A3 / A4 (b) (c): the delivered «ефір» of every channel NOT in `live` removed; `keep` (the request being delivered) never
+    static func keepLive(_ live: Set<String>, except keep: String? = nil, done: ((Int) -> Void)? = nil) {
+        let c = UNUserNotificationCenter.current()
+        c.getDeliveredNotifications { ns in
+            let gone = ns.filter { kind($0) == "stream_live" && $0.request.identifier != keep
+                && !live.contains(str($0.request.content.userInfo["channel_id"]) ?? "") }.map { $0.request.identifier }
+            if !gone.isEmpty { c.removeDeliveredNotifications(withIdentifiers: gone) }
+            done?(gone.count)
+        }
+    }
+    /// A4 (a): one channel's broadcast ended - its delivered «ефір» removed
+    static func removeLive(channel: String) {
+        let c = UNUserNotificationCenter.current()
+        c.getDeliveredNotifications { ns in
+            let gone = ns.filter { kind($0) == "stream_live" && str($0.request.content.userInfo["channel_id"]) == channel }.map { $0.request.identifier }
+            if !gone.isEmpty { c.removeDeliveredNotifications(withIdentifiers: gone) }
+        }
+    }
+    /// the live channels as the App Group knows them - only when that knowledge is fresh (≤ 60 min); nil = unknown (remove nothing)
+    static func liveKnown(maxAgeMs: Double = 3_600_000) -> Set<String>? {
+        guard let o = InokShared.json(InokShared.liveKey), let at = o["at"] as? Double, InokShared.nowMs - at <= maxAgeMs,
+              let st = o["status"] as? [String: Any], let live = st["live"] as? [[String: Any]] else { return nil }
+        return Set(live.compactMap { str($0["channel_id"]) })
     }
 }

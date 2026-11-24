@@ -4,6 +4,9 @@ import { cancelReminder, loadReminders, reconcile, saveReminders, scheduleRemind
 import { pushPermission, requestPushPermission } from '@/native/push';
 import { timeOf } from '@/data/live/streams';
 import type { Translate } from '@/i18n';
+import { syncCountdowns, type CountdownWords } from '@/native/countdown';
+import { onForeground } from './sortClock';
+import { CANCEL_EVENT } from '@/app/quickActions';
 
 /** T8 (A-153 (1)): the app's reminders - ONE list for the pills, the widgets (Preferences `reminders`) and the re-check on every live-status. */
 export interface Reminders {
@@ -39,6 +42,19 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
       if (keep.length !== cur.length || moved.length) await put(keep);
     })();
   }, [live, t, lang, put]);
+  // A-173 (C) / A-174: the countdowns follow the reminders - every change (set, moved, cancelled, dropped) and every return to the foreground
+  const words = useMemo<CountdownWords>(() => ({ label: t('countdown.label'), in: t('countdown.in'), started: t('countdown.started'), open: t('countdown.open'),
+    cancel: t('countdown.cancel'), channel: t('countdown.channel') }), [t]);
+  useEffect(() => { if (loaded.current) void syncCountdowns(list, words); }, [list, words]);
+  useEffect(() => onForeground(() => void loadReminders().then((l) => syncCountdowns(l, words))), [words]);
+  // A-174: the Android countdown's «Скасувати» (an address handed to the app) = the reminder cancelled by THIS path
+  useEffect(() => {
+    const h = (e: Event) => { const d = (e as CustomEvent<{ channel_id: number; video_id: string }>).detail; void (async () => {
+      const cur = await loadReminders(); const r = cur.find((x) => x.channel_id === d.channel_id && x.video_id === d.video_id);
+      if (r) { await cancelReminder(r); await put(cur.filter((x) => x !== r)); } })(); };
+    window.addEventListener(CANCEL_EVENT, h);
+    return () => window.removeEventListener(CANCEL_EVENT, h);
+  }, [put]);
   const value = useMemo<Reminders>(() => ({
     list,
     has: (c, v) => list.find((r) => r.channel_id === c && r.video_id === v),

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { cameForeground, wentBackground } from './sortClock';
 import type { Db } from '@/data/db/types';
 import { openDb } from '@/data/db';
 import { ensureSchema, getMeta, type FtsMode } from '@/data/db/schema';
@@ -159,11 +160,12 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
   useEffect(() => {
     if (!db || boot !== 'ready') return;
     const fire = () => void readLastCheck(db).then((last) => { if (dueOnReturn(last, Date.now())) void refreshRef.current(); });
+    // A-172: the same listener tells the sort clock when the app left and came back (3 h away = the default order)
     if (isNative()) {
-      const sub = CapApp.addListener('appStateChange', (st) => { if (st.isActive) fire(); });
+      const sub = CapApp.addListener('appStateChange', (st) => { if (st.isActive) { fire(); void cameForeground(Date.now()); } else wentBackground(Date.now()); });
       return () => { void sub.then((x) => x.remove()); };
     }
-    const vis = () => { if (document.visibilityState === 'visible') fire(); };
+    const vis = () => { if (document.visibilityState === 'visible') { fire(); void cameForeground(Date.now()); } else wentBackground(Date.now()); };
     document.addEventListener('visibilitychange', vis);
     return () => document.removeEventListener('visibilitychange', vis);
   }, [db, boot]);

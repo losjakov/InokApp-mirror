@@ -1,6 +1,6 @@
 import { IonButton, IonContent, IonIcon, IonLabel, IonList, IonPage, IonSegment, IonSegmentButton, useIonActionSheet } from '@ionic/react';
 import { SearchField } from '@/components/SearchField';
-import { checkmark, searchOutline, star, swapVerticalOutline } from 'ionicons/icons';
+import { checkmark, close, searchOutline, star, swapVerticalOutline } from 'ionicons/icons';
 import { Busy } from '@/components/Busy';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -11,7 +11,7 @@ import { useRefresh } from '@/components/Refresh';
 import { ArticleRow } from '@/components/ArticleRow';
 import { ArticleView } from '@/components/ArticleView';
 import type { Article } from '@/data/api/types';
-import { fetchKind, fetchOlder, fetchQuery, listArticles, localQuery, mergePage, nextCursor, queryText } from '@/data/repo/articles';
+import { fetchKind, fetchOlder, fetchQuery, keptPrior, listArticles, localQuery, mergePage, nextCursor, queryText } from '@/data/repo/articles';
 import type { ArticleKind } from '@/data/source';
 import { articleSorts, type ArticleSort } from '@/data/repo/articleOrder';
 import { ARTICLE_KINDS } from '@/native/push';
@@ -29,6 +29,8 @@ import { ContinueReading } from '@/components/ContinueReading';
 import { continueOver, SAVED } from '@/data/repo/reading';
 import { ArticleStar } from '@/components/FavMark';
 import { useQuickHint } from '@/components/QuickSheet';
+import { useReturnPlace } from '@/state/returnPlace';
+import { onSortExpired } from '@/state/sortClock';
 
 /** A-141 (1): the 5th segment = the saved articles («★», named «Обрані»), newest-saved first, from the phone only */
 export { SAVED };
@@ -80,6 +82,11 @@ export function ArticlesPage() {
   const setKind = (k: string) => (entry ? setEntryView({ ...entry, kind: k }) : setOwnKind(k));
   const sort: ArticleSort = entry ? entry.sort : sorts.includes(chosen) ? chosen : 'published'; // a kept v2 order on a server without it = the default
   const setSort = (s: ArticleSort) => { if (entry) { setEntryView({ ...entry, sort: s }); return; } sessionSort = s; setSortS(s); };
+  // A-172: 3 hours away from the app = the default order again (the search text stays)
+  useEffect(() => onSortExpired(() => { sessionSort = 'published'; setSortS('published'); }), []);
+  // A-179 (3): news are not rated - «за рейтингом» on «Новини» lists by date with a note; the CHOICE stays (the other tabs keep it)
+  const newsByDate = kind === 'news' && sort === 'rating';
+  const listSort: ArticleSort = newsByDate ? 'published' : sort;
   const [items, setItems] = useState<Article[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -106,8 +113,8 @@ export function ArticlesPage() {
   const searchbar = useRef<HTMLIonSearchbarElement>(null);
   useEffect(() => { const h = window.setTimeout(() => setQ(queryText(typed)), typed ? QUERY_DEBOUNCE_MS : 0); return () => window.clearTimeout(h); }, [typed]);
   useEffect(() => { if (searching) window.setTimeout(() => void searchbar.current?.setFocus(), 150); }, [searching]);
-  const active = canQuery && (q !== '' || sort !== 'published');
-  const qKey = `${lang}|${kind}|${q}|${sort}`;
+  const active = canQuery && (q !== '' || listSort !== 'published');
+  const qKey = `${lang}|${kind}|${q}|${listSort}`;
   const [found, setFound] = useState<{ key: string; items: Article[]; next: string | null; local: boolean } | null>(null);
   const fv = active && found?.key === qKey ? found : null; // another list's answer is never shown; its cursor never reused (R-44: 400)
   useEffect(() => {
@@ -115,23 +122,23 @@ export function ArticlesPage() {
     const c = new AbortController(); // a newer query / sort / tab cancels this one
     let on = true;
     if (kind === SAVED) { // the saved ones are searched and ordered on the phone (they are all here)
-      void savedList().then((base) => { if (on) setFound({ key: qKey, items: localQuery(base, q, sort), next: null, local: false }); });
+      void Promise.all([savedList(), keptPrior(db, lang)]).then(([base, prior]) => { if (on) setFound({ key: qKey, items: localQuery(base, q, listSort, prior), next: null, local: false }); });
       return () => { on = false; };
     }
     const k = kind === 'all' ? null : (kind as ArticleKind);
-    fetchQuery(db, lang, k, q, sort, null, c.signal)
+    fetchQuery(db, lang, k, q, listSort, null, c.signal)
       .then((p) => { if (on) setFound({ key: qKey, items: p.items, next: p.next, local: false }); })
       .catch(async () => { // offline (or refused): the saved 30 of this tab, filtered and ordered here, with the note
         if (!on) return;
-        const base = await listArticles(db, lang, k);
-        if (on) setFound({ key: qKey, items: localQuery(base, q, sort), next: null, local: true });
+        const [base, prior] = await Promise.all([listArticles(db, lang, k), keptPrior(db, lang)]); // A-179: the last C received (none = the old rule)
+        if (on) setFound({ key: qKey, items: localQuery(base, q, listSort, prior), next: null, local: true });
       });
     return () => { on = false; c.abort(); };
-  }, [active, qKey, db, lang, kind, q, sort, savedList]);
+  }, [active, qKey, db, lang, kind, q, listSort, savedList]);
   const [sheet] = useIonActionSheet();
   const openSort = () => void sheet({
     header: t('articles.sort'), cssClass: 'sort-sheet',
-    buttons: [...sorts.map((s) => ({ text: t(`articles.sort_${s}`), icon: s === sort ? checkmark : undefined, cssClass: s === sort ? 'sort-sheet__on' : undefined,
+    buttons: [...sorts.filter((s) => kind !== 'news' || s !== 'rating').map((s) => ({ text: t(`articles.sort_${s}`), icon: s === sort ? checkmark : undefined, cssClass: s === sort ? 'sort-sheet__on' : undefined,
       htmlAttributes: { role: 'radio', 'aria-checked': s === sort ? 'true' : 'false', 'data-testid': `sort-${s}` }, handler: () => setSort(s) })),
     { text: t('common.cancel'), role: 'cancel' }],
   });
@@ -145,7 +152,7 @@ export function ArticlesPage() {
     setMoreFail(null);
     try {
       if (fv) {
-        if (fv.next) { const p = await fetchQuery(db, lang, kind === 'all' ? null : (kind as ArticleKind), q, sort, fv.next); setFound((cur) => (cur?.key === fv.key ? { ...cur, items: mergePage(cur.items, p.items), next: p.next } : cur)); }
+        if (fv.next) { const p = await fetchQuery(db, lang, kind === 'all' ? null : (kind as ArticleKind), q, listSort, fv.next); setFound((cur) => (cur?.key === fv.key ? { ...cur, items: mergePage(cur.items, p.items), next: p.next } : cur)); }
         return;
       }
       if (tab) {
@@ -157,8 +164,13 @@ export function ArticlesPage() {
     } catch (e) { setMoreFail(await netFailure(e)); setFailKey(`${kind}|${lang}`); } finally { setMore(false); } // A-125: the cause under the button, «Повторити»
   };
   // an article opened inside a block's entry keeps the entry in its address: Back returns to the same list (its tab, its order)
-  const open = (a: number) => navigate(entry ? `/articles?sort=${entrySort}&id=${a}` : `/articles?id=${a}`, entry ? { state: { entry: entry.mark } } : undefined);
   const shown = active ? (fv ? fv.items : null) : tab ? tab.items : items && [...items, ...(older?.items ?? []).filter((a) => (kind === 'all' || a.kind === kind) && !items.some((b) => b.id === a.id))];
+  // A-178: on a phone the list is replaced by the article - Back brings the opened row back to where it stood (the loaded «Ще» pages stay)
+  const mark = useReturnPlace(`articles|${qKey}|${entry?.mark ?? ''}`, id == null && !wide && !!shown && shown.length > 0);
+  const open = (a: number) => {
+    if (!wide) mark(`arow-${a}`);
+    navigate(entry ? `/articles?sort=${entrySort}&id=${a}` : `/articles?id=${a}`, entry ? { state: { entry: entry.mark } } : undefined);
+  };
   useQuickHint('article', !!shown && shown.length > 0); // A-142 (4)
   const hasMore = active ? !!fv?.next : tab ? !!tab.next : older ? !!older.next : !!next;
   const list = (
@@ -169,7 +181,17 @@ export function ArticlesPage() {
           <IonIcon icon={star} aria-hidden="true" />
         </IonSegmentButton>
       </IonSegment>
-      {continueOver(kind, q) && <ContinueReading />}
+      {/* A-172: a non-default order is SHOWN (the person's own; a home block's entry shows its block's title instead) - a tap opens the sheet, ✕ = the default */}
+      {canQuery && !entry && sort !== 'published' && (
+        <div className="sort-strip" data-testid="sort-strip">
+          <button type="button" className="sort-strip__text" onClick={openSort} data-testid="sort-strip-open">{t('articles.sort_strip', { name: t(`articles.sort_${sort}`) })}</button>
+          <button type="button" className="sort-strip__x" onClick={() => setSort('published')} aria-label={t('articles.sort_reset')} data-testid="sort-reset">
+            <IonIcon icon={close} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+      {newsByDate && <p className="sort-note" role="note" data-testid="news-by-date">{t('articles.news_no_rating')}</p>}
+      {continueOver(kind, q) && <ContinueReading mark={wide ? undefined : mark} />}
       <StatusNote text={fv?.local ? t('articles.query_offline') : offline && !active && t('articles.offline')} testId="articles-offline" />
       {shown === null ? <div className="empty"><Busy /></div> : shown.length === 0
         ? <div className="empty" data-testid="articles-empty" role={active ? 'status' : undefined}>{t(active ? 'articles.nothing' : kind === SAVED ? 'articles.saved_empty' : 'articles.empty')}</div> : (

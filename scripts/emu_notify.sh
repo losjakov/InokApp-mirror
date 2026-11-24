@@ -67,6 +67,19 @@ if [ "$WV" -ge "$FLOOR" ]; then
   check "app opened on Home -> summary" "$(n '^articles$')" 0
   check "app opened -> the «ефір» stays" "$(n '^live_990001$')" 1
   CLEAR=ok
+  # cloud_46 (A-174): the reminder's countdown - posted by the app (a reminder 2 h ahead, its own silent channel, the chronometer), then the
+  # reminder gone -> the countdown gone (`tag countdown` 1 -> 0); the shade shot = the review / history frame
+  NAV="$(dirname "$0")/emu_nav.mjs"
+  cd1=$(node "$NAV" eval "(async () => { const P = Capacitor.Plugins.InokCountdown; const w = { label: 'НАГАДУВАННЯ · inok.info', in: 'Трансляція почнеться через', started: 'Трансляція почалася — відкрити', open: 'Відкрити', cancel: 'Скасувати', channel: 'Відлік до трансляції' }; return JSON.stringify(await P.sync({ items: [{ id: '3|ringcount1', channel_id: 3, video_id: 'ringcount1', at: Date.now() + 7200000, title: 'Божественна літургія', monastery: 'Свято-Успенська Почаївська Лавра' }], words: w, now: Date.now() })); })()" 2>>"$R" | head -1)
+  if [ -n "$cd1" ]; then
+    sleep 2; check "countdown posted (A-174)" "$(n '^countdown$')" 1
+    adb shell dumpsys notification 2>/dev/null | tr -d '\r' | grep -A3 "channel=countdown\|id=countdown" | head -6 >> "$R"
+    adb shell cmd statusbar expand-notifications 2>/dev/null || adb shell service call statusbar 1 > /dev/null; sleep 2
+    adb exec-out screencap -p > "$OUT/countdown_shade_light.png"
+    adb shell cmd statusbar collapse 2>/dev/null || adb shell service call statusbar 2 > /dev/null; sleep 1
+    node "$NAV" eval "Capacitor.Plugins.InokCountdown.sync({ items: [], words: {}, now: Date.now() }).then((x) => JSON.stringify(x))" >> "$R" 2>&1; sleep 2
+    check "countdown removed with its reminder (A-174)" "$(n '^countdown$')" 0
+  else say "countdown n/a: no answer from the page's eval (the shade proof waits for the next pass)"; fi
 else CLEAR="n/a(webview $WV)"; say "skip the Home-seen step: WebView $WV < $FLOOR (error.html, no JS)"; fi
 adb shell am force-stop $PKG
 say "notify $([ $fail = 0 ] && echo PASS || echo FAIL) clear=$CLEAR"

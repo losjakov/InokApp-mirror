@@ -277,7 +277,7 @@ export class InokMap {
       map.on('data', collapse);
     }
     map.on('error', (e: ErrorEvent & { sourceId?: string }) => {
-      if (isMapGlFailure(e.error)) { reportQuietly(e.error, 'error', true); this.fail(); return; } // A-182: MapLibre's own error event
+      if (isMapGlFailure(e.error, false)) { reportQuietly(e.error, 'error', true); this.fail(); return; } // A-182: MapLibre's own error event
       noteMapError(e);
       // a base map tile that failed (offline after the style came): the note; our own sources are GeoJSON, never fetched
       if (e.sourceId && map.getSource(e.sourceId)?.type !== 'geojson') { this.tileErrors++; this.loseTiles(); }

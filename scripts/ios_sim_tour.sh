@@ -441,13 +441,14 @@ a3_cloud46() {
   local v
   guard_crash spot46
   # A-170: the reading texts take the system's selection (computed in WebKit itself); a list row keeps A-142's held finger (no selection)
-  nav go /monasteries/242; node "$NAVJS" wait '.history' >> "$OUT/nav.txt" 2>&1; sleep 2
+  # (cloud_46 E2, ring 45328638031: the card's route is a two-pane list on an iPad - the article's page is one page on every device)
+  nav go "/articles?id=$ART"; node "$NAVJS" wait '[data-testid="article"] .aview__body' >> "$OUT/nav.txt" 2>&1; sleep 2
   v=$(ev "(() => { const u = (s) => { const e = Array.from(document.querySelectorAll(s)).find((x) => x.getClientRects().length > 0); return e ? getComputedStyle(e).webkitUserSelect || getComputedStyle(e).userSelect : 'missing'; };
-    return [u('h1.card__title'), u('.history'), document.documentElement.classList.contains('plt-mobile') ? 'plt-mobile' : 'no plt-mobile'].join(' / '); })()")
+    return [u('[data-testid=article] h1.card__title'), u('[data-testid=article] .aview__body'), document.documentElement.classList.contains('plt-mobile') ? 'plt-mobile' : 'no plt-mobile'].join(' / '); })()")
   nav go /monasteries; node "$NAVJS" wait '[data-testid^="mrow-"]' >> "$OUT/nav.txt" 2>&1; sleep 2
   local r; r=$(ev "(() => { const e = document.querySelector('.mrow'); return e ? getComputedStyle(e).webkitUserSelect || getComputedStyle(e).userSelect : 'missing'; })()")
-  case "$v|$r" in 'text / text / plt-mobile|none') a3 "text selection styles (A-170)" PASS "card title / history / platform: $v; list row: $r";;
-    *) a3 "text selection styles (A-170)" FAIL "card title / history / platform: $v; list row: $r";; esac
+  case "$v|$r" in 'text / text / plt-mobile|none') a3 "text selection styles (A-170)" PASS "article title / body / platform: $v; list row: $r";;
+    *) a3 "text selection styles (A-170)" FAIL "article title / body / platform: $v; list row: $r";; esac
   # A-183: the A-182 flag of THIS app + OS version (what a real GL failure writes) -> the «Карта» tab = Apple's map with our houses
   local ver; ver=$(node -p "require('$ROOT/package.json').version")
   v=$(ev "(async () => { const i = await Capacitor.Plugins.Device.getInfo(); await Capacitor.Plugins.Preferences.set({ key: 'map_gl_failed', value: JSON.stringify({ app_version: '$ver', os_version: String(i.osVersion) }) }); return 'set ' + i.osVersion; })()")
@@ -473,6 +474,52 @@ a3_cloud46() {
   case "$v|$at|$gone" in '{"found":true}|/monasteries/242|'*'"hidden":true'*|'{"found":true}|/monasteries/242|{"exists":false}') a3 "Apple map pin -> the card (A-183 (2))" PASS "$v -> $at; the map then $gone";;
     *) a3 "Apple map pin -> the card (A-183 (2))" FAIL "$v -> $at; the map then $gone";; esac
   ev "Capacitor.Plugins.Preferences.remove({ key: 'map_gl_failed' }).then(() => 'cleared')" >> "$OUT/nav.txt"
+  launch; answer_offers   # the app as a person opens it (the map flag gone)
+  # A-173 (C): the reminder's Live Activity - started by the app in the foreground (a reminder 2 h ahead), then ended (Activity.activities 1 -> 0)
+  local la1 la2
+  la1=$(ev "(async () => { const P = Capacitor.Plugins.InokCountdown; const w = { label: 'НАГАДУВАННЯ · inok.info', in: 'Трансляція почнеться через', started: 'Трансляція почалася — відкрити', open: 'Відкрити', cancel: 'Скасувати', channel: 'Відлік' };
+    await P.sync({ items: [{ id: '3|ringcount1', channel_id: 3, video_id: 'ringcount1', at: Date.now() + 7200000, title: 'Божественна літургія', monastery: 'Свято-Успенська Почаївська Лавра' }], words: w, now: Date.now() });
+    return JSON.stringify(await P.state()); })().catch((e) => 'REJECT ' + String((e && e.message) || e))")
+  shot "$OUT/a3-live-activity__$TAG.png"
+  la2=$(ev "(async () => { const P = Capacitor.Plugins.InokCountdown; await P.sync({ items: [], words: {}, now: Date.now() }); return JSON.stringify(await P.state()); })().catch((e) => 'REJECT ' + String((e && e.message) || e))")
+  case "$la1|$la2" in *'"active":1'*'|'*'"active":0'*) a3 "reminder Live Activity 1 -> 0 (A-173 (C))" PASS "started: $la1; ended: $la2";;
+    *'"enabled":false'*) a3 "reminder Live Activity 1 -> 0 (A-173 (C))" NOT-PROVABLE "Live Activities off on this simulator: $la1 / $la2 - the owner's iPhone";;
+    *) a3 "reminder Live Activity 1 -> 0 (A-173 (C))" FAIL "started: $la1; ended: $la2";; esac
+  a3_tray
+}
+
+# ---- cloud_46 (A-171 Part A, FUTURE_notifications_ios.md §5): the iPhone tray rules with `simctl push` (the app in the background, as a phone)
+apns() { # file type extra-json-fields [category]
+  local cat=""; [ -n "${4:-}" ] && cat=", \"category\": \"$4\""
+  printf '{"Simulator Target Bundle":"%s","aps":{"alert":{"title":"inok.info","body":"ring %s"},"mutable-content":1%s},"type":"%s"%s}\n' "$BUNDLE" "$2" "$cat" "$2" "$3" > "$1"
+}
+a3_tray() {
+  local v d st
+  v=$(ev "Capacitor.Plugins.FcmTopics.trayState().then((x) => JSON.stringify(x)).catch((e) => 'REJECT ' + String((e && e.message) || e))")
+  case "$v" in *'"INOK_ARTICLE"'*'"INOK_MARK_READ"'*) a3 "category INOK_ARTICLE + «Позначити прочитаним» registered (A6)" PASS "$v";;
+    *) a3 "category INOK_ARTICLE + «Позначити прочитаним» registered (A6)" FAIL "${v:-no answer}";; esac
+  d="$OUT/apns-$TAG"; mkdir -p "$d"
+  apns "$d/live3.apns" stream_live ', "channel_id": "3", "video_id": "ring3"'
+  apns "$d/live5.apns" stream_live ', "channel_id": "5", "video_id": "ring5"'
+  apns "$d/art1.apns" article ', "id": "2869", "kind": "publication"' INOK_ARTICLE
+  apns "$d/art2.apns" article ', "id": "2868", "kind": "publication"' INOK_ARTICLE
+  xcrun simctl launch "$U" com.apple.Preferences > /dev/null 2>&1; sleep 3   # our app to the background (a notification shows in the tray)
+  local f; for f in live3 live5 art1 art2; do xcrun simctl push "$U" "$BUNDLE" "$d/$f.apns" >> "$OUT/nav.txt" 2>&1; sleep 2; done
+  shot "$OUT/a3-tray-pushed__$TAG.png"
+  xcrun simctl launch "$U" "$BUNDLE" > /dev/null 2>&1; sleep 4   # back to the app (the same process: no restart)
+  st=$(ev "Capacitor.Plugins.FcmTopics.trayState().then((x) => JSON.stringify(x.delivered))")
+  echo "tray after simctl push: $st" >> "$OUT/nav.txt"
+  case "$st" in *'"article":2'*'"stream_live":2'*|*'"stream_live":2'*'"article":2'*) ;;
+    *) a3 "tray rules on iPhone (A2 / A3 / A5)" NOT-PROVABLE "delivered after 4 simctl pushes: ${st:-no answer} (the simulator shows pushes only with the notification permission granted - the A2 offer answered «no» in this walk; the owner's iPhone)"; return;; esac
+  local s1 s2 s3
+  s1=$(ev "Capacitor.Plugins.FcmTopics.liveChannels({ ids: ['3'] }).then(() => Capacitor.Plugins.FcmTopics.trayState()).then((x) => JSON.stringify(x.delivered))")
+  s2=$(ev "Capacitor.Plugins.FcmTopics.consumedArticles({ ids: ['2869'] }).then(() => Capacitor.Plugins.FcmTopics.trayState()).then((x) => JSON.stringify(x.delivered))")
+  s3=$(ev "Capacitor.Plugins.FcmTopics.consumedArticles({}).then(() => Capacitor.Plugins.FcmTopics.trayState()).then((x) => JSON.stringify(x.delivered))")
+  case "$s1|$s2|$s3" in *'"stream_live":1'*'|'*'"article":1'*'|'*) case "$s3" in *'"article"'*) a3 "tray rules on iPhone (A2 / A3 / A5)" FAIL "live [3] -> $s1; opened 2869 -> $s2; Home seen -> $s3";;
+      *'"stream_live":1'*) a3 "tray rules on iPhone (A2 / A3 / A5)" PASS "2 «ефір» + 2 articles; live [3] -> $s1; opened 2869 -> $s2; Home seen -> $s3";;
+      *) a3 "tray rules on iPhone (A2 / A3 / A5)" FAIL "Home seen removed «ефір» too: $s3";; esac;;
+    *) a3 "tray rules on iPhone (A2 / A3 / A5)" FAIL "live [3] -> $s1; opened 2869 -> $s2; Home seen -> $s3";; esac
+  a3 "apns-collapse-id / apns-expiration / stream_ended background (A4 a, S1-S3)" NOT-PROVABLE "simctl push carries no APNs headers and wakes no background push reliably - the owner's iPhone (PHONE_TEST_BACKLOG cloud_46)"
 }
 
 # ---- the App Store set (newest runtime only): the frames of store_frames.txt, uk / ru / en, the LIVE export

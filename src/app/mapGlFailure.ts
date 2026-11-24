@@ -12,12 +12,14 @@ import { deviceFacts } from './device';
 const GL_WORDS = /program failed to link|shader|webgl|\bgl context|context lost|metal backend|failed to initialize|createProgram|getContext/i;
 const MAP_CHUNK = /inokMap-[\w-]*\.js|maplibre/i;
 
-/** the message or the stack says a GL failure of the map (the stack alone counts only in the map's own code) */
-export function isMapGlFailure(err: unknown): boolean {
+/** the message or the stack says a GL failure of the map. `byStack` false = the message only: MapLibre's own `error` EVENTS (a tile, a style
+ *  swap, a sprite - handled, the map lives on) all come from the map chunk; only an UNCAUGHT error there (or a failed construction) may be
+ *  read by its stack (cloud_46 E1: screens 45328638042 - two map screens lost their map to a style-swap error read as GL) */
+export function isMapGlFailure(err: unknown, byStack = true): boolean {
   const e = err as { message?: unknown; stack?: unknown } | null;
   const msg = typeof err === 'string' ? err : typeof e?.message === 'string' ? e.message : '';
   const stack = typeof e?.stack === 'string' ? e.stack : '';
-  return GL_WORDS.test(msg) || MAP_CHUNK.test(stack.split('\n').slice(0, 6).join('\n'));
+  return GL_WORDS.test(msg) || (byStack && MAP_CHUNK.test(stack.split('\n').slice(0, 6).join('\n')));
 }
 
 type Fail = (err: unknown) => void;

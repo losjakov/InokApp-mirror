@@ -7,3 +7,5 @@
 "intent_new" = "New on the site";
 "intent_find" = "Find a monastery";
 "entity_house" = "Monastery";
+/* cloud_46 (A-171 A6): the article notification's action (category INOK_ARTICLE) */
+"INOK_MARK_READ" = "Mark as read";

@@ -120,6 +120,9 @@
 		</dict>
 	</array>
 	<!-- cloud_43 (A-155 (2)): `stream_ended` arrives as a background push (content-available) - the widgets' live data changes at once -->
+	<!-- cloud_46 (A-173 (C)): the reminder's Live Activity (started by the app in the foreground; iOS 16.1+; no push token) -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

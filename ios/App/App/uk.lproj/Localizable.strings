@@ -7,3 +7,5 @@
 "intent_new" = "Нове на сайті";
 "intent_find" = "Знайти обитель";
 "entity_house" = "Обитель";
+/* cloud_46 (A-171 A6): the article notification's action (category INOK_ARTICLE) */
+"INOK_MARK_READ" = "Позначити прочитаним";

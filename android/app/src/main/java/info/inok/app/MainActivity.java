@@ -34,6 +34,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(IntegrityPlugin.class); // local plugin: Play Integrity standard tokens for every write (A-66)
         registerPlugin(InAppReviewPlugin.class); // local plugin: Google Play's own rating window (cloud_41, A-133 C2)
         registerPlugin(InokWidgetsPlugin.class); // local plugin: the home-screen widgets' data (cloud_43, A-153 (2))
+        registerPlugin(CountdownPlugin.class); // local plugin: the reminder's countdown notification (cloud_46, A-174)
         registerPlugin(WindowColorsPlugin.class); // local plugin: the window colour under the system bars follows the app theme (cloud_38 NOTE 6)
         super.onCreate(savedInstanceState);
         if (bridge != null) bridge.addWebViewListener(new RenderGuard());

@@ -24,7 +24,7 @@ export function ReadBar({ pct, testId }: { pct: number; testId?: string }) {
  * A-141 (3) «ПРОДОВЖИТИ ЧИТАННЯ»: ONE card - the latest unfinished article (cover, title, the bar, ✕) + «ще N ›» (-> «Недочитані») when there
  * are more; over the «Публікації» list (every tab but «★») and on «Головна» under the four buttons; nothing at all while nothing is unfinished.
  */
-export function ContinueReading({ testId = 'continue' }: { testId?: string }) {
+export function ContinueReading({ testId = 'continue', mark }: { testId?: string; mark?: (testId: string) => void }) {
   const { t } = useApp();
   const { unfinished, dismiss } = useReading();
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ export function ContinueReading({ testId = 'continue' }: { testId?: string }) {
         {more > 0 && <Link to={UNFINISHED_PATH} className="continue__more" aria-label={t('reading.more_a11y', { n: more })} data-testid={`${testId}-more`}>{t('reading.more', { n: more })} ›</Link>}
       </div>
       <div className="continue__card">
-        <button type="button" className="continue__open" onClick={() => navigate(`/articles?id=${p.id}`)} data-testid={`${testId}-open`} data-id={p.id}>
+        <button type="button" className="continue__open" onClick={() => { mark?.(`${testId}-open`); navigate(`/articles?id=${p.id}`); }} data-testid={`${testId}-open`} data-id={p.id}>
           <CoverImage small keep code={`a${p.id}`} url={p.snap.cover?.url ?? null} alt="" className="continue__cover" />
           <span className="continue__text">
             <span className="continue__title">{p.snap.title}</span>

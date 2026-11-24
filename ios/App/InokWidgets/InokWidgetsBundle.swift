@@ -125,5 +125,9 @@ struct NewWidget: Widget {
 
 @main
 struct InokWidgetsBundle: WidgetBundle {
-    var body: some Widget { LiveWidget(); UpcomingWidget(); NewWidget() }
+    var body: some Widget {
+        LiveWidget(); UpcomingWidget(); NewWidget()
+        // cloud_46 (A-173 (C)): the reminder's Live Activity UI (ActivityKit) - iOS 16.1+ only; below it the bundle is the three widgets of 1.0.18
+        if #available(iOSApplicationExtension 16.1, *) { InokCountdownLive() }
+    }
 }

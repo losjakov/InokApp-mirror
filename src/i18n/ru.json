@@ -425,5 +425,14 @@
   "map.gl_retry": "Попробовать показать карту",
   "crash.send": "Отправить разработчику",
   "crash.send_offline": "Нет соединения с интернетом. Текст отчёта скопирован — отправьте его, когда появится сеть.",
-  "map.apple_open": "Открыть карточку"
+  "map.apple_open": "Открыть карточку",
+  "articles.sort_strip": "Сортировка: {name}",
+  "articles.sort_reset": "Сбросить сортировку",
+  "articles.news_no_rating": "У новостей нет оценок — показаны по дате",
+  "countdown.label": "НАПОМИНАНИЕ · inok.info",
+  "countdown.in": "Трансляция начнётся через",
+  "countdown.started": "Трансляция началась — открыть",
+  "countdown.open": "Открыть",
+  "countdown.cancel": "Отменить",
+  "countdown.channel": "Отсчёт до трансляции"
 }

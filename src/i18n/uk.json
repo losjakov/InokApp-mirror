@@ -425,5 +425,14 @@
   "map.gl_retry": "Спробувати показати карту",
   "crash.send": "Надіслати розробнику",
   "crash.send_offline": "Немає з'єднання з інтернетом. Текст звіту скопійовано — надішліть його, коли з'явиться мережа.",
-  "map.apple_open": "Відкрити картку"
+  "map.apple_open": "Відкрити картку",
+  "articles.sort_strip": "Сортування: {name}",
+  "articles.sort_reset": "Скинути сортування",
+  "articles.news_no_rating": "У новин немає оцінок — показано за датою",
+  "countdown.label": "НАГАДУВАННЯ · inok.info",
+  "countdown.in": "Трансляція почнеться через",
+  "countdown.started": "Трансляція почалася — відкрити",
+  "countdown.open": "Відкрити",
+  "countdown.cancel": "Скасувати",
+  "countdown.channel": "Відлік до трансляції"
 }

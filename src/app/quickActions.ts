@@ -23,6 +23,16 @@ export function quickRoute(url: string | null | undefined): string | null {
   return [...QUICK_ACTIONS, ...SYSTEM_ROUTES].find((a) => a.id === id)?.to ?? null;
 }
 
+/** A-174 (cloud_46): the Android countdown's «Скасувати» - `inokapp://tab/streams?cancel=<channel id>.<video id>`: «Трансляції» + that
+ *  reminder cancelled by the app's own path (its countdown goes with it); null for every other address */
+export function quickCancel(url: string | null | undefined): { channel_id: number; video_id: string } | null {
+  if (quickRoute(url) !== '/streams') return null;
+  const m = /[?&]cancel=(\d{1,9})\.([A-Za-z0-9_-]{6,20})(?:[&#]|$)/.exec(url!);
+  return m ? { channel_id: Number(m[1]), video_id: m[2] } : null;
+}
+/** the app's event that carries such a cancel to the reminders (src/state/reminders.tsx) */
+export const CANCEL_EVENT = 'inok-reminder-cancel';
+
 /** A-161 (3) (cloud_44): the widget's live row `inokapp://tab/streams?play=<video id>` - the stream to open ON TOP of «Трансляції» (a YouTube
  *  video id only: letters, digits, «_», «-»; anything else = «Трансляції» alone); null for every other address */
 export function quickPlay(url: string | null | undefined): string | null {

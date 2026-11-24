@@ -163,6 +163,26 @@ const selectSentence = async (p: Page, sel: string) => {
     return g.toString().length; }, sel);
   expect(n, 'a sentence selected').toBeGreaterThan(20);
 };
+/** A-178: tap `row` scrolled to the middle of the screen, read the article, the header's Back -> the same row at the same offset (± 8 px), the
+ *  list as long as before (`n`: the «Ще» pages kept), lit and focused */
+const placeKept = async (p: Page, row: Locator, n: number | null) => {
+  await row.scrollIntoViewIfNeeded();
+  await row.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await p.waitForTimeout(300);
+  const id = await row.getAttribute('data-testid');
+  const top = (await row.boundingBox())!.y;
+  await row.click();
+  await expect(onShown(p, 'article')).toBeVisible({ timeout: 15_000 });
+  await settled(p);
+  await systemBack(p); // the system Back (Android's key / iOS's edge swipe both run Ionic's back)
+  const again = p.locator(`${SHOWN} [data-testid="${id}"]`).first();
+  await expect(again).toBeVisible({ timeout: 15_000 });
+  await expect(again).toHaveClass(/row--back/);
+  await expect.poll(async () => Math.abs((await again.boundingBox())!.y - top), { timeout: 3000, message: `${id}: the offset after Back (was ${Math.round(top)})` }).toBeLessThanOrEqual(8);
+  if (n != null) await expect(onShown(p, 'articles').locator('[data-testid^="arow-"]')).toHaveCount(n);
+  expect(await again.evaluate((e) => e === document.activeElement || e.contains(document.activeElement) || e.shadowRoot?.activeElement != null), 'the focus on the row').toBe(true);
+  await p.waitForTimeout(1300); // the light fades before the next tap / the frame
+};
 /** A-40 (owner 03.11): the article's lead (анонс) after the date and before the text - one block, italic, a thin brand line at the left, the body's size */
 const leadShown = async (p: Page) => {
   const lead = onShown(p, 'article').locator('.aview__lead');
@@ -896,9 +916,9 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(await p.getByTestId('mrow-37').evaluate((row) => { const x = getComputedStyle(row.querySelector('.mrow__dist')!);
         return { same: x.color === getComputedStyle(row.querySelector('.mrow__title')!).color, w: x.fontWeight }; }), 'the distance = the title colour').toEqual({ same: true, w: '500' });
       await expect(p.getByTestId('home-checked')).toHaveText(/^(Перевірено сьогодні о|Проверено сегодня в|Checked today at) \d\d:\d\d$/, { timeout: 15_000 }); // A-52
-      // A-128: «Нове на сайті» + «Популярне за тиждень», four rows each: 2 «Статті», «Відео», «Новина» (the blocks' own screen: home-blocks)
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8);
-      expect(await p.locator('[data-testid^="arow-"]').evaluateAll((es) => es.map((e) => e.getAttribute('data-kind')))).toEqual(['publication', 'publication', 'video', 'news', 'publication', 'publication', 'video', 'news']);
+      // A-128: «Нове на сайті» + «Популярне за тиждень», A-176: 3 rows of ONE queue + «Новина»; «Популярне» never repeats «Нове» (the blocks' own screen: home-blocks)
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7);
+      expect(await p.locator('[data-testid^="arow-"]').evaluateAll((es) => es.map((e) => e.getAttribute('data-kind')))).toEqual(['publication', 'publication', 'publication', 'news', 'video', 'video', 'news']);
       expect(await noLeads(p, 'ion-content'), 'A-55: the two news rows without a lead').toBe(2);
       await expect(p.getByTestId('home-live')).toContainText('(3)');
       await expect(p.getByTestId('home-live-more')).toHaveCount(0);
@@ -926,8 +946,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // home's last row, under the social block); the frame is now tall enough to hold it and the check below says it is IN the frame
   { name: 'home-blocks', path: '/home', tall: 2650, ready: async (p) => {
       await expect(onShown(p, 'home-popular')).toBeVisible({ timeout: 15_000 });
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
-      expect(await homeBlocks(p)).toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [2869, 2738, 1892, 2871] });
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7, { timeout: 15_000 });
+      expect(await homeBlocks(p)).toEqual({ 'home-new': [2869, 2868, 2738, 2871], 'home-popular': [1892, 1894, 2870] });
       const [nw, pop] = await words(p, ['home.new', 'home.popular']);
       await expect(onShown(p, 'home-new').getByRole('heading', { level: 2 })).toHaveText(nw);
       await expect(onShown(p, 'home-popular').getByRole('heading', { level: 2 })).toHaveText(pop);
@@ -945,8 +965,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await onShown(p, 'social').scrollIntoViewIfNeeded();
     } },
   { name: 'home-blocks-font200', path: '/home', font: 200, tall: 3600, only: ['phone-light', 'phone-dark'], ready: async (p) => {
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
-      expect(await homeBlocks(p)).toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [2869, 2738, 1892, 2871] });
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7, { timeout: 15_000 });
+      expect(await homeBlocks(p)).toEqual({ 'home-new': [2869, 2868, 2738, 2871], 'home-popular': [1892, 1894, 2870] });
       const cut = await p.locator('.ion-page:not(.ion-page-hidden) [data-testid="home-popular"], .ion-page:not(.ion-page-hidden) [data-testid="home-popular-all"]')
         .evaluateAll((es) => es.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
       expect(cut, 'the block head and its «Усі» whole at 200 %').toEqual([]);
@@ -955,7 +975,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // A-128: «Усі» of a block = «Публікації» on «Усі» in THAT block's order, set and shown (the sort button's mark + its spoken name)
   ...([['home-new-all', 'home-new', 'created'], ['home-popular-all', 'home-popular', 'views_week']] as const).map(([name, block, sort]) => ({ name, path: '/home',
     only: ['phone-light', 'phone-dark', 'tablet'], ready: async (p: Page) => {
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7, { timeout: 15_000 });
       await onShown(p, `${block}-all`).click();
       await expect.poll(() => new URL(p.url()).pathname + new URL(p.url()).search).toBe(`/articles?sort=${sort}`);
       await entryKind(p, 'all');
@@ -984,7 +1004,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
   // A-128 + A-125: offline - the kept lists stay (no line under them, never a spinner); nothing kept and no answer = THE «no connection»
   // line with «Повторити» (a polite live region, in the page before), which brings the block
   { name: 'home-offline-kept', path: '/home', only: ['phone-light'], tall: 2400, ready: async (p) => {
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 });
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7, { timeout: 15_000 });
       const before = await homeBlocks(p);
       await p.context().setOffline(true);
       await onShown(p, 'refresh').click();
@@ -1002,7 +1022,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(live).toHaveAttribute('role', 'status');
       const [off, retry] = await words(p, ['net.offline', 'net.retry']);
       await expect(live).toContainText(off, { timeout: 15_000 });
-      await expect.poll(() => homeBlocks(p), { timeout: 15_000, message: 'cloud_41 NOTE 4: the kept rows, polled' }).toEqual({ 'home-new': [2869, 2868, 1892, 2871], 'home-popular': [] });
+      await expect.poll(() => homeBlocks(p), { timeout: 15_000, message: 'cloud_41 NOTE 4: the kept rows, polled' }).toEqual({ 'home-new': [2869, 2868, 2738, 2871], 'home-popular': [] });
       await expect(p.locator('.ion-page:not(.ion-page-hidden) .home__list ion-spinner')).toHaveCount(0);
       await live.scrollIntoViewIfNeeded();
       const r = await live.getByRole('button', { name: retry }).boundingBox();
@@ -1016,7 +1036,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(live, 'the device online, the site silent: never «no internet»').toContainText(silent, { timeout: 15_000 });
       await p.unroute(/fixtures\/articles\.json\?.*sort=views_week/);
       await live.getByRole('button', { name: retry }).click();
-      await expect.poll(async () => (await homeBlocks(p))['home-popular'], { message: '«Повторити» brings the block' }).toEqual([2869, 2738, 1892, 2871]);
+      await expect.poll(async () => (await homeBlocks(p))['home-popular'], { message: '«Повторити» brings the block' }).toEqual([1892, 1894, 2870]);
       await expect(live).toHaveText('');
     } },
   // A-25 #5 (R-24): the calendar in paragraphs as /live/ on a phone — folded 2, unfolded all 5 with their emphasis; at 17:30 Kyiv the
@@ -2240,7 +2260,8 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       expect(await onShown(p, 'articles').locator('[data-testid^="arow-"]').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-testid'))))
         .toEqual(['arow-2869', 'arow-1892', 'arow-2868', 'arow-1894']);
       await onShown(p, 'kind-tab-news').click(); // the same order on every tab
-      await expect(onShown(p, 'kinds')).toHaveAttribute('data-query', /\|news\|\|rating$/, { timeout: 5000 });
+      // A-179 (3): «Новини» are not rated - with «за рейтингом» chosen the news list is by date (no query), the note says so (news-by-date)
+      await expect(onShown(p, 'news-by-date')).toBeVisible({ timeout: 5000 });
       await onShown(p, 'kind-tab-all').click();
       expect([...new Set(asked)], 'only the orders the server takes').toEqual(['views_week', 'rating']);
       await onShown(p, 'sort-open').click(); // the shot: the sheet, «За рейтингом» checked
@@ -2398,6 +2419,106 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await onShown(p, 'map-gl-retry').click(); // «Спробувати показати карту»: the flag cleared, ONE try
       await expect(onShown(p, 'map')).toHaveAttribute('data-ready', '1', { timeout: 30_000 });
       expect(await p.evaluate(() => localStorage.getItem('CapacitorStorage.map_gl_failed'))).toBeNull();
+    } },
+  // A-178 (T3): Back from a publication = the same place of its list: the opened row at the same screen offset (± 8 px), the «Ще» page still
+  // loaded, the row lit (`row--back`) and focused - «Усі» after «Ще», a sort, a search; RED before (the list started at its top: CD S336)
+  { name: 'back-place-articles', only: ['phone-light', 'phone-dark'], path: '/articles', ready: async (p) => {
+      await toAll(p);
+      const rows = onShown(p, 'articles').locator('[data-testid^="arow-"]');
+      await expect(rows).toHaveCount(10);
+      await placeKept(p, rows.nth(8), 10); // the default order, low in the list
+      // a sort whose list pages (the fixture's «за переглядами»: 4 rows, «Ще» -> 8): the «Ще» page loaded, its row
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-views_week"]').click();
+      await expect(onShown(p, 'kinds')).toHaveAttribute('data-query', /\|all\|\|views_week$/, { timeout: 5000 });
+      await expect(rows).toHaveCount(4);
+      await onShown(p, 'articles-more').click();
+      await expect(rows).toHaveCount(8);
+      await placeKept(p, rows.nth(6), 8);
+      // a search result: its own list, the same rule
+      const word = (await rows.first().locator('.mrow__title').innerText()).split(/\s+/).find((w) => w.length >= 5)!.slice(0, 4);
+      await onShown(p, 'search-open').click();
+      await p.locator(SHOWN).getByTestId('articles-search').locator('input').fill(word);
+      await expect(onShown(p, 'kinds')).toHaveAttribute('data-query', new RegExp(`\\|all\\|${word}\\|views_week$`), { timeout: 5000 });
+      await expect(rows.first()).toBeVisible();
+      await placeKept(p, rows.last(), await rows.count());
+    } },
+  { name: 'back-place-home', only: ['phone-light'], path: '/home', tall: 780, ready: async (p) => {
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7, { timeout: 15_000 });
+      await placeKept(p, onShown(p, 'home-popular').locator('xpath=following::*[starts-with(@data-testid, "arow-")]').last(), null);
+    } },
+  // A-172 (T4): a non-default order is SHOWN above the list on every kind tab (its name; a tap = the sheet); ✕ (44 x 44, «Скинути
+  // сортування») = the default; absent on the default; the sort button's dot stays. RED before (no strip).
+  { name: 'sort-strip', only: [...UK, 'phone-ru'], path: '/articles', ready: async (p) => {
+      await entryKind(p, 'publication');
+      await expect(onShown(p, 'sort-strip')).toHaveCount(0);
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-views_week"]').click();
+      const [strip, name, reset] = await words(p, ['articles.sort_strip', 'articles.sort_views_week', 'articles.sort_reset']);
+      await expect(onShown(p, 'sort-strip-open')).toHaveText(strip.replace('{name}', name));
+      await expect(onShown(p, 'sort-reset')).toHaveAccessibleName(reset);
+      const x = (await onShown(p, 'sort-reset').boundingBox())!;
+      expect(Math.min(x.width, x.height), 'the ✕ target').toBeGreaterThanOrEqual(44);
+      await expect(onShown(p, 'sort-mark')).toBeVisible();
+      for (const k of ['all', 'video', 'news', 'saved']) { await onShown(p, `kind-tab-${k}`).click(); await expect(onShown(p, 'sort-strip'), `on «${k}»`).toBeVisible(); }
+      await onShown(p, 'kind-tab-publication').click(); await entryKind(p, 'publication'); await settled(p);
+      await onShown(p, 'sort-strip-open').click(); // a tap on the text = the sheet
+      await expect(p.locator('ion-action-sheet.sort-sheet:not(.overlay-hidden)')).toBeVisible();
+      await p.waitForTimeout(500); await p.keyboard.press('Escape'); // the sheet dismissed (its cancel button moves while it animates in)
+      await expect(p.locator('ion-action-sheet.sort-sheet:not(.overlay-hidden)')).toHaveCount(0, { timeout: 5000 });
+      await settled(p);
+    } },
+  { name: 'sort-strip-reset', only: ['phone-light'], path: '/articles', ready: async (p) => {
+      await entryKind(p, 'publication');
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-rating"]').click();
+      await expect(onShown(p, 'sort-strip')).toBeVisible();
+      await onShown(p, 'sort-reset').click();
+      await expect(onShown(p, 'sort-strip')).toHaveCount(0);
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', 'published');
+      await expect(onShown(p, 'sort-mark')).toHaveCount(0);
+    } },
+  { name: 'sort-strip-font200', only: ['phone-light', 'phone-dark'], font: 200, path: '/articles', ready: async (p) => {
+      await entryKind(p, 'publication');
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-views_week"]').click();
+      await expect(onShown(p, 'sort-strip')).toBeVisible();
+      const r = await onShown(p, 'sort-strip').evaluate((e) => ({ over: e.scrollWidth > e.clientWidth + 1, x: e.querySelector('.sort-strip__x')!.getBoundingClientRect().right <= e.getBoundingClientRect().right + 0.5 }));
+      expect(r, 'the strip whole at 200 %, the ✕ inside').toEqual({ over: false, x: true });
+    } },
+  // A-172: 3 hours away (the page hidden, the clock moved) = the default order; 2 h 59 min = kept; the search text untouched
+  { name: 'sort-reset-3h', only: ['phone-light'], path: '/articles', before: async (p) => { await p.clock.install(); }, ready: async (p) => {
+      await entryKind(p, 'publication');
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-views_week"]').click();
+      await expect(onShown(p, 'sort-strip')).toBeVisible();
+      const away = async (ms: number) => {
+        await p.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); });
+        await p.clock.fastForward(ms);
+        await p.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' }); document.dispatchEvent(new Event('visibilitychange')); });
+        await p.waitForTimeout(500);
+      };
+      await away(3 * 3_600_000 - 60_000);
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', 'views_week');
+      await away(3 * 3_600_000);
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', 'published');
+      await expect(onShown(p, 'sort-strip')).toHaveCount(0);
+    } },
+  // A-179 (3): «Новини» has no rating order: the sheet does not offer it; chosen elsewhere -> the news by date + ONE note; the choice is kept
+  { name: 'news-by-date', only: [...UK, 'phone-ru'], path: '/articles', ready: async (p) => {
+      await entryKind(p, 'publication');
+      await onShown(p, 'sort-open').click(); await p.locator('[data-testid="sort-rating"]').click();
+      await onShown(p, 'kind-tab-news').click(); await entryKind(p, 'news');
+      const [note] = await words(p, ['articles.news_no_rating']);
+      await expect(onShown(p, 'news-by-date')).toHaveText(note);
+      await expect(onShown(p, 'news-by-date')).toHaveAttribute('role', 'note');
+      await expect(onShown(p, 'sort-strip')).toBeVisible(); // the chosen order still shown
+      await expect(onShown(p, 'kinds')).not.toHaveAttribute('data-query', /rating/);
+      await onShown(p, 'sort-open').click();
+      await expect(p.locator('ion-action-sheet.sort-sheet:not(.overlay-hidden) [data-testid="sort-published"]')).toBeVisible();
+      await expect(p.locator('ion-action-sheet:not(.overlay-hidden) [data-testid="sort-rating"]')).toHaveCount(0);
+      await p.waitForTimeout(500); await p.keyboard.press('Escape'); // the sheet dismissed (its cancel button moves while it animates in)
+      await expect(p.locator('ion-action-sheet.sort-sheet:not(.overlay-hidden)')).toHaveCount(0, { timeout: 5000 });
+      await onShown(p, 'kind-tab-video').click(); await entryKind(p, 'video');
+      await expect(onShown(p, 'sort-open')).toHaveAttribute('data-sort', 'rating'); // no reset across tabs
+      await expect(onShown(p, 'news-by-date')).toHaveCount(0);
+      await onShown(p, 'kind-tab-news').click(); await entryKind(p, 'news');
+      await settled(p);
     } },
   { name: 'article-lead-ru', only: ['phone-ru'], path: '/articles?id=2869', before: async (p) => {
       await p.route(FEED_AND_ITEM, (r) => r.fulfill({ contentType: 'application/json', body: readFileSync('fixtures/articles_ru.json', 'utf8') }));
@@ -3263,14 +3384,14 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await p.route(/\/fixtures\/manifest\.json/, async (r) => (n++ === 0 ? r.fallback() : r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!DOCTYPE html><html><head><title>Захищена сторінка</title></head><body></body></html>' })));
     }, ready: async (p) => {
       // the first manifest = the first-run import; the START refresh already meets the page: silent (no message), no «checked» time
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8, { timeout: 15_000 }); // A-128: two blocks of four
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7, { timeout: 15_000 }); // A-128: A-176: 4 + 3 (the fixture: «Популярне» skips «Нове» - 2 left of publication + video)
       await expect(onShown(p, 'refresh')).toHaveAttribute('data-busy', '0', { timeout: 15_000 });
       await expect(p.locator('ion-toast.refresh-toast')).toHaveCount(0);
       await expect(p.getByTestId('home-checked')).toHaveText('Оновити дані');
       await onShown(p, 'refresh').click();
       await expect(p.locator('ion-toast.refresh-toast')).toHaveText('Сервер зайнятий, спробуйте пізніше.');
       await toastAboveTabs(p, 'ion-toast.refresh-toast'); // D73
-      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(8);
+      await expect(p.locator('[data-testid^="arow-"]')).toHaveCount(7);
       await expect(p.getByTestId('tiles')).toBeVisible();
     } },
   // A-51 (R-35): an opened article takes its item from the server - an admin's edit shows without a restart (the feed still has the old copy)
@@ -4370,6 +4491,7 @@ const screens: { name: string; path: string; tall?: number; width?: number; font
       await expect(p).toHaveURL(/\/articles\/unfinished$/);
       await expect(onShown(p, 'unfinished').locator('[data-testid^="arow-"]')).toHaveCount(2);
       await expect(onShown(p, 'apct-2869')).toBeVisible();
+      if (!wide) await placeKept(p, onShown(p, 'unfinished').locator('[data-testid^="arow-"]').first(), null); // A-178: «Недочитані» too (opening one moves it first: the first stays)
     } },
   { name: 'continue-dismiss', only: ['phone-light'], path: '/articles?id=2869', before: async (p: Page) => { await p.clock.install(); }, ready: async (p: Page) => {
       await expect(onShown(p, 'article')).toBeVisible({ timeout: 20_000 });

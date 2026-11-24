@@ -44,21 +44,32 @@ export class AppleMapView {
   private visible = true;
   private pageShown = true;
   private sub: PluginListenerHandle | null = null;
+  /** the first houses wait here until the area has a size (a page still entering: 0 x 0 - cloud_46 E2, ring 45328638031 iPad) */
+  private pending: { houses: AppleHouse[]; open: string; center?: { lat: number; lon: number } } | null = null;
+  private starting = false;
   constructor(private plugin: AppleMapPlugin, private rect: () => Rect | null, private onOpen: (code: number) => void,
     private onFail: (e: unknown) => void, private overlay: () => boolean = () => webOverlayOpen()) {}
   async start(houses: AppleHouse[], open: string, center?: { lat: number; lon: number }): Promise<void> {
+    this.pending = { houses, open, ...(center ? { center } : {}) };
+    return this.begin();
+  }
+  /** the native view made once the area has a size (asked again by every sync: a resize, the page shown, an overlay change) */
+  private async begin(): Promise<void> {
     const r = this.rect();
-    if (!r) return;
+    const p = this.pending;
+    if (!r || !p || this.live || this.starting) return;
+    this.starting = true; this.pending = null;
+    const { houses, open, center } = p;
     try {
       this.sub = await this.plugin.addListener('open', (d) => this.onOpen(Number(d.code)));
       await this.plugin.show({ rect: r, houses, open, ...(center ? { center } : {}) });
       this.live = true;
       await this.sync();
-    } catch (e) { this.fail(e); }
+    } catch (e) { this.fail(e); } finally { this.starting = false; }
   }
   /** the rect and the visibility as they are now (an overlay opened / closed, the page shown / left, a resize) */
   async sync(): Promise<void> {
-    if (!this.live) return;
+    if (!this.live) { if (this.pending) await this.begin(); return; }
     const want = this.pageShown && !this.overlay();
     try {
       const r = this.rect();
@@ -68,7 +79,7 @@ export class AppleMapView {
   }
   page(shown: boolean): Promise<void> { this.pageShown = shown; return this.sync(); }
   async setHouses(houses: AppleHouse[]): Promise<void> {
-    if (!this.live) return;
+    if (!this.live) { if (this.pending) this.pending = { ...this.pending, houses }; return; }
     try { await this.plugin.setHouses({ houses }); } catch (e) { this.fail(e); }
   }
   async stop(): Promise<void> {

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { IonTabButton, NavContext } from '@ionic/react';
 import { App } from '@capacitor/app';
 import { isNative } from '@/native/platform';
+import { forgetPlaces } from '@/state/returnPlace';
 import type { CardEntry, ListEntry } from './linkRoute';
 
 /**
@@ -64,7 +65,7 @@ export function TabButton({ tab, children }: { tab: TabId; children: ReactNode; 
   const loc = useLocation();
   const tap = () => {
     const a = tabTap(tab, loc.pathname, loc.search);
-    if (a.kind === 'scrollTop') scrollShownToTop();
+    if (a.kind === 'scrollTop') { forgetPlaces(); scrollShownToTop(); } // A-178: the top means the top
     // a fresh entry of the top screen in its tab, no slide (a tab switch); the screen opened from another tab stays behind it
     else nav.navigate(a.to, 'none', 'push', undefined, undefined, tab);
   };

@@ -425,5 +425,14 @@
   "map.gl_retry": "Try the map again",
   "crash.send": "Send to the developer",
   "crash.send_offline": "No internet connection. The report text is copied — send it when the network is back.",
-  "map.apple_open": "Open the card"
+  "map.apple_open": "Open the card",
+  "articles.sort_strip": "Sort: {name}",
+  "articles.sort_reset": "Reset sort",
+  "articles.news_no_rating": "News items are not rated — shown by date",
+  "countdown.label": "REMINDER · inok.info",
+  "countdown.in": "The broadcast starts in",
+  "countdown.started": "The broadcast has started — open",
+  "countdown.open": "Open",
+  "countdown.cancel": "Cancel",
+  "countdown.channel": "Countdown to a broadcast"
 }

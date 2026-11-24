@@ -12,10 +12,11 @@ import { StreamRow } from '@/components/StreamRow';
 import { CalendarStrip } from '@/components/CalendarStrip';
 import { MonasteryRow } from '@/components/MonasteryRow';
 import { ContinueReading } from '@/components/ContinueReading';
+import { useReturnPlace } from '@/state/returnPlace';
 import { churchOutline } from '@/components/icons';
 import { listChannels } from '@/data/repo/channels';
 import { nearbyMonasteries } from '@/data/repo/monasteries';
-import { cachedBlock, fetchBlock, type HomeBlockSort } from '@/data/repo/articles';
+import { blockRows, cachedBlock, fetchBlock, shownIds, type HomeBlockSort } from '@/data/repo/articles';
 import type { ArticleSort } from '@/data/repo/articleOrder';
 import { SocialLinks } from '@/components/SocialLinks';
 import { NetNotice } from '@/components/NetNotice';
@@ -86,6 +87,12 @@ export function HomePage() {
   // A-128: «Нове на сайті» by the date of placing, «Популярне за тиждень» by the week's views - only the orders the server takes (R-44 / R-48)
   const newSort: ArticleSort = config && !config.features.articles_query ? 'published' : 'created';
   const popular = !config || !!config.features.articles_sort_v2;
+  // A-176: «Популярне» skips every id «Нове» shows (its 3 rows and its news) - both blocks' rows from ONE rule over their candidates
+  const newBlock = useBlockPool(newSort, true);
+  const mark = useReturnPlace('home', true); // A-178: Back from a publication = the same place of «Головна» (anchored on the row)
+  const popBlock = useBlockPool('views_week', popular);
+  const newRows = useMemo(() => (newBlock.pool ? blockRows(newBlock.pool, newSort) : null), [newBlock.pool, newSort]);
+  const popRows = useMemo(() => (popBlock.pool ? blockRows(popBlock.pool, 'views_week', shownIds(newRows ?? [])) : null), [popBlock.pool, newRows]);
   const homeBlock: Record<HomeBlock, ReactNode> = {
     live: <>
           {header(online.length ? t('home.live_now_n', { n: online.length }) : t('home.live_now'), '/streams', 'home-live')}
@@ -107,10 +114,10 @@ export function HomePage() {
           )}
           </>,
     new: <>
-          <ArticleBlock sort={newSort} title={t('home.new')} testId="home-new" />
+          <ArticleBlock sort={newSort} block={newBlock} rows={newRows} title={t('home.new')} testId="home-new" mark={mark} />
           </>,
     popular: <>
-          {popular && <ArticleBlock sort="views_week" title={t('home.popular')} testId="home-popular" />}
+          {popular && <ArticleBlock sort="views_week" block={popBlock} rows={popRows} title={t('home.popular')} testId="home-popular" mark={mark} />}
           </>,
   };
   return (
@@ -127,7 +134,7 @@ export function HomePage() {
             </Link>
           ))}
         </nav>
-        <ContinueReading testId="home-continue" />{/* A-141 (3): under the four buttons, only while something is unfinished */}
+        <ContinueReading testId="home-continue" mark={mark} />{/* A-141 (3): under the four buttons, only while something is unfinished */}
         <CalendarStrip />
         <IonList className="home__list">
           {/* A-162 (2) (cloud_44): the order of the blocks from the site's ui-config (a permutation of HOME_BLOCKS; the default = this order) */}
@@ -155,43 +162,50 @@ function HomeHeading({ label, to, testId, state }: { label: string; to: string; 
 }
 
 /**
- * A-128: ONE block of the site's materials on «Головна» («Нове на сайті», «Популярне за тиждень») - 2 «Статті», a «Відео», a «Новина» in the
- * block's order; the kept list at once (offline too), then the server once the feed was tried this run; nothing to show = the shared
- * A-125 line with «Повторити», never an empty block without a word, never a spinner for ever (the request has its timeout).
- * «Усі» = «Публікації» on «Усі» in THIS block's order, for this entry only (`articlesEntry`).
+ * A-128 / A-176: a block's candidates on «Головна» - the kept ones at once (offline too), then the server once the feed was tried this run;
+ * `fail` = why nothing new came (the shared A-125 line with «Повторити»), never a spinner for ever (the request has its timeout).
  */
-function ArticleBlock({ sort, title, testId }: { sort: ArticleSort; title: string; testId: string }) {
-  const { db, t, lang, articlesVersion } = useApp();
-  const navigate = useNavigate();
-  const [rows, setRows] = useState<Article[] | null>(null);
+interface BlockPool { pool: Article[] | null; busy: boolean; fail: NetFailure | null; fetched: boolean; retry: () => void }
+function useBlockPool(sort: ArticleSort, enabled: boolean): BlockPool {
+  const { db, lang, articlesVersion } = useApp();
+  const [pool, setPool] = useState<Article[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [fail, setFail] = useState<NetFailure | null>(null);
   const [tries, setTries] = useState(0);
   const [fetched, setFetched] = useState(false); // the server answered (or failed) once this run - the store frames wait for it (cloud_39)
   useEffect(() => {
+    if (!enabled) return;
     let on = true;
     void (async () => {
       const kept = await cachedBlock(db, lang, sort);
       if (!on) return;
-      setRows(kept);
+      setPool(kept);
       if (articlesVersion === 0 && tries === 0) return; // the feed's own try first (A-25 #3: no second burst at start)
       setBusy(true); setFetched(false); // a new language / a retry: «answered» again only by THIS request
-      try { const r = await fetchBlock(db, lang, sort); if (on) { setRows(r); setFail(null); } }
+      try { const r = await fetchBlock(db, lang, sort); if (on) { setPool(r); setFail(null); } }
       catch (e) { const f = await netFailure(e); if (on) setFail(f); }
       finally { if (on) { setBusy(false); setFetched(true); } }
     })();
     return () => { on = false; };
-  }, [db, lang, sort, articlesVersion, tries]);
+  }, [db, lang, sort, articlesVersion, tries, enabled]);
+  return { pool, busy, fail, fetched, retry: () => setTries((n) => n + 1) };
+}
+
+/** A-128: ONE block - its rows (A-176's rule, computed by the page), the heading with «Усі» (= «Публікації» on «Усі» in THIS block's order) */
+function ArticleBlock({ sort, block, rows, title, testId, mark }: { sort: ArticleSort; block: BlockPool; rows: Article[] | null; title: string; testId: string; mark: (testId: string) => void }) {
+  const { t } = useApp();
+  const navigate = useNavigate();
+  const { busy, fail, fetched } = block;
   const empty = !rows || rows.length === 0;
   const entry = articlesEntry(sort as HomeBlockSort);
   return (
     <>
       <HomeHeading label={title} to={entry.to} state={entry.state} testId={testId} />
-      {!empty ? rows.map((a) => <ArticleRow key={a.id} a={a} onSelect={(id) => navigate(`/articles?id=${id}`)} mixed />)
+      {!empty ? rows.map((a) => <ArticleRow key={a.id} a={a} onSelect={(id) => { mark(`arow-${id}`); navigate(`/articles?id=${id}`); }} mixed />)
         : busy ? <ListBox><div className="empty empty--row"><Busy /></div></ListBox>
           : !fail && rows ? <IonItem lines="none"><IonLabel className="home__quiet">{t('articles.empty')}</IonLabel></IonItem> : null}
       <div role="listitem" data-testid={`${testId}-block`} data-fetched={fetched ? '1' : '0'} data-rows={rows?.length ?? 0}>
-        <NetNotice failure={empty && !busy ? fail : null} onRetry={() => setTries((n) => n + 1)} testId={`${testId}-net`} />
+        <NetNotice failure={empty && !busy ? fail : null} onRetry={block.retry} testId={`${testId}-net`} />
       </div>
     </>
   );

@@ -7,6 +7,7 @@ import { getMonasteriesInOrder } from '@/data/repo/monasteries';
 import type { MonasteryListRow as Row } from '@/data/repo/types';
 import { useApp } from '@/state/AppContext';
 import { useReading } from '@/state/reading';
+import { useReturnPlace } from '@/state/returnPlace';
 import { ArticleRow } from '@/components/ArticleRow';
 
 /** THE page of the person's own marks (A-15: one component) - «Обрані» (the star) and «Я тут був» (A-133: the counter in its head, the
@@ -47,12 +48,13 @@ export function UnfinishedPage() {
   const { t } = useApp();
   const { unfinished } = useReading();
   const navigate = useNavigate();
+  const mark = useReturnPlace('unfinished', unfinished.length > 0); // A-178
   return (
     <IonPage>
       <PageHeader title={t('reading.unfinished')} />
       <IonContent>
         {unfinished.length === 0 ? <div className="empty" data-testid="unfinished-empty">{t('reading.unfinished_empty')}</div> : (
-          <IonList data-testid="unfinished">{unfinished.map((p) => <ArticleRow key={p.id} a={{ ...p.snap, body: null }} onSelect={(id) => navigate(`/articles?id=${id}`)} mixed />)}</IonList>
+          <IonList data-testid="unfinished">{unfinished.map((p) => <ArticleRow key={p.id} a={{ ...p.snap, body: null }} onSelect={(id) => { mark(`arow-${id}`); navigate(`/articles?id=${id}`); }} mixed />)}</IonList>
         )}
       </IonContent>
     </IonPage>

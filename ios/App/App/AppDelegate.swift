@@ -3,6 +3,7 @@ import Capacitor
 import FirebaseCore
 import FirebaseMessaging
 import WidgetKit
+import UserNotifications
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -13,7 +14,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // cloud_38 (A2): Firebase Messaging for the site's FCM topics - only when the CI put GoogleService-Info.plist into the bundle
         // (never in git); without it the app runs as before and src/native/push.ts says why the topics are not kept
         if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil { FirebaseApp.configure() }
+        AppDelegate.registerArticleCategory()
         return true
+    }
+
+    /// cloud_46 (A-171 A6): the site's article alert carries `category: INOK_ARTICLE` - its «Позначити прочитаним» action (no foreground
+    /// launch), registered at every launch BESIDE any category another part of the app registered (never replacing them)
+    static func registerArticleCategory() {
+        let read = UNNotificationAction(identifier: InokTray.markRead, title: NSLocalizedString("INOK_MARK_READ", comment: "the article notification's action"), options: [])
+        let cat = UNNotificationCategory(identifier: InokTray.articleCategory, actions: [read], intentIdentifiers: [], options: [])
+        let c = UNUserNotificationCenter.current()
+        c.getNotificationCategories { have in
+            c.setNotificationCategories(have.filter { $0.identifier != InokTray.articleCategory }.union([cat]))
+        }
     }
 
     // cloud_38 (A2): the APNs token - to Firebase (FirebaseAppDelegateProxyEnabled = NO in Info.plist: no swizzling) and to
@@ -27,6 +40,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     /// wakes the app (unless force-quit): the widgets' live data changes at once + the widgets reload.
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         let changed = InokShared.applyStreamPush(userInfo)
+        // cloud_46 (A-171 A4 a): a broadcast ended - its delivered «ефір» leaves Notification Center (when iOS delivers this push at all)
+        if userInfo["type"] as? String == "stream_ended", let ch = InokTray.str(userInfo["channel_id"]) { InokTray.removeLive(channel: ch) }
         if changed, #available(iOS 14.0, *) { WidgetCenter.shared.reloadAllTimelines() }
         completionHandler(changed ? .newData : .noData)
     }

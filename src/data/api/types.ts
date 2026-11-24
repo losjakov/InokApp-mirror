@@ -185,7 +185,9 @@ export interface Article {
   /** R-48: with `q` / any `sort` - the page's views of the last 7 site days (0 = none) */
   views_week?: number;
 }
-export interface ArticlesPage { items: Article[]; next: string | null }
+/** R-64 (A-179): the server's prior of the rating order - C = the site mean of all ratings (4 decimals), m = its weight (5) */
+export interface RatingPrior { mean: number; weight: number }
+export interface ArticlesPage { items: Article[]; next: string | null; rating_prior?: RatingPrior }
 /** R-27: the page's own like / dislike counts of a comment or reply; `mine` = this install's vote (1 like, -1 dislike, 0 none) */
 export interface Votes { likes: number; dislikes: number; mine: -1 | 0 | 1 }
 export interface Comment { id: number; author: string; text: string; at: string; votes?: Votes; replies?: Omit<Comment, 'replies'>[] }

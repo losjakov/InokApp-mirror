@@ -3,6 +3,7 @@ import UIKit
 import Capacitor
 import FirebaseCore
 import FirebaseMessaging
+import UserNotifications
 
 /// cloud_38 (A-124, A2): the iOS twin of android/.../FcmTopicsPlugin.java - the SAME JS name and methods (src/native/push.ts), so the topics
 /// of a device are kept by ONE code path on both platforms. Firebase Messaging subscribes the device to the site's FCM topics (contract §4);
@@ -17,7 +18,8 @@ public class FcmTopicsPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "unsubscribe", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "consumedArticles", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "liveChannels", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "liveChannels", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "trayState", returnType: CAPPluginReturnPromise)
     ]
 
     private func topic(_ call: CAPPluginCall) -> String? {
@@ -48,7 +50,33 @@ public class FcmTopicsPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    /// Android's tray bookkeeping (A-84 b, c) - the iOS tray is the system's: nothing to do
-    @objc func consumedArticles(_ call: CAPPluginCall) { call.resolve() }
-    @objc func liveChannels(_ call: CAPPluginCall) { call.resolve() }
+    /// cloud_46 (A-171 A2 / A5 / A7): the article notifications the app has SHOWN (Home's «Нове на сайті» seen = all; an opened article =
+    /// its own) leave Notification Center - by their real identifiers; the app badge back to 0 (the site sends none: a safety net)
+    @objc func consumedArticles(_ call: CAPPluginCall) {
+        let ids = call.getArray("ids", String.self).map { Set($0) }
+        InokTray.removeArticles(ids) { _ in
+            FcmTopicsPlugin.clearBadge()
+            call.resolve()
+        }
+    }
+    /// cloud_46 (A-171 A3 / A4 c): a FRESH live-status lists the live channels; every delivered «ефір» of another channel goes
+    @objc func liveChannels(_ call: CAPPluginCall) {
+        guard let ids = call.getArray("ids", String.self) else { call.reject("ids required"); return }
+        InokTray.keepLive(Set(ids)) { _ in call.resolve() }
+    }
+    /// cloud_46 (the ring's read, §5): the registered categories and the delivered notifications by type (never their texts)
+    @objc func trayState(_ call: CAPPluginCall) {
+        let c = UNUserNotificationCenter.current()
+        c.getNotificationCategories { cats in
+            c.getDeliveredNotifications { ns in
+                var by: [String: Int] = [:]
+                for n in ns { by[n.request.content.userInfo["type"] as? String ?? "other", default: 0] += 1 }
+                call.resolve(["categories": cats.map { $0.identifier }.sorted(), "actions": cats.flatMap { $0.actions.map { $0.identifier } }.sorted(), "delivered": by])
+            }
+        }
+    }
+    static func clearBadge() {
+        if #available(iOS 16.0, *) { UNUserNotificationCenter.current().setBadgeCount(0) }
+        else { DispatchQueue.main.async { UIApplication.shared.applicationIconBadgeNumber = 0 } }
+    }
 }

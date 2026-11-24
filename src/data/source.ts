@@ -70,13 +70,17 @@ async function fixtureQuery(f: ArticleFilter, since: string | null | undefined, 
   const [all, video, views] = await Promise.all([fx<ArticlesPage>(`articles.json?q=${encodeURIComponent(f.q ?? '')}&sort=${f.sort ?? ''}`), fx<ArticlesPage>('articles_video.json'),
     fx<Record<string, number | null> & { __week?: Record<string, number> }>('views.json')]);
   const q = (f.q ?? '').toLowerCase().replace(/\s+/g, ' ');
+  // R-64 (A-179): C = the mean of ALL ratings of the rated items (the site: of the rated sections), 4 decimals; m = 5 - sent with every answer
+  const rated = [...all.items, ...video.items].filter((a) => (a.rating?.count ?? 0) > 0);
+  const n = rated.reduce((t, a) => t + a.rating!.count, 0);
+  const prior = n ? { mean: Math.round((rated.reduce((t, a) => t + a.rating!.value * a.rating!.count, 0) / n) * 10000) / 10000, weight: 5 } : undefined;
   const items = sortArticles([...all.items, ...video.items].filter((a) => (!f.kind || a.kind === f.kind) && (!q || [a.title, a.subtitle ?? ''].some((s) => s.toLowerCase().replace(/\s+/g, ' ').includes(q))))
-    .map((a) => ({ ...a, created_at: a.published_at, views: views?.[`articles/${a.id}/views`] ?? null, views_week: views?.__week?.[String(a.id)] ?? 0 })), f.sort ?? 'published');
+    .map((a) => ({ ...a, created_at: a.published_at, views: views?.[`articles/${a.id}/views`] ?? null, views_week: views?.__week?.[String(a.id)] ?? 0 })), f.sort ?? 'published', prior);
   const [ck, at] = since ? since.split('#') : [key, '0'];
   if (ck !== key) throw new ApiError(400, 'bad_request');
   const size = Math.min(f.limit ?? 4, 4); // a home block's `limit` 1 / 2 (A-128); else pages of 4
   const from = Number(at); const page = items.slice(from, from + size);
-  return { items: page, next: from + size < items.length ? `${key}#${from + size}` : null };
+  return { items: page, next: from + size < items.length ? `${key}#${from + size}` : null, ...(prior ? { rating_prior: prior } : {}) };
 }
 
 const mode = (): 'live' | 'fixtures' => {

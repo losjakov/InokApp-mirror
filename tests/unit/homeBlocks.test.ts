@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BLOCK_SLOTS, blockRows, cachedBlock, fetchBlock, getArticle, parseArticles, storeArticles } from '@/data/repo/articles';
+import { BLOCK_FETCH, blockRows, cachedBlock, fetchBlock, getArticle, parseArticles, shownIds, storeArticles } from '@/data/repo/articles';
 import { dataSource } from '@/data/source';
 import { articleOrder } from '@/data/repo/articleOrder';
 import { freshDb, serveFixtures } from './helpers';
@@ -10,41 +10,62 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const ids = (a: { id: number }[]) => a.map((x) => x.id);
 const kinds = (a: { kind: string }[]) => a.map((x) => x.kind);
 
-/** A-128: the home's two blocks - 2 «Статті», 1 «Відео», 1 «Новина», each kind by the block's order (the «Публікації» screen's sort code). */
-describe('home blocks (A-128)', () => {
-  it('the slots: publication x2, video, news - in that order', () => {
-    expect(BLOCK_SLOTS).toEqual([{ kind: 'publication', n: 2 }, { kind: 'video', n: 1 }, { kind: 'news', n: 1 }]);
-  });
-  it('«Нове на сайті» = by the date of placing (sort=created): each kind asked as its section list with ITS limit', async () => {
+const art = (id: number, kind: string, created: string, week = 0) => ({ id, kind, created_at: created, published_at: created, views_week: week }) as never;
+
+/** A-128 / A-176: the home's two blocks - 3 rows from ONE queue of «Статті» + «Відео» + the first «Новина»; «Популярне» never repeats «Нове». */
+describe('home blocks (A-128, A-176)', () => {
+  it('«Нове на сайті»: each kind asked as its section list, limit 7, sort=created', async () => {
     serveFixtures();
     const { db } = await freshDb();
     const asked = vi.spyOn(dataSource(), 'articles');
-    const got = await fetchBlock(db, 'uk', 'created');
-    expect(asked.mock.calls.map((c) => c[2])).toEqual([{ kind: 'publication', sort: 'created', limit: 2 }, { kind: 'video', sort: 'created', limit: 1 }, { kind: 'news', sort: 'created', limit: 1 }]);
-    expect(kinds(got)).toEqual(['publication', 'publication', 'video', 'news']);
-    expect(ids(got)).toEqual([2869, 2868, 1892, 2871]);
+    const pool = await fetchBlock(db, 'uk', 'created');
+    expect(BLOCK_FETCH).toBe(7);
+    expect(asked.mock.calls.map((c) => c[2])).toEqual(['publication', 'video', 'news'].map((kind) => ({ kind, sort: 'created', limit: 7 })));
+    const rows = blockRows(pool, 'created');
+    expect(rows).toHaveLength(4);
+    expect(kinds(rows).slice(0, 3).every((k) => k === 'publication' || k === 'video')).toBe(true);
+    expect(kinds(rows)[3]).toBe('news');
   });
-  it('«Популярне за тиждень» = the same four places by views of the week (sort=views_week)', async () => {
-    serveFixtures();
-    const { db } = await freshDb();
-    expect(ids(await fetchBlock(db, 'uk', 'views_week'))).toEqual([2869, 2738, 1892, 2871]);
+  it('ONE queue, no quota per kind: the 3 newest are 2 video + 1 publication -> that order', () => {
+    const pool = [art(1, 'publication', '2026-11-20T10:00:00Z'), art(2, 'publication', '2026-11-23T10:00:00Z'), art(3, 'video', '2026-11-24T05:00:00Z'),
+      art(4, 'video', '2026-11-22T10:00:00Z'), art(5, 'video', '2026-11-24T06:00:00Z'), art(9, 'news', '2026-11-24T07:00:00Z')];
+    expect(ids(blockRows(pool, 'created'))).toEqual([5, 3, 2, 9]);
   });
-  it('a kind with nothing = its row is absent (never an empty row)', () => {
-    const a = (id: number, kind: string) => ({ id, kind }) as never;
-    expect(ids(blockRows({ publication: [a(1, 'publication')], video: [], news: [a(3, 'news'), a(4, 'news')] }))).toEqual([1, 3]);
+  it('«Популярне» skips what «Нове» shows: its top 2 shown in «Нове» -> ranks 3-5; its news row skips «Нове»\'s news', () => {
+    const pool = [art(10, 'publication', '2026-11-01T00:00:00Z', 50), art(11, 'publication', '2026-11-01T00:00:00Z', 40), art(12, 'video', '2026-11-01T00:00:00Z', 30),
+      art(13, 'publication', '2026-11-01T00:00:00Z', 20), art(14, 'video', '2026-11-01T00:00:00Z', 10), art(20, 'news', '2026-11-01T00:00:00Z', 9), art(21, 'news', '2026-11-01T00:00:00Z', 5)];
+    expect(ids(blockRows(pool, 'views_week'))).toEqual([10, 11, 12, 20]);
+    expect(ids(blockRows(pool, 'views_week', new Set([10, 11, 99, 20])))).toEqual([12, 13, 14, 21]);
+    // fewer left = fewer rows, never a repeat
+    expect(ids(blockRows(pool, 'views_week', new Set([10, 11, 12, 13, 20, 21])))).toEqual([14]);
   });
-  it('the order code is the screen\'s own comparator (one source): the live answer order is kept as given', async () => {
+  it('the order code is the screen\'s own comparator (one source, no second comparator in the repo)', () => {
+    const src = readFileSync('src/data/repo/articles.ts', 'utf8');
+    expect(src).toMatch(/sortArticles\(pool\.filter/);
+    expect(src).not.toMatch(/\.sort\(\(a, b\) =>/);
     expect(articleOrder('created')).not.toBeNull();
-    expect(readFileSync('src/data/repo/articles.ts', 'utf8')).not.toMatch(/newest_by_kind|fetchNewestByKind/);
   });
-  it('offline: the last list received (both blocks); its articles open', async () => {
+  it('the live fixture: «Популярне» shares no id with «Нове»', async () => {
     serveFixtures();
     const { db } = await freshDb();
-    const pop = await fetchBlock(db, 'uk', 'views_week');
+    const n = blockRows(await fetchBlock(db, 'uk', 'created'), 'created');
+    const p = blockRows(await fetchBlock(db, 'uk', 'views_week'), 'views_week', shownIds(n));
+    expect(p.length).toBeGreaterThan(0);
+    expect(ids(p).filter((id) => ids(n).includes(id))).toEqual([]);
+  });
+  it('offline: the kept candidates of both blocks, the same rule -> no repeats; its articles open', async () => {
+    serveFixtures();
+    const { db } = await freshDb();
+    const newOnline = blockRows(await fetchBlock(db, 'uk', 'created'), 'created');
+    const popOnline = blockRows(await fetchBlock(db, 'uk', 'views_week'), 'views_week', shownIds(newOnline));
     vi.stubGlobal('fetch', async () => { throw new TypeError('offline'); });
     await expect(fetchBlock(db, 'uk', 'views_week')).rejects.toThrow();
-    expect(ids((await cachedBlock(db, 'uk', 'views_week'))!)).toEqual(ids(pop));
-    expect((await getArticle(db, 1892, 'uk'))?.kind).toBe('video');
+    const newOff = blockRows((await cachedBlock(db, 'uk', 'created'))!, 'created');
+    const popOff = blockRows((await cachedBlock(db, 'uk', 'views_week'))!, 'views_week', shownIds(newOff));
+    expect(ids(newOff)).toEqual(ids(newOnline));
+    expect(ids(popOff)).toEqual(ids(popOnline));
+    expect(ids(popOff).filter((id) => ids(newOff).includes(id))).toEqual([]);
+    expect((await getArticle(db, popOff[0].id, 'uk'))?.id).toBe(popOff[0].id);
   });
   it('offline, nothing kept: «Популярне» = null (the caller shows the «no connection» line); «Нове» = the saved feed by date of placing', async () => {
     const { db } = await freshDb();
@@ -52,14 +73,14 @@ describe('home blocks (A-128)', () => {
     expect(await cachedBlock(db, 'uk', 'created')).toBeNull();
     await storeArticles(db, 'uk', parseArticles(JSON.parse(file('articles.json'))).items);
     expect(await cachedBlock(db, 'uk', 'views_week')).toBeNull();
-    expect(kinds((await cachedBlock(db, 'uk', 'created'))!)).toEqual(['publication', 'publication', 'news']);
+    expect(blockRows((await cachedBlock(db, 'uk', 'created'))!, 'created').length).toBeGreaterThan(0);
   });
-  it('one kind failed: its kept rows stay, the others are new', async () => {
+  it('one kind failed: its kept candidates stay, the others are new', async () => {
     serveFixtures();
     const { db } = await freshDb();
-    await fetchBlock(db, 'uk', 'created');
+    const before = blockRows(await fetchBlock(db, 'uk', 'created'), 'created');
     const real = dataSource().articles;
     vi.spyOn(dataSource(), 'articles').mockImplementation((l, s, f, sig) => (f?.kind === 'video' ? Promise.reject(new TypeError('x')) : real(l, s, f, sig)));
-    expect(ids(await fetchBlock(db, 'uk', 'created'))).toEqual([2869, 2868, 1892, 2871]);
+    expect(ids(blockRows(await fetchBlock(db, 'uk', 'created'), 'created'))).toEqual(ids(before));
   });
 });

@@ -1,6 +1,6 @@
 import { PushNotifications, type ActionPerformed, type PushNotificationSchema } from '@capacitor/push-notifications';
 import { registerPlugin } from '@capacitor/core';
-import { isAndroid, isNative } from './platform';
+import { isNative } from './platform';
 import { Preferences } from '@capacitor/preferences';
 import { versionCode } from '@/app/version';
 
@@ -61,6 +61,8 @@ export const PUSH_TEST = import.meta.env.VITE_PUSH_TEST === '1';
 export const PUSH_TEST_MARK = 'InokPush-test-topic-on';
 
 export type PushPermission = 'granted' | 'denied' | 'prompt' | 'unsupported';
+/** the article notification's action on iPhone (category INOK_ARTICLE, ios AppDelegate) */
+export const MARK_READ_ACTION = 'INOK_MARK_READ';
 export interface PushMessage { type: 'stream_live' | 'article' | string; data: Record<string, string> }
 
 const log = (...a: unknown[]) => console.info('InokPush:', ...a); // grep-able in logcat (scripts/emulator_smoke.sh), never the token
@@ -108,7 +110,8 @@ export async function registerPush(handlers: { onTap: (m: PushMessage) => void; 
     void PushNotifications.addListener('registrationError', (e) => { log('registration error', JSON.stringify(e)); resolve(false); });
   });
   void PushNotifications.addListener('pushNotificationReceived', (n) => onMessage?.(toMessage(n)));
-  void PushNotifications.addListener('pushNotificationActionPerformed', (a: ActionPerformed) => onTap?.(toMessage(a.notification)));
+  // cloud_46 (A-171 A6): «Позначити прочитаним» is handled natively (InokNotificationDelegate) - it is not a tap, nothing opens
+  void PushNotifications.addListener('pushNotificationActionPerformed', (a: ActionPerformed) => { if (a.actionId !== MARK_READ_ACTION) onTap?.(toMessage(a.notification)); });
   try {
     await PushNotifications.register();
   } catch (e) {
@@ -165,13 +168,13 @@ async function versionTopic(): Promise<void> {
 
 /** A-84 (b): the tray forgets what the app has shown - all articles (Home's «Нове на сайті» seen) or the opened ones. Never throws. */
 export async function consumedArticles(ids?: string[]): Promise<void> {
-  if (!isAndroid()) return;
+  if (!isNative()) return; // cloud_46 (A-171 A1): the same rule on iPhone (ios/App/App/FcmTopicsPlugin.swift removes the delivered ones)
   try { await FcmTopics.consumedArticles(ids ? { ids } : {}); } catch (e) { log('consume failed', String(e)); }
 }
 
 /** A-84 (c): a FRESH live-status lists the live channels; the tray keeps «ефір» notifications of those only. Never throws. */
 export async function liveChannelsNow(ids: Array<number | string>): Promise<void> {
-  if (!isAndroid()) return;
+  if (!isNative()) return; // cloud_46 (A-171 A1)
   try { await FcmTopics.liveChannels({ ids: ids.map(String) }); } catch (e) { log('live channels failed', String(e)); }
 }
 

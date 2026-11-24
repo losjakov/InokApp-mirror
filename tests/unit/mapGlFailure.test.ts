@@ -51,6 +51,9 @@ describe('isMapGlFailure (A-182 (1): ONE predicate)', () => {
     expect(isMapGlFailure(Object.assign(new Error('t is null'), { stack: 'TypeError: t is null\n at a (inokMap-Bq1x2.js:815:1)' }))).toBe(true);
     expect(isMapGlFailure(new TypeError('x is not a function'))).toBe(false);
     expect(isMapGlFailure(Object.assign(new Error('t is null'), { stack: 'TypeError: t is null\n at a (index-Ab12.js:4:1)' }))).toBe(false);
+    // cloud_46 E1: a handled MapLibre error EVENT (its stack is always the map chunk) counts by its words only
+    expect(isMapGlFailure(Object.assign(new Error('Style is not done loading'), { stack: 'Error: x\n at a (inokMap-Bq1x2.js:9:1)' }), false)).toBe(false);
+    expect(isMapGlFailure(new Error(GL), false)).toBe(true);
   });
 });
 

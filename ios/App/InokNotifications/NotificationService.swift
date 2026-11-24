@@ -15,7 +15,9 @@ class NotificationService: UNNotificationServiceExtension {
         if InokShared.applyStreamPush(request.content.userInfo), #available(iOS 14.0, *) {
             WidgetCenter.shared.reloadTimelines(ofKind: "info.inok.app.widget.live")
         }
-        deliver()
+        // cloud_46 (A-171 A4 b): ANY visible push that arrives also clears the «ефір» of channels the App Group (fresh, ≤ 60 min) no longer
+        // lists as live - never the notification being delivered, never an article; unknown / stale live data = nothing removed
+        if let live = InokTray.liveKnown() { InokTray.keepLive(live, except: request.identifier) { _ in self.deliver() } } else { deliver() }
     }
 
     override func serviceExtensionTimeWillExpire() { deliver() }

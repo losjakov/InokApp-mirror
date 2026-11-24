@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1C0A114600000000000000C2 /* InokCountdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A114600000000000000C0 /* InokCountdown.swift */; };
+		1C0A114600000000000000C1 /* InokCountdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A114600000000000000C0 /* InokCountdown.swift */; };
 		1C0A1143000000000000F103 /* widget_samples.json in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A1143000000000000F101 /* widget_samples.json */; };
 		1C0A1143000000000000F104 /* av in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A1143000000000000F102 /* av */; };
 		1C0A1143000000000000F105 /* widget_samples.json in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A1143000000000000F101 /* widget_samples.json */; };
@@ -29,6 +31,7 @@
 		1C0A11000000000000000015 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 1C0A11000000000000000014 /* Localizable.strings */; };
 		1C0A11000000000000000021 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 1C0A11000000000000000020 /* FirebaseMessaging */; };
 		1C0A11430000000000000005 /* InokWidgetsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000004 /* InokWidgetsPlugin.swift */; };
+		1C0A114600000000000000B5 /* InokCountdownPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A114600000000000000B4 /* InokCountdownPlugin.swift */; };
 		1C0A114600000000000000A5 /* InokAppleMapPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A114600000000000000A4 /* InokAppleMapPlugin.swift */; };
 		1C0A11430000000000000006 /* InokShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000002 /* InokShared.swift */; };
 		1C0A11430000000000000018 /* InokWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0A11430000000000000010 /* InokWidgetsBundle.swift */; };
@@ -74,7 +77,9 @@
 		1C0A11000000000000000018 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		1C0A11430000000000000002 /* InokShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokShared.swift; sourceTree = "<group>"; };
 		1C0A11430000000000000003 /* WidgetCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetCore.swift; sourceTree = "<group>"; };
+		1C0A114600000000000000C0 /* InokCountdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokCountdown.swift; sourceTree = "<group>"; };
 		1C0A11430000000000000004 /* InokWidgetsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokWidgetsPlugin.swift; sourceTree = "<group>"; };
+		1C0A114600000000000000B4 /* InokCountdownPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokCountdownPlugin.swift; sourceTree = "<group>"; };
 		1C0A114600000000000000A4 /* InokAppleMapPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokAppleMapPlugin.swift; sourceTree = "<group>"; };
 		1C0A11430000000000000010 /* InokWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InokWidgetsBundle.swift; sourceTree = "<group>"; };
 		1C0A11430000000000000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -149,6 +154,7 @@
 				1C0A1143000000000000FF04 /* AppShortcuts.strings */,
 				1C0A1143000000000000FF02 /* InokIntents.swift */,
 				1C0A11430000000000000004 /* InokWidgetsPlugin.swift */,
+				1C0A114600000000000000B4 /* InokCountdownPlugin.swift */,
 				1C0A114600000000000000A4 /* InokAppleMapPlugin.swift */,
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
@@ -176,6 +182,7 @@
 			children = (
 				1C0A11430000000000000002 /* InokShared.swift */,
 				1C0A11430000000000000003 /* WidgetCore.swift */,
+				1C0A114600000000000000C0 /* InokCountdown.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -381,8 +388,10 @@
 			files = (
 				1C0A1143000000000000FF03 /* InokIntents.swift in Sources */,
 				1C0A1143000000000000FF01 /* WidgetCore.swift in Sources */,
+				1C0A114600000000000000C1 /* InokCountdown.swift in Sources */,
 				1C0A11430000000000000006 /* InokShared.swift in Sources */,
 				1C0A11430000000000000005 /* InokWidgetsPlugin.swift in Sources */,
+				1C0A114600000000000000B5 /* InokCountdownPlugin.swift in Sources */,
 				1C0A114600000000000000A5 /* InokAppleMapPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
@@ -400,6 +409,7 @@
 				1C0A11430000000000000018 /* InokWidgetsBundle.swift in Sources */,
 				1C0A11430000000000000019 /* InokShared.swift in Sources */,
 				1C0A1143000000000000001A /* WidgetCore.swift in Sources */,
+				1C0A114600000000000000C2 /* InokCountdown.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
