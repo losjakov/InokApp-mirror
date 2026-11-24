@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import UIKit
+import WidgetKit // cloud_46: AccessoryWidgetBackground, widgetAccentable (the Lock Screen kinds; E4: ios 45338200271 «cannot find in scope»)
 
 /// 1.0.18 (A-160, A-161, A-163, A-155 (1); the CD kit reports/mockups/a1018/widgets/README.md): WHAT the three widgets show and HOW - the iOS
 /// twin of Android's WidgetModel (the same rules, the same JSON; the words come from the app). In the widget extension AND the app (the
