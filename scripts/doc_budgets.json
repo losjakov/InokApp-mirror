@@ -76,5 +76,9 @@
   },
   "ref/REF_gotchas_7.md": {
     "max_bytes": 12000
+  },
+  "ref/DECISIONS_31.md": {
+    "max_bytes": 14000,
+    "note": "CD S341 24.11.2026: a CLOSED part (A-187 written at 13254 b; DECISIONS_32 opened for A-188)"
   }
 }
