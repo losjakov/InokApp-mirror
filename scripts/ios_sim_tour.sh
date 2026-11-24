@@ -43,6 +43,8 @@ toast_watch() { ev "(() => { window.__toasts = []; clearInterval(window.__toastT
 toasts() { ev "(window.__toasts || []).join(' ; ') || 'no toast'"; }
 demo_all() { sb_override; sleep 1; }
 ev() { local o; o=$(node "$NAVJS" eval "$1" 2>>"$OUT/nav.txt") || true; o="${o%%$'\n'*}"; printf '%s\n' "${o#eval: }"; }
+# cloud_46 E8 (ios 45368637795 newest iPad: «live tap» FAIL with an EMPTY address - the page busy for a moment): an answer that must exist is asked again (<= 3)
+ask() { local o="" i; for i in 1 2 3; do o=$(ev "$1"); [ -n "$o" ] && break; sleep 4; done; printf '%s\n' "$o"; }
 
 # ---- the runtime: the newest iOS the runner has; «oldest» (A-169, cloud_45) = the LOWEST rung of OLDEST_LADDER whose simulator STARTS
 # this Xcode's simulator build - measured in every run (the device loop below), each rung present or downloaded, each refusal written with
@@ -429,9 +431,9 @@ a3_walk() {
   # spot); a widget's own Link opens with no alert (the owner's iPhone). «Трансляції», the stream's sheet on top (no DOM: the frame), closed
   nav go /home; sleep 2; answer_offers
   ev "(window.dispatchEvent(new CustomEvent('inok-url-open', { detail: 'inokapp://tab/streams?play=DWCj8tI47q4' })), 'ok')" > /dev/null; sleep 8
-  v=$(ev "location.pathname"); shot "$OUT/a3-live-tap-sheet__$TAG.png"
+  v=$(ask "location.pathname"); shot "$OUT/a3-live-tap-sheet__$TAG.png"
   ev "Capacitor.Plugins.Browser.close().then(() => 'closed').catch(() => 'none')" > /dev/null; sleep 3
-  local after; after=$(ev "location.pathname"); shot "$OUT/a3-live-tap-back__$TAG.png"
+  local after; after=$(ask "location.pathname"); shot "$OUT/a3-live-tap-back__$TAG.png"
   if [ "$v" = /streams ] && [ "$after" = /streams ]; then a3 "live tap -> «Трансляції» + the stream (A-161 (3))" PASS "the address -> $v; sheet closed -> $after"; else a3 "live tap -> «Трансляції» + the stream (A-161 (3))" FAIL "the address -> $v; after $after"; fi
   a3 "VoiceOver" NOT-PROVABLE "the simulator has no VoiceOver - names / roles / order are the a11y tree of the same DOM (axe 0); the owner's iPhone"
   a3 "share sheet / call / directions (Apple Maps)" NOT-PROVABLE "system sheets and other apps - the owner's iPhone"
