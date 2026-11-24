@@ -17,7 +17,9 @@ class NotificationService: UNNotificationServiceExtension {
         }
         // cloud_46 (A-171 A4 b): ANY visible push that arrives also clears the «ефір» of channels the App Group (fresh, ≤ 60 min) no longer
         // lists as live - never the notification being delivered, never an article; unknown / stale live data = nothing removed
-        if let live = InokTray.liveKnown() { InokTray.keepLive(live, except: request.identifier) { _ in self.deliver() } } else { deliver() }
+        // the notification is delivered AT ONCE (never kept waiting for the tray's answer); the prune is best-effort beside it
+        if let live = InokTray.liveKnown() { InokTray.keepLive(live, except: request.identifier) }
+        deliver()
     }
 
     override func serviceExtensionTimeWillExpire() { deliver() }

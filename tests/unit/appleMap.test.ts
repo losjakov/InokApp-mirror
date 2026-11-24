@@ -81,3 +81,11 @@ describe('AppleMapView waits for a size (cloud_46 E2: ring 45328638031 iPad - th
     expect((shows[0][1] as { houses: unknown[] }).houses).toHaveLength(2);
   });
 });
+
+describe('Apple\'s map area has a size (cloud_46 E6, ring 45340172761: `exists:false` - the div was 0 px tall)', () => {
+  it('the reserved area fills its pane by its OWN class (MapLibre\'s absolute fill is `.maplibregl-map` only)', async () => {
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync('src/theme/app.css', 'utf8')).toMatch(/\n\.apple-map \{ position: absolute; inset: 0; \}/);
+    expect(readFileSync('src/components/AppleMapPane.tsx', 'utf8')).toMatch(/className="map-canvas apple-map"/);
+  });
+});

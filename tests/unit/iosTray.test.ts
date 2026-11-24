@@ -42,7 +42,7 @@ describe('A2-A8 in the iOS code (static)', () => {
   });
   it('A4 (a) background stream_ended -> its «ефір» removed; (b) the NSE prunes stale «ефір» but never the request delivered and never alters content', () => {
     expect(app).toMatch(/"stream_ended", let ch = InokTray\.str\(userInfo\["channel_id"\]\) \{ InokTray\.removeLive\(channel: ch\)/);
-    expect(nse).toMatch(/InokTray\.keepLive\(live, except: request\.identifier\)/);
+    expect(nse).toMatch(/InokTray\.keepLive\(live, except: request\.identifier\) \}\s*deliver\(\)/); // delivered at once, never waiting
     expect(nse).toMatch(/h\(c\) \/\/ the very content that arrived - never modified/);
     expect(nse).not.toMatch(/mutableCopy|bestAttemptContent/);
   });

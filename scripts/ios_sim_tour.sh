@@ -441,7 +441,9 @@ a3_cloud46() {
   local v
   guard_crash spot46
   # A-170: the reading texts take the system's selection (computed in WebKit itself); a list row keeps A-142's held finger (no selection)
-  # (cloud_46 E2, ring 45328638031: the card's route is a two-pane list on an iPad - the article's page is one page on every device)
+  # (cloud_46 E2, ring 45328638031: the card's route is a two-pane list on an iPad - the article's page is one page on every device; E6: the
+  # live tap before PUSHED a route - `go` after it is read as Back (cloud_45 E2) - so a fresh start first)
+  launch; answer_offers
   nav go "/articles?id=$ART"; node "$NAVJS" wait '[data-testid="article"] .aview__body' >> "$OUT/nav.txt" 2>&1; sleep 2
   v=$(ev "(() => { const u = (s) => { const e = Array.from(document.querySelectorAll(s)).find((x) => x.getClientRects().length > 0); return e ? getComputedStyle(e).webkitUserSelect || getComputedStyle(e).userSelect : 'missing'; };
     return [u('[data-testid=article] h1.card__title'), u('[data-testid=article] .aview__body'), document.documentElement.classList.contains('plt-mobile') ? 'plt-mobile' : 'no plt-mobile'].join(' / '); })()")

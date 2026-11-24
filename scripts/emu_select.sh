@@ -11,13 +11,14 @@ ev() { local o; o=$(node "$NAV" eval "$1" 2>>"$L") || true; o="${o%%$'\n'*}"; pr
 # the element's centre in SCREEN pixels: CSS px x the page's devicePixelRatio (the WebView fills the screen edge to edge, A-83)
 centre() { ev "(() => { const e = Array.from(document.querySelectorAll('$1')).find((x) => !x.closest('.ion-page-hidden') && x.getClientRects().length > 0); if (!e) return 'none';
   e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); const d = devicePixelRatio; return Math.round((r.left + Math.min(r.width / 2, 120)) * d) + ' ' + Math.round((r.top + Math.min(r.height / 2, 60)) * d); })()"; }
-ART=$(curl -s -H 'X-Inok-App: eb741a6e64315c8aff6281ad13c21378' 'https://inok.info/api/app/v1/articles?lang=uk&limit=1' | python3 -I -c 'import json,sys; i=json.load(sys.stdin).get("items") or []; print(i[0]["id"] if i else "")' 2>/dev/null || true)
+ART=$(curl -s -H 'X-Inok-App: eb741a6e64315c8aff6281ad13c21378' 'https://inok.info/api/app/v1/articles?lang=uk&kind=publication&limit=1' | python3 -I -c 'import json,sys; i=json.load(sys.stdin).get("items") or []; print(i[0]["id"] if i else "")' 2>/dev/null || true)
 echo "article: ${ART:-none}" >> "$L"
 adb shell am start -n "$PKG/.MainActivity" > /dev/null; sleep 6
 if [ -n "$ART" ]; then
-  node "$NAV" go "/articles?id=$ART" >> "$L" 2>&1; sleep 6
-  xy=$(centre '[data-testid=article] .aview__body p'); [ "$xy" = none ] && xy=$(centre '[data-testid=article] .aview__body')
-  echo "body at: $xy" >> "$L"; sleep 1; xy=$(centre '[data-testid=article] .aview__body p'); [ "$xy" = none ] && xy=$(centre '[data-testid=article] .aview__body')
+  node "$NAV" go "/articles?id=$ART" >> "$L" 2>&1
+  # emulator 45338314385 (E5): a news item may carry no body and the item is fetched from the site - a PUBLICATION, its body waited for (<= 20 s)
+  xy=none; for _ in 1 2 3 4 5 6 7 8 9 10; do sleep 2; xy=$(centre '[data-testid=article] .aview__body p'); [ "$xy" = none ] && xy=$(centre '[data-testid=article] .aview__body'); [ "$xy" != none ] && [ -n "$xy" ] && break; done
+  echo "body at: $xy" >> "$L"; sleep 1
   if [ "$xy" != none ] && [ -n "$xy" ]; then
     # shellcheck disable=SC2086
     adb shell input swipe $xy $xy 900; sleep 2
